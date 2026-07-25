@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Build
 import android.os.Looper
 import com.pockethub.BuildConfig
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -41,7 +42,7 @@ private val reporterScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
  */
 @Singleton
 class IssueReporter @Inject constructor(
-    private val context: Context,
+    @ApplicationContext private val context: Context,
 ) {
     private val _events = MutableSharedFlow<IssueEvent>(extraBufferCapacity = 32)
     /** Observers can subscribe to live severe events (rarely useful for UI, mainly for tests). */
