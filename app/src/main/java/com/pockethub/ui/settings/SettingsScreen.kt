@@ -585,7 +585,7 @@ private fun OAuthClientSheet(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun IssueEmailSheet(
     initialEmail: String,
@@ -646,7 +646,7 @@ private fun IssueEmailSheet(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun IssueTargetRepoSheet(
     initialRepo: String,

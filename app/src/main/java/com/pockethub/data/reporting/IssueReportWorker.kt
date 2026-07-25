@@ -84,7 +84,7 @@ class IssueReportWorker @AssistedInject constructor(
     }
 
     // ── Email draft delivery ────────────────────────────────────────────
-    private fun deliverEmail(events: List<IssueEvent>) {
+    private suspend fun deliverEmail(events: List<IssueEvent>) {
         val email = settings.issueReportEmail.first()
         // Even if blank we leave the ring intact — see doWork's guard.
         require(email.isNotBlank()) { "issue_report_email not set; cannot stage" }

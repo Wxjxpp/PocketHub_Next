@@ -47,6 +47,9 @@ class SettingsViewModel @Inject constructor(
     val notifPollMinutes: StateFlow<Int> = settings.notifPollMinutes
         .stateIn(viewModelScope, SharingStarted.Eagerly, 0)
 
+    val translateTarget: StateFlow<String?> = settings.translateTarget
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
     // Severe-issue reporting
     val issueReportEnabled: StateFlow<Boolean> = settings.issueReportEnabled
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
