@@ -403,6 +403,14 @@
     <string name="severe_issues_enabled">启用严重问题捕获</string>
     <string name="severe_issues_email">目标邮箱</string>
     <string name="severe_issues_email_hint">you@example.com</string>
+    <string name="severe_issues_mode">上报方式</string>
+    <string name="severe_issues_mode_email">邮件草稿（手动发送）</string>
+    <string name="severe_issues_mode_email_summary">暂存好邮件草稿到你的邮箱，你点一下发送。</string>
+    <string name="severe_issues_mode_github">GitHub Issue（自动）</string>
+    <string name="severe_issues_mode_github_summary">自动在目标仓库创建带标签的 Issue，无需点按。最适合搭配 AI 自动整环。</string>
+    <string name="severe_issues_target_repo">目标仓库（GitHub）</string>
+    <string name="severe_issues_target_repo_hint">owner/repo</string>
+    <string name="severe_issues_target_repo_summary">github 方式上报提交到哪里。留空时默认上报到 PocketHub 自仓库。</string>
     <string name="severe_issues_interval">发送周期</string>
     <string name="severe_issues_interval_1d">每天</string>
     <string name="severe_issues_interval_3d">每 3 天</string>

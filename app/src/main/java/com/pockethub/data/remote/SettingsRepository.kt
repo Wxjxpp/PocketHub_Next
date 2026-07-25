@@ -45,6 +45,8 @@ class SettingsRepository @Inject constructor(
         val ISSUE_REPORT_ENABLED = intPreferencesKey("issue_report_enabled")
         val ISSUE_REPORT_INTERVAL_DAYS = intPreferencesKey("issue_report_interval_days")
         val ISSUE_REPORT_EMAIL = stringPreferencesKey("issue_report_email")
+        val ISSUE_REPORT_MODE = stringPreferencesKey("issue_report_mode")
+        val ISSUE_REPORT_TARGET_REPO = stringPreferencesKey("issue_report_target_repo")
     }
 
     // ── Theme ─────────────────────────────────────────────
@@ -262,6 +264,33 @@ class SettingsRepository @Inject constructor(
     }
     suspend fun setIssueReportEmail(email: String) {
         context.dataStore.edit { it[Keys.ISSUE_REPORT_EMAIL] = email.trim() }
+    }
+
+    /**
+     * Delivery mode for the issue report:
+     *  - "email"   — stage ACTION_SEND mail composer draft (email destination)
+     *  - "github"  — create a new issue on the configured target GitHub repo
+     *                (no user interaction, fully automatic via the GitHub API)
+     *
+     * The "github" path lets us close the audit loop with an external AI task
+     * that simply scrapes the target repo's labelled issues.
+     */
+    val issueReportMode: Flow<String> = context.dataStore.data.map {
+        it[Keys.ISSUE_REPORT_MODE] ?: "email"
+    }
+    suspend fun setIssueReportMode(mode: String) {
+        context.dataStore.edit { it[Keys.ISSUE_REPORT_MODE] = when (mode) { "github" -> "github"; else -> "email" } }
+    }
+
+    /**
+     * Target repo for github-mode reports, in the form "owner/repo" (lowercased).
+     * Falls back to empty if unset; the worker will refuse (no-op) in that case.
+     */
+    val issueReportTargetRepo: Flow<String> = context.dataStore.data.map {
+        it[Keys.ISSUE_REPORT_TARGET_REPO].orEmpty()
+    }
+    suspend fun setIssueReportTargetRepo(slug: String) {
+        context.dataStore.edit { it[Keys.ISSUE_REPORT_TARGET_REPO] = slug.trim().lowercase() }
     }
 
     private companion object {

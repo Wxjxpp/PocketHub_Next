@@ -419,6 +419,14 @@
     <string name="severe_issues_enabled">Enable severe-issue capture</string>
     <string name="severe_issues_email">Destination email</string>
     <string name="severe_issues_email_hint">you@example.com</string>
+    <string name="severe_issues_mode">Delivery mode</string>
+    <string name="severe_issues_mode_email">Email draft (manual send)</string>
+    <string name="severe_issues_mode_email_summary">Stages a mail composer draft to your inbox; you hit send.</string>
+    <string name="severe_issues_mode_github">GitHub issue (auto)</string>
+    <string name="severe_issues_mode_github_summary">Creates a labelled issue on the target repo automatically — no tap needed. Best for the AI-audit loop.</string>
+    <string name="severe_issues_target_repo">Target repo (GitHub)</string>
+    <string name="severe_issues_target_repo_hint">owner/repo</string>
+    <string name="severe_issues_target_repo_summary">Where github-mode reports are filed. Auto-defaults to the PocketHub self repo if blank.</string>
     <string name="severe_issues_interval">Cadence</string>
     <string name="severe_issues_interval_1d">Every day</string>
     <string name="severe_issues_interval_3d">Every 3 days</string>

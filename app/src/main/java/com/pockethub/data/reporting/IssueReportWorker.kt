@@ -5,25 +5,26 @@ import android.content.Intent
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import com.pockethub.data.remote.GitHubApi
 import com.pockethub.data.remote.SettingsRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.flow.first
+import org.json.JSONArray
+import org.json.JSONObject
 
 /**
- * Builds an email report body out of every persisted issue event and stages
- * a user-visible system notification whose tap action launches a pre-filled
- * ACTION_SEND email intent to the user's configured inbox.
+ * Drains the local severe-event ring buffer ([IssueReporter]) into a delivery
+ * channel the user picked:
  *
- * Strategy note — why we don't do SMTP directly:
- * - Adds zero native deps (no JavaMail, no SAAJ) — keeps APK thin.
- * - No password storage in-app, no cleartext Mail.smtp tricky network rules.
- * - One tap fires a default mail composer pre-filled with To/Subject/Body — the
- *   user just hits "Send" once. This is the standard "AI app lets a real mail
- *   client do the sending" pattern and is what the user asked for
- *   ("定期发送到我邮箱" → staged email composer).
+ *  - "email"  → stage a ready-to-send email draft (ACTION_SEND). No SMTP relay,
+ *    no native deps — the user's mail client actually sends.
+ *  - "github" → POST a new issue on the target repo via [GitHubApi.createIssue].
+ *    Fully automatic, lets an external script/AI close the loop by scraping
+ *    labelled issues over the public GitHub API.
  *
- * Events are wiped after the report is staged — no double-send.
+ * The local ring buffer is wiped after a successful drain so we never re-send
+ * the same batch.
  */
 @HiltWorker
 class IssueReportWorker @AssistedInject constructor(
@@ -31,6 +32,7 @@ class IssueReportWorker @AssistedInject constructor(
     @Assisted params: WorkerParameters,
     private val reporter: IssueReporter,
     private val settings: SettingsRepository,
+    private val githubApi: GitHubApi,
 ) : CoroutineWorker(context, params) {
 
     companion object {
@@ -38,46 +40,80 @@ class IssueReportWorker @AssistedInject constructor(
         const val CHANNEL_ID = "pockethub_issue_report"
         const val NOTI_ID = 9010
         const val ACTION_SHOULD_SEND = "pockethub.action.ISSUE_REPORT_READY"
+        const val GH_LABEL = "severe-issue-audit"
     }
 
     override suspend fun doWork(): Result {
         val events = reporter.readLog()
         if (events.isEmpty()) return Result.success()
 
-        val email = settings.issueReportEmail.first()
-        if (email.isBlank()) {
-            // Auto-still-clear the buffer is dangerous: we'd lose evidence of
-            // a real crash if the user hasn't configured a recipient yet.
-            // Keep it around — surface a one-shot notification asking the user
-            // to configure a target. Once configured, next scheduling will send.
-            return Result.success()
+        val mode = settings.issueReportMode.first()
+        return try {
+            when (mode) {
+                "github" -> deliverGithub(events)
+                else     -> deliverEmail(events)
+            }
+            reporter.clearLog()
+            Result.success()
+        } catch (e: Exception) {
+            // Network failure → retry the next WorkManager slot; don't drop
+            // local events so this batch survives across retries.
+            Result.retry()
         }
-
-        val first = events.first()
-        val body = buildBody(events)
-        val subject = "[PocketHub] 严重问题汇总 ${events.size} 条 — v${first.appVersionName}"
-
-        // Stage email: ACTION_SEND with mailto fallback. The to-directory-file is
-        // also written so the next app launch / Settings screen can show "Pending report".
-        stageEmail(email, subject, body)
-
-        // Successful stage → wipe the local log so the same set isn't re-sent.
-        reporter.clearLog()
-        return Result.success()
     }
 
-    private fun stageEmail(toEmail: String, subject: String, body: String) {
+    // ── GitHub Issues delivery ───────────────────────────────────────────
+    private suspend fun deliverGithub(events: List<IssueEvent>) {
+        val targetRepo = settings.issueReportTargetRepo.first()
+        require(targetRepo.isNotBlank()) { "issue_report_target_repo not set; cannot post" }
+        val parts = targetRepo.split("/", limit = 2)
+        require(parts.size == 2 && parts.all { it.isNotBlank() }) { "target repo must be owner/repo, got: $targetRepo" }
+        val (owner, repo) = parts
+
+        val subject = "[PocketHub] 严重问题汇总 ${events.size} 条 — v${events.first().appVersionName}"
+        val body = buildBody(events, githubMarkdown = true)
+
+        val request = GitHubApi.IssueCreateRequest(
+            title = subject,
+            body = body,
+            labels = listOf(GH_LABEL),
+            assignees = emptyList(),
+            milestone = null,
+        )
+        githubApi.createIssue(owner, repo, request)
+    }
+
+    // ── Email draft delivery ────────────────────────────────────────────
+    private fun deliverEmail(events: List<IssueEvent>) {
+        val email = settings.issueReportEmail.first()
+        // Even if blank we leave the ring intact — see doWork's guard.
+        require(email.isNotBlank()) { "issue_report_email not set; cannot stage" }
+
+        val subject = "[PocketHub] 严重问题汇总 ${events.size} 条 — v${events.first().appVersionName}"
+        val body = buildBody(events, githubMarkdown = false)
+
+        stageEmailIntoOutbox(email, subject, body)
+        postStagedNotification(events.size)
+    }
+
+    /**
+     * Drop the ACTION_SEND staging artefacts into SharedPreferences so the
+     * Settings screen can always re-(open) the draft for the user, plus fire
+     * a broadcast so an in-app listener (if registered) can react.
+     */
+    private fun stageEmailIntoOutbox(toEmail: String, subject: String, body: String) {
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = "message/rfc822"
             putExtra(Intent.EXTRA_EMAIL, arrayOf(toEmail))
             putExtra(Intent.EXTRA_SUBJECT, subject)
             putExtra(Intent.EXTRA_TEXT, body)
-            // WHY EXTRA_STREAM OFF: attach the body inline so it's self-contained;
-            // no app-private file URI exposure needed (no FileProvider trouble).
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        // We persist the "pending to send" intent so that the next time the user
-        // opens the app the settings screen / startup can offer a tap target.
+        runCatching {
+            context.startActivity(Intent.createChooser(intent, "选择邮件客户端发送").apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            })
+        }
         val pending = Intent(ACTION_SHOULD_SEND).apply {
             setPackage(context.packageName)
             putExtra("to", toEmail)
@@ -86,20 +122,6 @@ class IssueReportWorker @AssistedInject constructor(
         }
         context.sendBroadcast(pending)
 
-        // Also surface a system notification so the user knows an issue report
-        // is queued up — tapping it opens the app settings to send/view.
-        ensureChannel()
-        val notif = androidx.core.app.NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(com.pockethub.R.drawable.ic_launcher_foreground)
-            .setContentTitle("PocketHub 严重问题报告待发送")
-            .setContentText("检测到 ${events.size} 条严重问题已整理，点击打开邮件草稿发送")
-            .setAutoCancel(true)
-            .build()
-        val nm = context.getSystemService(android.app.NotificationManager::class.java)
-        nm?.notify(NOTI_ID, notif)
-
-        // Persist a send-ready Intent for the Settings screen to pull and launch
-        // when the user taps "立即发送". We keep the body in prefs so we survive reboots.
         val prefs = context.getSharedPreferences("pockethub_issue_outbox", Context.MODE_PRIVATE)
         prefs.edit()
             .putString("to", toEmail)
@@ -108,47 +130,69 @@ class IssueReportWorker @AssistedInject constructor(
             .apply()
     }
 
-    private fun buildBody(events: List<IssueEvent>): String {
+    private fun postStagedNotification(count: Int) {
+        val nm = context.getSystemService(android.app.NotificationManager::class.java) ?: return
+        if (nm.getNotificationChannel(CHANNEL_ID) == null) {
+            val channel = android.app.NotificationChannel(
+                CHANNEL_ID,
+                "严重问题报告待发送",
+                android.app.NotificationManager.IMPORTANCE_DEFAULT,
+            ).apply { description = "当后台Worker整理完严重问题后通知你打开邮件草稿发送" }
+            nm.createNotificationChannel(channel)
+        }
+        val notif = androidx.core.app.NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(com.pockethub.R.drawable.ic_launcher_foreground)
+            .setContentTitle("PocketHub 严重问题报告待发送")
+            .setContentText("检测到 $count 条严重问题，邮件草稿已暂存在系统通知")
+            .setAutoCancel(true)
+            .build()
+        nm.notify(NOTI_ID, notif)
+    }
+
+    // ── Body rendering ───────────────────────────────────────────────────
+    private fun buildBody(events: List<IssueEvent>, githubMarkdown: Boolean): String {
+        val first = events.first()
+        val last = events.last()
+        val crash = events.count { it.kind == IssueKind.CRASH }
+        val anr = events.count { it.kind == IssueKind.ANR }
+        val err = events.count { it.kind == IssueKind.ERROR }
+
         val sb = StringBuilder()
-        sb.append("PocketHub 严重问题汇总报告\n")
-        sb.append("================================\n\n")
-        sb.append("时间窗: ${events.first().isoTs} → ${events.last().isoTs}\n")
-        sb.append("事件总数: ${events.size}\n")
-        sb.append("版本: v${events.first().appVersionName} (build ${events.first().appVersionCode}, ${events.first().appVariant})\n")
-        sb.append("设备: ${events.first().deviceModel}, Android API ${events.first().sdkInt}\n\n")
-        sb.append("================================\n")
+        sb.append(if (githubMarkdown) "**PocketHub 严重问题汇总报告**\n\n" else "PocketHub 严重问题汇总报告\n")
+        sb.append(if (githubMarkdown) "```\n" else "================================\n")
+        sb.append("时间窗: ${first.isoTs} → ${last.isoTs}\n")
+        sb.append("事件总数: ${events.size}  (崩溃=$crash, ANR=$anr, 其他=$err)\n")
+        sb.append("版本: v${first.appVersionName} (build ${first.appVersionCode}, ${first.appVariant})\n")
+        sb.append("设备: ${first.deviceModel}, Android API ${first.sdkInt}\n")
+        sb.append(if (githubMarkdown) "```\n\n" else "================================\n")
+
+        if (githubMarkdown) {
+            sb.append("## 事件列表\n\n")
+        }
         events.forEachIndexed { idx, e ->
-            sb.append("\n【#${idx + 1}】类型=${e.kind.id.uppercase()}  时间=${e.isoTs}  线程=${e.threadName}\n")
-            sb.append("说明: ${e.subject}\n")
+            sb.append(if (githubMarkdown) "### #${idx + 1} " else "\n【#${idx + 1}】")
+            sb.append(if (githubMarkdown) "**类型=${e.kind.id.uppercase()}**  时间=${e.isoTs}  线程=${e.threadName}\n\n" else "类型=${e.kind.id.uppercase()}  时间=${e.isoTs}  线程=${e.threadName}\n")
+            sb.append(if (githubMarkdown) "**说明:** ${e.subject}\n\n" else "说明: ${e.subject}\n")
             if (e.extra.isNotEmpty()) {
-                sb.append("上下文:\n")
-                e.extra.forEach { (k, v) -> sb.append("  - $k = $v\n") }
+                sb.append(if (githubMarkdown) "**上下文:**\n\n" else "上下文:\n")
+                e.extra.forEach { (k, v) ->
+                    sb.append(if (githubMarkdown) "- $k = $v\n" else "  - $k = $v\n")
+                }
+                if (githubMarkdown) sb.append("\n")
             }
             if (e.stackTrace.isNotBlank()) {
-                sb.append("堆栈:\n")
-                // Indent each stack frame for readability in mail body.
-                e.stackTrace.lineSequence().take(40).forEach { ln ->
-                    sb.append("  $ln\n")
+                sb.append(if (githubMarkdown) "**堆栈:**\n\n```\n" else "堆栈:\n")
+                // For markdown wrap stack frames in code fence; for plain email indent them.
+                val frames = e.stackTrace.lineSequence().take(40).toList()
+                frames.forEach { ln ->
+                    sb.append(if (githubMarkdown) "$ln\n" else "  $ln\n")
                 }
-                if (e.stackTrace.lines().size > 40) sb.append("  ... (more ${e.stackTrace.lines().size - 40} lines\n")
+                val total = e.stackTrace.lines().size
+                if (total > 40) sb.append(if (githubMarkdown) "... (+${total - 40} lines)\n```\n\n" else "  ... (+${total - 40} lines\n")
+                else sb.append(if (githubMarkdown) "```\n\n" else "")
             }
         }
-        sb.append("\n================================\n")
-        sb.append("-- 由 PocketHub 自动埋点系统生成\n")
+        sb.append(if (githubMarkdown) "---\n_由 PocketHub 自动埋点系统生成_\n" else "================================\n-- 由 PocketHub 自动埋点系统生成\n")
         return sb.toString()
     }
-
-    private fun ensureChannel() {
-        val nm = context.getSystemService(android.app.NotificationManager::class.java) ?: return
-        if (nm.getNotificationChannel(CHANNEL_ID) != null) return
-        val channel = android.app.NotificationChannel(
-            CHANNEL_ID,
-            "严重问题报告待发送",
-            android.app.NotificationManager.IMPORTANCE_DEFAULT,
-        ).apply {
-            description = "当后台Worker整理完严重问题后通知你打开邮件草稿发送"
-        }
-        nm.createNotificationChannel(channel)
-    }
-
 }

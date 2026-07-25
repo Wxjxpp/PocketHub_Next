@@ -57,6 +57,12 @@ class SettingsViewModel @Inject constructor(
     val issueReportEmail: StateFlow<String> = settings.issueReportEmail
         .stateIn(viewModelScope, SharingStarted.Eagerly, "")
 
+    val issueReportMode: StateFlow<String> = settings.issueReportMode
+        .stateIn(viewModelScope, SharingStarted.Eagerly, "email")
+
+    val issueReportTargetRepo: StateFlow<String> = settings.issueReportTargetRepo
+        .stateIn(viewModelScope, SharingStarted.Eagerly, "")
+
     private val _issueCount = MutableStateFlow(0)
     val issueCount: StateFlow<Int> = _issueCount
 
@@ -133,6 +139,17 @@ class SettingsViewModel @Inject constructor(
 
     fun setIssueReportEmail(email: String) {
         viewModelScope.launch { settings.setIssueReportEmail(email) }
+    }
+
+    fun setIssueReportMode(mode: String) {
+        viewModelScope.launch {
+            settings.setIssueReportMode(mode)
+            issueReportScheduler.rescheduleFromSettings()
+        }
+    }
+
+    fun setIssueReportTargetRepo(slug: String) {
+        viewModelScope.launch { settings.setIssueReportTargetRepo(slug) }
     }
 
     /**
