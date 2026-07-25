@@ -1,0 +1,281 @@
+package com.pockethub.data.reporting
+
+import android.content.Context
+import android.os.Build
+import android.os.Looper
+import com.pockethub.BuildConfig
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
+import javax.inject.Inject
+import javax.inject.Singleton
+
+private val reporterScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+/**
+ * Severe-issue logging facility for PocketHub.
+ *
+ * Captures only critical events:
+ * - JVM uncaught exceptions (crashes)
+ * - ANR (Application Not Responding) detected via main-thread heartbeat watch-dog
+ *
+ * Events are persisted as a ring of JSON lines in [logFile] (max [MAX_EVENTS] entries).
+ * Anything finer than Throwable or ANR is intentionally NOT captured —
+ * this is a quality alarm, not a usage log.
+ */
+@Singleton
+class IssueReporter @Inject constructor(
+    private val context: Context,
+) {
+    private val _events = MutableSharedFlow<IssueEvent>(extraBufferCapacity = 32)
+    /** Observers can subscribe to live severe events (rarely useful for UI, mainly for tests). */
+    val events: SharedFlow<IssueEvent> = _events.asSharedFlow()
+    private val mutex = Mutex()
+    private val installedCrashHook = AtomicBoolean(false)
+    private val watchDogRunning = AtomicBoolean(false)
+    private val heartbeatMs = AtomicLong(System.currentTimeMillis())
+    private val formatter = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ", Locale.US)
+
+    private val logFile: File get() = File(context.filesDir, "issue_log.jsonl")
+
+    /**
+     * Install the global uncaught-exception handler and ANR watch-dog.
+     * Safe to call multiple times — guards prevent double-install. Should
+     * be called once from [com.pockethub.PocketHubApp.onCreate].
+     */
+    fun install() {
+        installCrashHook()
+        installAnrWatchDog()
+    }
+
+    /**
+     * Emit a custom severe event (e.g. ANR detected by the watch-dog, or
+     * a critical state from app code that callers want persisted).
+     */
+    suspend fun report(
+        kind: IssueKind,
+        subject: String,
+        stackTrace: String = "",
+        threadName: String = Thread.currentThread().name,
+        extra: Map<String, String> = emptyMap(),
+    ) {
+        val event = IssueEvent(
+            kind = kind,
+            ts = System.currentTimeMillis(),
+            isoTs = formatter.format(Date()),
+            appVersionName = BuildConfig.VERSION_NAME,
+            appVersionCode = BuildConfig.VERSION_CODE,
+            appVariant = BuildConfig.BUILD_TYPE,
+            sdkInt = Build.VERSION.SDK_INT,
+            deviceModel = "${Build.MANUFACTURER} ${Build.MODEL}",
+            subject = subject.take(MAX_SUBJECT),
+            stackTrace = stackTrace.take(MAX_STACK),
+            threadName = threadName,
+            extra = extra,
+        )
+        appendToLogFile(event)
+        _events.tryEmit(event)
+    }
+
+    /** Read all persisted events, oldest first. The ring buffer cap still applies. */
+    suspend fun readLog(): List<IssueEvent> = mutex.withLock {
+        if (!logFile.exists()) return@withLock emptyList()
+        runCatching {
+            logFile.readLines()
+                .filter { it.isNotBlank() }
+                .mapNotNull { line -> runCatching {
+                    val obj = JSONObject(line)
+                    IssueEvent(
+                        kind = IssueKind.from(obj.optString("kind")),
+                        ts = obj.optLong("ts"),
+                        isoTs = obj.optString("isoTs"),
+                        appVersionName = obj.optString("appVersionName"),
+                        appVersionCode = obj.optInt("appVersionCode"),
+                        appVariant = obj.optString("appVariant"),
+                        sdkInt = obj.optInt("sdkInt"),
+                        deviceModel = obj.optString("deviceModel"),
+                        subject = obj.optString("subject"),
+                        stackTrace = obj.optString("stackTrace"),
+                        threadName = obj.optString("threadName"),
+                        extra = runCatching {
+                            val arr = obj.optJSONArray("extra")
+                            if (arr != null && arr.length() > 0) {
+                                (0 until arr.length()).associate {
+                                    arr.getJSONObject(it).optString("k") to arr.getJSONObject(it).optString("v")
+                                }
+                            } else emptyMap()
+                        }.getOrDefault(emptyMap()),
+                    )
+                }.getOrNull() }
+        }.getOrDefault(emptyList())
+    }
+
+    /** Wipe the persisted log. Called by the report-worker after a successful send. */
+    suspend fun clearLog() = mutex.withLock {
+        runCatching { logFile.delete() }
+        Unit
+    }
+
+    private fun installCrashHook() {
+        if (!installedCrashHook.compareAndSet(false, true)) return
+        val previous = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { t, e ->
+            // Persist synchronously — process is about to die.
+            val stack = runCatching {
+                val sw = java.io.StringWriter()
+                e.printStackTrace(java.io.PrintWriter(sw))
+                sw.toString()
+            }.getOrDefault(e.toString())
+            try {
+                val event = IssueEvent(
+                    kind = IssueKind.CRASH,
+                    ts = System.currentTimeMillis(),
+                    isoTs = formatter.format(Date()),
+                    appVersionName = BuildConfig.VERSION_NAME,
+                    appVersionCode = BuildConfig.VERSION_CODE,
+                    appVariant = BuildConfig.BUILD_TYPE,
+                    sdkInt = Build.VERSION.SDK_INT,
+                    deviceModel = "${Build.MANUFACTURER} ${Build.MODEL}",
+                    subject = "${e.javaClass.name}: ${e.message ?: "<no message>"}",
+                    stackTrace = stack.take(MAX_STACK),
+                    threadName = t.name,
+                    extra = emptyMap(),
+                )
+                appendToFileSync(event)
+            } catch (_: Throwable) { /* never let the hook throw while already crashing */ }
+            previous?.uncaughtException(t, e)
+        }
+    }
+
+    private fun installAnrWatchDog() {
+        if (!watchDogRunning.compareAndSet(false, true)) return
+        // Watch-dog thread: pings the main looper every [HEARTBEAT_TICK_MS];
+        // if the main thread hasn't broadcast a tick in [ANR_THRESHOLD_MS],
+        // emit an ANR event.
+        val mainThread = Looper.getMainLooper().thread
+        reporterScope.launch {
+            // Heartbeat ticker on the main thread.
+            val ticker = object : Runnable {
+                override fun run() {
+                    heartbeatMs.set(System.currentTimeMillis())
+                    mainThreadHandler.postDelayed(this, HEARTBEAT_TICK_MS)
+                }
+            }
+            mainThreadHandler.postDelayed(ticker, HEARTBEAT_TICK_MS)
+            while (true) {
+                kotlinx.coroutines.delay(HEARTBEAT_TICK_MS)
+                val last = heartbeatMs.get()
+                val lag = System.currentTimeMillis() - last
+                if (lag > ANR_THRESHOLD_MS) {
+                    // Build a synthetic stack trace of the main thread for diagnostics.
+                    val mainStack = mainThread.stackTrace
+                        .joinToString("\n")
+                        .take(MAX_STACK)
+                    report(
+                        kind = IssueKind.ANR,
+                        subject = "Main thread blocked for ${lag}ms (threshold ${ANR_THRESHOLD_MS}ms)",
+                        stackTrace = mainStack,
+                        threadName = mainThread.name,
+                        extra = mapOf("threadState" to mainThread.state.name, "lagMs" to lag.toString()),
+                    )
+                    // Back-off so we don't emit a flood of dupes for the same stall.
+                    kotlinx.coroutines.delay(ANR_COOLDOWN_MS)
+                    heartbeatMs.set(System.currentTimeMillis())
+                }
+            }
+        }
+    }
+
+    private val mainThreadHandler by lazy {
+        android.os.Handler(Looper.getMainLooper())
+    }
+
+    private suspend fun appendToLogFile(event: IssueEvent) = mutex.withLock {
+        appendToFileSync(event)
+    }
+
+    @Synchronized
+    private fun appendToFileSync(event: IssueEvent) {
+        if (!logFile.parentFile.exists()) logFile.parentFile.mkdirs()
+        val jsonObject = JSONObject().apply {
+            put("kind", event.kind.id)
+            put("ts", event.ts)
+            put("isoTs", event.isoTs)
+            put("appVersionName", event.appVersionName)
+            put("appVersionCode", event.appVersionCode)
+            put("appVariant", event.appVariant)
+            put("sdkInt", event.sdkInt)
+            put("deviceModel", event.deviceModel)
+            put("subject", event.subject)
+            put("stackTrace", event.stackTrace)
+            put("threadName", event.threadName)
+            if (event.extra.isNotEmpty()) {
+                val arr = JSONArray()
+                event.extra.forEach { (k, v) -> arr.put(JSONObject().put("k", k).put("v", v)) }
+                put("extra", arr)
+            }
+        }
+        logFile.appendText(jsonObject.toString() + "\n")
+        trimRingBuffer()
+    }
+
+    /** Trim oldest lines until we're at [MAX_EVENTS]. */
+    private fun trimRingBuffer() {
+        val lines = logFile.readLines()
+        if (lines.size > MAX_EVENTS) {
+            logFile.writeText(lines.takeLast(MAX_EVENTS).joinToString("\n") + "\n")
+        }
+    }
+
+    companion object {
+        private const val MAX_EVENTS = 200
+        private const val MAX_SUBJECT = 400
+        private const val MAX_STACK = 8_000
+        private const val HEARTBEAT_TICK_MS = 2_000L
+        private const val ANR_THRESHOLD_MS = 5_000L
+        private const val ANR_COOLDOWN_MS = 15_000L
+    }
+}
+
+/** Issue type. [id] is the value stored in the JSON log line. */
+enum class IssueKind(val id: String) {
+    CRASH("crash"),
+    ANR("anr"),
+    ERROR("error");
+    companion object {
+        fun from(id: String?): IssueKind = entries.firstOrNull { it.id == id } ?: ERROR
+    }
+}
+
+/** Persistent record of one severe event. */
+@Serializable
+data class IssueEvent(
+    @SerialName("kind") val kind: IssueKind,
+    @SerialName("ts") val ts: Long,
+    @SerialName("isoTs") val isoTs: String,
+    @SerialName("appVersionName") val appVersionName: String,
+    @SerialName("appVersionCode") val appVersionCode: Int,
+    @SerialName("appVariant") val appVariant: String,
+    @SerialName("sdkInt") val sdkInt: Int,
+    @SerialName("deviceModel") val deviceModel: String,
+    @SerialName("subject") val subject: String,
+    @SerialName("stackTrace") val stackTrace: String,
+    @SerialName("threadName") val threadName: String,
+    @SerialName("extra") val extra: Map<String, String> = emptyMap(),
+)

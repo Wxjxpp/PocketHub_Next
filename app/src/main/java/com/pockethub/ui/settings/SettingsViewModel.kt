@@ -7,6 +7,9 @@ import androidx.lifecycle.viewModelScope
 import com.pockethub.data.local.AccountDao
 import com.pockethub.data.remote.NotifScheduler
 import com.pockethub.data.remote.SettingsRepository
+import com.pockethub.data.reporting.IssueKind
+import com.pockethub.data.reporting.IssueReporter
+import com.pockethub.data.reporting.IssueReportScheduler
 import com.pockethub.ui.theme.ThemeMode
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,6 +27,8 @@ class SettingsViewModel @Inject constructor(
     private val settings: SettingsRepository,
     private val accountDao: AccountDao,
     private val notifScheduler: NotifScheduler,
+    private val issueReporter: IssueReporter,
+    private val issueReportScheduler: IssueReportScheduler,
 ) : ViewModel() {
 
     val themeMode: StateFlow<ThemeMode> = settings.themeMode
@@ -42,8 +47,18 @@ class SettingsViewModel @Inject constructor(
     val notifPollMinutes: StateFlow<Int> = settings.notifPollMinutes
         .stateIn(viewModelScope, SharingStarted.Eagerly, 0)
 
-    val translateTarget: StateFlow<String?> = settings.translateTarget
-        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+    // Severe-issue reporting
+    val issueReportEnabled: StateFlow<Boolean> = settings.issueReportEnabled
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    val issueReportIntervalDays: StateFlow<Int> = settings.issueReportIntervalDays
+        .stateIn(viewModelScope, SharingStarted.Eagerly, 7)
+
+    val issueReportEmail: StateFlow<String> = settings.issueReportEmail
+        .stateIn(viewModelScope, SharingStarted.Eagerly, "")
+
+    private val _issueCount = MutableStateFlow(0)
+    val issueCount: StateFlow<Int> = _issueCount
 
     private val _accountCount = MutableStateFlow(0)
     val accountCount: StateFlow<Int> = _accountCount
@@ -51,7 +66,10 @@ class SettingsViewModel @Inject constructor(
     private val _cacheSizeBytes = MutableStateFlow(0L)
     val cacheSizeBytes: StateFlow<Long> = _cacheSizeBytes
 
-    init { refreshAccountCount() }
+    init {
+        refreshAccountCount()
+        refreshIssueCount()
+    }
 
     fun setThemeMode(mode: ThemeMode) {
         viewModelScope.launch { settings.setThemeMode(mode) }
@@ -89,5 +107,58 @@ class SettingsViewModel @Inject constructor(
 
     fun setCacheSize(bytes: Long) {
         _cacheSizeBytes.value = bytes
+    }
+
+    /**
+     * Snapshot the physical count of issues in the ring buffer — used by the
+     * Settings screen to say "currently N severe issues collected".
+     */
+    fun refreshIssueCount() {
+        viewModelScope.launch { _issueCount.value = issueReporter.readLog().size }
+    }
+
+    fun setIssueReportEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            settings.setIssueReportEnabled(enabled)
+            issueReportScheduler.rescheduleFromSettings()
+        }
+    }
+
+    fun setIssueReportIntervalDays(days: Int) {
+        viewModelScope.launch {
+            settings.setIssueReportIntervalDays(days)
+            issueReportScheduler.rescheduleFromSettings()
+        }
+    }
+
+    fun setIssueReportEmail(email: String) {
+        viewModelScope.launch { settings.setIssueReportEmail(email) }
+    }
+
+    /**
+     * Inject a synthetic test issue into the local ring buffer so the user
+     * can verify "Open staged mail" → see the email composer pre-filled end to end.
+     */
+    fun stageTestIssue(callback: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            issueReporter.report(
+                kind = IssueKind.ERROR,
+                subject = "[测试] 这是一条植入的严重问题样本，验证邮件上报链路是否畅通",
+                stackTrace = "TestIssue at com.pockethub.ui.settings.SettingsViewModel:stageTestIssue\n" +
+                    "  at com.pockethub.data.reporting.IssueReporter.report(IssueReporter.kt)\n" +
+                    "  Triggered by user from Settings → Severe-issue reporting",
+                extra = listOf("source" to "manual_test").associate { it },
+            )
+            refreshIssueCount()
+            callback(true)
+        }
+    }
+
+    /** Forget all local events (used after the user manually emails them out). */
+    fun clearIssueLog() {
+        viewModelScope.launch {
+            issueReporter.clearLog()
+            refreshIssueCount()
+        }
     }
 }

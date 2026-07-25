@@ -42,6 +42,9 @@ class SettingsRepository @Inject constructor(
         val LAST_UPDATE_CHECK_MS = intPreferencesKey("last_update_check_epoch_ms")
         val LAST_UPDATE_PROMPT_MS = intPreferencesKey("last_update_prompt_epoch_ms")
         val PINNED_REPOS = stringPreferencesKey("pinned_repos_json")
+        val ISSUE_REPORT_ENABLED = intPreferencesKey("issue_report_enabled")
+        val ISSUE_REPORT_INTERVAL_DAYS = intPreferencesKey("issue_report_interval_days")
+        val ISSUE_REPORT_EMAIL = stringPreferencesKey("issue_report_email")
     }
 
     // ── Theme ─────────────────────────────────────────────
@@ -231,6 +234,34 @@ class SettingsRepository @Inject constructor(
         val arr = JSONArray()
         list.forEach { slug -> arr.put(JSONObject().put("slug", slug)) }
         return arr.toString()
+    }
+
+    // ── Issue reporting (severe events → scheduled email) ─
+    /**
+     * Whether the periodic severe-issue reporter is enabled.
+     * Stored as int (0/1) because DataStore preferences are typed.
+     */
+    val issueReportEnabled: Flow<Boolean> = context.dataStore.data.map {
+        (it[Keys.ISSUE_REPORT_ENABLED] ?: 0) == 1
+    }
+    suspend fun setIssueReportEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.ISSUE_REPORT_ENABLED] = if (enabled) 1 else 0 }
+    }
+
+    /** Periodic interval in days (min 1). WorkManager schedules accordingly. */
+    val issueReportIntervalDays: Flow<Int> = context.dataStore.data.map {
+        it[Keys.ISSUE_REPORT_INTERVAL_DAYS] ?: 7
+    }
+    suspend fun setIssueReportIntervalDays(days: Int) {
+        context.dataStore.edit { it[Keys.ISSUE_REPORT_INTERVAL_DAYS] = days.coerceAtLeast(1) }
+    }
+
+    /** Destination email address for severe-issue reports. */
+    val issueReportEmail: Flow<String> = context.dataStore.data.map {
+        it[Keys.ISSUE_REPORT_EMAIL].orEmpty()
+    }
+    suspend fun setIssueReportEmail(email: String) {
+        context.dataStore.edit { it[Keys.ISSUE_REPORT_EMAIL] = email.trim() }
     }
 
     private companion object {

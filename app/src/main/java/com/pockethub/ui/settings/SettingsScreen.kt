@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -55,6 +56,7 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -105,6 +107,11 @@ fun SettingsScreen(
     var showOAuthSheet by remember { mutableStateOf(false) }
     var showAbout by remember { mutableStateOf(false) }
     var showSignOutDialog by remember { mutableStateOf(false) }
+    var showIssueEmailSheet by remember { mutableStateOf(false) }
+    val issueReportEnabled by vm.issueReportEnabled.collectAsState()
+    val issueReportIntervalDays by vm.issueReportIntervalDays.collectAsState()
+    val issueReportEmail by vm.issueReportEmail.collectAsState()
+    val issueCount by vm.issueCount.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -245,6 +252,80 @@ fun SettingsScreen(
             )
             HorizontalDivider()
 
+            SectionHeader(stringResource(R.string.section_severe_issues))
+            Text(
+                stringResource(R.string.severe_issues_intro, issueReportIntervalDays),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+            )
+            ListItem(
+                leadingContent = { Icon(Icons.Outlined.Shield, contentDescription = null) },
+                headlineContent = { Text(stringResource(R.string.severe_issues_enabled)) },
+                trailingContent = {
+                    Switch(checked = issueReportEnabled, onCheckedChange = { vm.setIssueReportEnabled(it) })
+                },
+            )
+            ListItem(
+                leadingContent = { Icon(Icons.Outlined.Email, contentDescription = null) },
+                headlineContent = { Text(stringResource(R.string.severe_issues_email)) },
+                supportingContent = { Text(issueReportEmail.ifBlank { stringResource(R.string.severe_issues_email_hint) }) },
+                modifier = Modifier.clickable { showIssueEmailSheet = true },
+            )
+            ListItem(
+                leadingContent = { Icon(Icons.Outlined.Brightness2, contentDescription = null) },
+                headlineContent = { Text(stringResource(R.string.severe_issues_interval)) },
+                supportingContent = { Text(issueCadenceLabel(issueReportIntervalDays)) },
+                modifier = Modifier.clickable {
+                    val presets = listOf(1, 3, 7)
+                    val idx = presets.indexOf(issueReportIntervalDays).let { if (it == -1) 0 else it }
+                    vm.setIssueReportIntervalDays(presets[(idx + 1) % presets.size])
+                },
+            )
+            ListItem(
+                leadingContent = { Icon(Icons.Outlined.Info, contentDescription = null) },
+                headlineContent = { Text(stringResource(R.string.severe_issues_collect_now)) },
+                supportingContent = { Text(stringResource(R.string.severe_issues_collect_now_summary, issueCount)) },
+                modifier = Modifier.clickable { vm.refreshIssueCount() },
+            )
+            ListItem(
+                leadingContent = { Icon(Icons.Outlined.CleaningServices, contentDescription = null) },
+                headlineContent = { Text(stringResource(R.string.severe_issues_test_now)) },
+                supportingContent = {
+                    Text(
+                        if (issueCount == 0) stringResource(R.string.severe_issues_status_normal)
+                        else stringResource(R.string.severe_issues_collect_now_summary, issueCount)
+                    )
+                },
+                modifier = Modifier.clickable {
+                    vm.stageTestIssue { injected ->
+                        scope.launch {
+                            snackbarHostState.showSnackbar(
+                                context.getString(if (injected) R.string.severe_issues_test_injected else R.string.severe_issues_no_staged_report)
+                            )
+                        }
+                    }
+                },
+            )
+            ListItem(
+                leadingContent = { Icon(Icons.Outlined.Email, contentDescription = null) },
+                headlineContent = { Text(stringResource(R.string.severe_issues_send_now)) },
+                supportingContent = { Text(stringResource(R.string.severe_issues_send_now_summary)) },
+                modifier = Modifier.clickable {
+                    if (issueReportEmail.isBlank()) {
+                        showIssueEmailSheet = true
+                    } else {
+                        stageAndOpenEmailComposer(
+                            context = context,
+                            email = issueReportEmail,
+                            onAfter = { vm.clearIssueLog() },
+                        )
+                    }
+                },
+            )
+            HorizontalDivider()
+
+
             SectionHeader(stringResource(R.string.section_about))
             ListItem(
                 leadingContent = { Icon(Icons.Outlined.SystemUpdate, contentDescription = null) },
@@ -318,6 +399,19 @@ fun SettingsScreen(
             initialSecret = customClientSecret,
             onDismiss = { showOAuthSheet = false },
             onSave = { id, secret -> vm.setCustomOAuthClient(id, secret); showOAuthSheet = false },
+        )
+    }
+
+    if (showIssueEmailSheet) {
+        IssueEmailSheet(
+            initialEmail = issueReportEmail,
+            initialIntervalDays = issueReportIntervalDays,
+            onDismiss = { showIssueEmailSheet = false },
+            onSave = { email, days ->
+                vm.setIssueReportEmail(email)
+                vm.setIssueReportIntervalDays(days)
+                showIssueEmailSheet = false
+            },
         )
     }
 
@@ -446,6 +540,66 @@ private fun OAuthClientSheet(
 }
 
 @Composable
+private fun IssueEmailSheet(
+    initialEmail: String,
+    initialIntervalDays: Int,
+    onDismiss: () -> Unit,
+    onSave: (email: String, intervalDays: Int) -> Unit,
+) {
+    var email by rememberSaveable { mutableStateOf(initialEmail) }
+    var intervalDays by rememberSaveable { mutableStateOf(initialIntervalDays) }
+
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState()) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+                .imePadding()
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(stringResource(R.string.severe_issues_email), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            OutlinedTextField(
+                value = email,
+                onValueChange = { email = it },
+                label = { Text(stringResource(R.string.severe_issues_email)) },
+                placeholder = { Text(stringResource(R.string.severe_issues_email_hint)) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                leadingIcon = { Icon(Icons.Outlined.Email, null, modifier = Modifier.size(18.dp)) },
+            )
+            Text(
+                stringResource(R.string.severe_issues_interval),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+            val presets = listOf(1, 3, 7)
+            presets.forEach { days ->
+                Row(
+                    Modifier.fillMaxWidth().clickable {
+                        intervalDays = days
+                    }.padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    RadioButton(selected = intervalDays == days, onClick = { intervalDays = days })
+                    Spacer(Modifier.width(12.dp))
+                    Text(issueCadenceLabel(days))
+                }
+            }
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = { onSave(email.trim(), intervalDays) },
+                    enabled = email.isNotBlank() && email.contains("@"),
+                ) { Text(stringResource(R.string.action_save)) }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+            }
+            Spacer(Modifier.height(24.dp))
+        }
+    }
+}
+
+@Composable
 private fun ThemeOption(label: String, selected: Boolean, onClick: () -> Unit) {
     Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
         RadioButton(selected = selected, onClick = onClick)
@@ -521,6 +675,62 @@ private fun OpenSourceLicensesList() {
 }
 
 // ── helpers ────────────────────────────────────────────────────────────
+
+@Composable
+private fun issueCadenceLabel(days: Int): String = when (days) {
+    1 -> stringResource(R.string.severe_issues_interval_1d)
+    3 -> stringResource(R.string.severe_issues_interval_3d)
+    7 -> stringResource(R.string.severe_issues_interval_7d)
+    else -> stringResource(R.string.severe_issues_interval_7d)
+}
+
+/**
+ * Synthesise an ACTION_SEND email intent pre-filled with a one-shot issue
+ * report body and launch it. The body is built from the report worker's
+ * "outbox" (the staging SharedPreferences that [IssueReportWorker] populates
+ * when it runs in the background) — falling back to a fresh empty stub when
+ * no staged report exists yet (e.g. the user taps "Send staged report" right
+ * after installing the app).
+ *
+ * @param email destination address.
+ * @param onAfter invoked after the intent is fired (useful to wipe the local
+ *   issue ring so we don't re-email the same batch the next time the worker
+ *   runs).
+ */
+private fun stageAndOpenEmailComposer(
+    context: android.content.Context,
+    email: String,
+    onAfter: () -> Unit,
+) {
+    val prefs = context.getSharedPreferences("pockethub_issue_outbox", android.content.Context.MODE_PRIVATE)
+    val subject: String
+    val body: String
+    if (prefs.contains("subject") && prefs.contains("body")) {
+        subject = prefs.getString("subject", "[PocketHub] 严重问题汇总") ?: "[PocketHub] 严重问题汇总"
+        body = prefs.getString("body", "") ?: ""
+    } else {
+        // No staged report — synthesise a minimal one so the user gets to see
+        // their mail composer pop up instead of a misleading "no staged report".
+        subject = "[PocketHub] 严重问题汇总 — 尚无事件"
+        body = "PocketHub 严重问题报告\n================================\n\n" +
+            "目前本地环形缓冲区中尚无严重事件可发送。\n\n" +
+            "如果你想验证：在 设置 → 严重问题上报 → 点 立即植入测试报告，再回到此项发送。\n"
+    }
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "message/rfc822"
+        putExtra(Intent.EXTRA_EMAIL, arrayOf(email))
+        putExtra(Intent.EXTRA_SUBJECT, subject)
+        putExtra(Intent.EXTRA_TEXT, body)
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+    runCatching {
+        val chooser = Intent.createChooser(intent, "选择邮件客户端发送").apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(chooser)
+    }
+    onAfter()
+}
 
 @Composable
 private fun localeLabel(locale: AppLocale): String = when (locale) {
