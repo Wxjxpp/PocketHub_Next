@@ -164,16 +164,124 @@ class FeedSourceService @Inject constructor(
         }
         val lang = if (cfg.trendingLanguage == "All") "" else cfg.trendingLanguage.lowercase()
         val langParam = java.net.URLEncoder.encode(lang, "UTF-8")
-        // Older forks speak `?since=&language=` directly on the base path; newer
-        // ones put the list under `/repositories` (the original huchenme fork).
-        // Try both shapes before giving up so the user's self-host URL only needs
-        // to match one of them.
-        val firstUrl = "${base}repositories?since=$since&language=$langParam"
-        val secondUrl = "${base}?since=$since&language=$langParam"
-        val items: List<TrendingApiResponseItem> = runCatching {
-            requestJsonArray(firstUrl, forceFresh) ?: requestJsonArray(secondUrl, forceFresh).orEmpty()
-        }.getOrDefault(emptyList())
-        return items.map { it.toDiscoverItem(since) }
+        val periodLabel = when (since) {
+            "weekly"  -> "week"
+            "monthly" -> "month"
+            else      -> "day"
+        }
+
+        // Each candidate URL is fetched in priority order and parsed against
+        // every supported shape. URLs come first because the *field* shape
+        // cannot be known ahead of time; we just see which parse wins and
+        // return the first non-empty result so the user's self-host URL only
+        // needs to match one of them.
+        val urls = listOf(
+            "${base}repositories?since=$since&language=$langParam",
+            "${base}?since=$since&language=$langParam",
+        )
+        for (url in urls) {
+            val body = runCatching { requestText(url, forceFresh) }.getOrNull() ?: continue
+            if (body.isBlank()) continue
+
+            // Shape A — legacy community forks: top-level JSON array of
+            // { author, name, url, currentPeriodStars, ... }.
+            val legacy: List<DiscoverItem> = runCatching {
+                json.decodeFromString<List<TrendingApiResponseItem>>(body)
+                    .map { it.toDiscoverItem(periodLabel) }
+            }.getOrDefault(emptyList())
+            if (legacy.isNotEmpty()) return legacy
+
+            // Shape B — search-proxy envelope used by several self-hosted
+            // services: { items: [{ name:"owner/repo", url, description,
+            // language, stars, forks, topics:[...], owner:{ login, avatar } }] }.
+            val envelope = parseSearchProxyEnvelope(body, periodLabel)
+            if (envelope.isNotEmpty()) return envelope
+        }
+        return emptyList()
+    }
+
+    /**
+     * Parses a "search-proxy envelope": a top-level JSON object that wraps a
+     * `items` array where every item is a simplified repo (full_name as `name`,
+     * `owner.login`, `owner.avatar`, `topics`, etc.). This shape is produced
+     * by various self-hosted GitHub-trending proxies that wrap GitHub's Search
+     * Repositories response — we only consume the fields we surface, ignore
+     * the rest. Designed to be tolerant of missing fields; any parsing failure
+     * returns an empty list so the caller can fall through.
+     */
+    private fun parseSearchProxyEnvelope(body: String, periodLabel: String): List<DiscoverItem> {
+        val env = runCatching {
+            json.parseToJsonElement(body) as? JsonObject
+        }.getOrNull() ?: return emptyList()
+        // Accept either `items` (a search-proxy envelope) or a bare search
+        // response `items` key. A few proxies use `data`; we look for the
+        // first array-typed field we recognise.
+        val itemsEl = env["items"] as? JsonArray
+            ?: env["data"] as? JsonArray
+            ?: env["repositories"] as? JsonArray
+            ?: env["repos"] as? JsonArray
+            ?: return emptyList()
+        return itemsEl.mapNotNull { rowElement ->
+            val row = rowElement as? JsonObject ?: return@mapNotNull null
+            // `name` here is the full "owner/repo" slug; split it. Fall back to
+            // `full_name` for proxies that preserve GitHub's field name, and
+            // to separate `owner`/`repo` keys when those exist.
+            val fullName = row.rowStr("name").ifBlank { row.rowStr("full_name") }
+            if (fullName.isBlank()) return@mapNotNull null
+            val parts = fullName.split("/", limit = 2).map { it.trim() }
+            val owner = parts.getOrNull(0).orEmpty()
+            val repo = parts.getOrNull(1).orEmpty().ifBlank { row.rowStr("repo") }
+            if (owner.isBlank() || repo.isBlank()) return@mapNotNull null
+
+            // Owner may be a string or a nested object; prefer the nested
+            // `owner.login` / `owner.avatar` when present, else fall back to
+            // the slug's owner segment and an avatar URL synthesised from it.
+            val ownerObj = row["owner"] as? JsonObject
+            val ownerLogin = ownerObj?.let { it.rowStr("login") }?.ifBlank { null } ?: owner
+            val avatar = ownerObj?.let { it.rowStr("avatar").ifBlank { null } }
+                ?: ownerObj?.let { it.rowStr("avatar_url").ifBlank { null } }
+                ?: "https://avatars.githubusercontent.com/$owner"
+
+            val stars = row.rowStr("stars").extractInt()
+            val forks = row.rowStr("forks").extractInt()
+            val htmlUrl = row.rowStr("url").ifBlank { row.rowStr("html_url") }
+                .ifBlank { "https://github.com/$owner/$repo" }
+            val language = row.rowStr("language").ifBlank { row.rowStr("primary_language") }
+            val description = row.rowStr("description")
+            val topicsArr = row["topics"] as? JsonArray
+            val topics = topicsArr?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
+                ?.filter { it.isNotBlank() } ?: emptyList()
+
+            // `currentPeriodStars` is the legacy field name for a star delta;
+            // search-proxy envelopes usually omit it. If present we surface it;
+            // else we leave starDelta null and the card simply prints the
+            // absolute star count, which is still useful.
+            val delta = maybeStarsDelta(row, periodLabel)
+            DiscoverItem(
+                id = DiscoverItem.stableId(ownerLogin, repo),
+                source = FeedSourceOption.GITHUB_TRENDING_API,
+                owner = ownerLogin,
+                repo = repo,
+                htmlUrl = htmlUrl,
+                description = description.takeIf { it.isNotBlank() },
+                language = language.takeIf { it.isNotBlank() },
+                stars = stars,
+                forks = forks,
+                topics = topics,
+                ownerAvatarUrl = avatar,
+                starDelta = delta,
+            )
+        }
+    }
+
+    private fun maybeStarsDelta(row: JsonObject, periodLabel: String): StarDelta? {
+        // Several variants we may see: `currentPeriodStars` (legacy), `stars_delta`,
+        // or `period_stars`. Take the first one that parses to a positive int.
+        for (key in listOf("currentPeriodStars", "stars_delta", "period_stars", "delta")) {
+            val v = row.rowStr(key).extractInt()
+            if (v > 0) return StarDelta(v, periodLabel)
+        }
+        return null
     }
 
     private fun TrendingApiResponseItem.toDiscoverItem(since: String): DiscoverItem {
@@ -399,11 +507,6 @@ class FeedSourceService @Inject constructor(
             resp.body?.string()
         }.getOrNull()
     }
-
-    private suspend fun requestJsonArray(url: String, forceFresh: Boolean): List<TrendingApiResponseItem>? =
-        requestText(url, forceFresh)?.let {
-            runCatching { json.decodeFromString<List<TrendingApiResponseItem>>(it) }.getOrNull()
-        }
 }
 
 /** Greedy-parse the first integer-looking sequence out of an OSS-Insight value. */
