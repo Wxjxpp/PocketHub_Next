@@ -238,44 +238,53 @@ fun ExploreScreen(
 
             when (section) {
                 ExploreSection.TRENDING -> {
-                    // Language filter chips
-                    item {
-                        LazyRow(
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            items(LANGUAGES) { lang ->
-                                FilterChip(
-                                    selected = selectedLang == lang,
-                                    onClick = { vm.setTrendingFilters(lang, selectedRange) },
-                                    label = { Text(if (lang == "All") stringResource(R.string.trending_language_all) else lang, style = MaterialTheme.typography.labelMedium) },
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    ),
-                                )
+                    // Language + time-range filter chips are conditionally
+                    // rendered based on the Trending tab's configured source:
+                    // only sources that actually respond to language / time
+                    // window params expose this surface (see
+                    // FeedSourceOption.supportsTrendingFilters). For sources that
+                    // don't, the chips would be decorative waste — so we drop
+                    // them entirely rather than misleading the user.
+                    if (trendingSource.supportsTrendingFilters) {
+                        // Language filter chips
+                        item {
+                            LazyRow(
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                items(LANGUAGES) { lang ->
+                                    FilterChip(
+                                        selected = selectedLang == lang,
+                                        onClick = { vm.setTrendingFilters(lang, selectedRange) },
+                                        label = { Text(if (lang == "All") stringResource(R.string.trending_language_all) else lang, style = MaterialTheme.typography.labelMedium) },
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        ),
+                                    )
+                                }
                             }
                         }
-                    }
-                    // Time range chips
-                    item {
-                        LazyRow(
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            items(TIME_RANGES) { range ->
-                                FilterChip(
-                                    selected = selectedRange == range,
-                                    onClick = { vm.setTrendingFilters(selectedLang, range) },
-                                    label = { Text(rangeLabel(range), style = MaterialTheme.typography.labelMedium) },
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                        selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                                    ),
+                        // Time range chips
+                        item {
+                            LazyRow(
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                items(TIME_RANGES) { range ->
+                                    FilterChip(
+                                        selected = selectedRange == range,
+                                        onClick = { vm.setTrendingFilters(selectedLang, range) },
+                                        label = { Text(rangeLabel(range), style = MaterialTheme.typography.labelMedium) },
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                            selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        ),
                                 )
                             }
                         }
                         Spacer(Modifier.height(4.dp))
+                    }
                     }
                     repoItems(trending, isLoading, error, { vm.load() }, onNavigateToRepo, onNavigateToUser)
                 }

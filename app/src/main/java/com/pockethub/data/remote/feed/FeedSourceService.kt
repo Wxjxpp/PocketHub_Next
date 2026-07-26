@@ -162,12 +162,40 @@ class FeedSourceService @Inject constructor(
             "Monthly" -> "monthly"
             else      -> "daily"
         }
+        // Map the Trending-range chip to a day count too — newer search-proxy
+        // envelopes (eg self-hosted search wrappers) speak `days=7|30|1` rather
+        // than either `since` or `language`. We let it stay empty for the
+        // "All languages" chip so the proxy reverts to its own default mix.
         val lang = if (cfg.trendingLanguage == "All") "" else cfg.trendingLanguage.lowercase()
         val langParam = java.net.URLEncoder.encode(lang, "UTF-8")
+        val days = when (since) {
+            "weekly" -> 7
+            "monthly" -> 30
+            else -> 1
+        }
         val periodLabel = when (since) {
             "weekly"  -> "week"
             "monthly" -> "month"
             else      -> "day"
+        }
+        // Emit a union of every filter syntax proxies of this family use, so the
+        // same URL works against:
+        //   legacy forks        (?since=&language=)  — they ignore lang/days
+        //   search-proxy envelopes (?lang=&days=)   — they ignore since/language
+        // Net effect: the Trending-tab language + time-range chips actually
+        // shape the result across both proxy families.
+        fun appendFilters(url: String): String = buildString {
+            append(url)
+            // Legacy forks speak ?since=&language=; the search-proxy format
+            // speaks ?lang= and ?days=. Emit both pairs so both families honour
+            // the chips without us sniffing the URL ahead of time. When the
+            // language chip is "All" we drop both language params so neither
+            // treats an empty filter as "filter by empty string" and zeroes the
+            // list.
+            append("?since=$since&days=$days")
+            if (langParam.isNotEmpty()) {
+                append("&language=$langParam&lang=$langParam")
+            }
         }
 
         // Each candidate URL is fetched in priority order and parsed against
@@ -176,8 +204,8 @@ class FeedSourceService @Inject constructor(
         // return the first non-empty result so the user's self-host URL only
         // needs to match one of them.
         val urls = listOf(
-            "${base}repositories?since=$since&language=$langParam",
-            "${base}?since=$since&language=$langParam",
+            appendFilters("${base}repositories"),
+            appendFilters(base.removeSuffix("/")),
         )
         for (url in urls) {
             val body = runCatching { requestText(url, forceFresh) }.getOrNull() ?: continue

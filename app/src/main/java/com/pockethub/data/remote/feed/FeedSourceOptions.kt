@@ -18,6 +18,13 @@ enum class FeedTab { TRENDING, FEATURED, FOLLOWING }
  * (HTML/JSON endpoints), [urlModifiable] is true; for sources that always call a
  * fixed GitHub endpoint (e.g. GitHub Search/Events), it is false.
  *
+ * [supportsTrendingFilters] declares whether the Explore home screen should
+ * render the trending language + time-range filter chips when this source is
+ * selected for the Trending tab. Only sources whose response is actually
+ * shaped by language/time-window parameters set this true; the chips are
+ * hidden for everything else so the home screen never misleads a user with
+ * controls that don't affect the feed.
+ *
  * The string ids intentionally match enum names so old installs reading "GITHUB_SEARCH"
  * still resolve correctly even if we later rename the display label.
  */
@@ -26,6 +33,7 @@ enum class FeedSourceOption(
     val id: String,
     val defaultBaseUrl: String,
     val urlModifiable: Boolean = false,
+    val supportsTrendingFilters: Boolean = false,
 ) {
     // Trending tab
     GITHUB_SEARCH(
@@ -39,6 +47,10 @@ enum class FeedSourceOption(
         // service then refuses to fetch on this source until that's set.
         defaultBaseUrl = "",
         urlModifiable = true,
+        // Self-hosted GitHub-trending proxies honour language / time-window
+        // filters (newer search-proxy envelopes accept `lang` + `days`, legacy
+        // forks accept `language` + `since`). The service emits both shapes.
+        supportsTrendingFilters = true,
     ),
 
     // Featured tab
