@@ -332,21 +332,24 @@ private fun ContentRow(
         val icon = if (entry.type == "dir") Icons.Outlined.Folder else Icons.Outlined.Description
         Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.width(10.dp))
-        Column(Modifier.weight(1f)) {
-            Text(entry.name, style = MaterialTheme.typography.bodyMedium)
-            if (lastCommit != null) {
-                Text(
-                    "${lastCommit.message} · ${relativeTime(lastCommit.dateIso)}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            } else if (entry.type == "file" && entry.size > 0) {
-                Text(humanReadableSize(entry.size), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
+        Text(
+            entry.name,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.weight(1f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        // GitHub-style relative time, smaller font, muted — every file/dir.
+        if (lastCommit != null) {
+            Text(
+                relativeTime(lastCommit.dateIso),
+                style = MaterialTheme.typography.labelSmall,
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
         if (onDownload != null) {
+            Spacer(Modifier.width(6.dp))
             IconButton(onClick = onDownload) {
                 Icon(
                     Icons.Outlined.Download,

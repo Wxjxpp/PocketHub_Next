@@ -243,31 +243,29 @@ class CodeBrowserViewModel @Inject constructor(
 
         viewModelScope.launch {
             val sem = Semaphore(5)
-            val results = withContext(Dispatchers.IO) {
+            // Each completed request eagerly updates the UI so the user sees the
+            // time appear progressively instead of waiting for every entry to finish.
+            withContext(Dispatchers.IO) {
                 coroutineScope {
                     toFetch.map { entry ->
                         async {
                             sem.withPermit {
-                                runCatching {
+                                val lc = runCatching {
                                     val commits = api.getCommits(owner, repo, perPage = 1, sha = ref, path = entry.path)
-                                    commits.firstOrNull()?.commit?.committer?.date?.let { date ->
-                                        val msg = commits.first().commit?.message.orEmpty().lineSequence().firstOrNull().orEmpty()
-                                        LastCommit(message = msg, dateIso = date)
-                                    }
-                                }.getOrNull()?.let { entry.path to it }
+                                    val c = commits.firstOrNull()?.commit
+                                    val date = c?.committer?.date ?: c?.author?.date
+                                    date?.let { LastCommit(message = "", dateIso = it) }
+                                }.getOrNull() ?: return@withPermit
+                                commitCache[cacheKey(entry.path)] = lc
+                                // Apply only if still on the same dir; otherwise cache wins next time.
+                                val cur = _state.value
+                                if (cur.owner == owner && cur.repo == repo && cur.ref == ref) {
+                                    _state.update { it.copy(lastCommits = it.lastCommits + (entry.path to lc)) }
+                                }
                             }
                         }
-                    }.awaitAll().filterNotNull()
+                    }.awaitAll()
                 }
-            }
-            if (results.isEmpty()) return@launch
-            val map = results.toMap()
-            // Persist to in-memory cache
-            map.forEach { (path, lc) -> commitCache[cacheKey(path)] = lc }
-            // Only apply if the user is still on the same directory.
-            val cur = _state.value
-            if (cur.owner == owner && cur.repo == repo && cur.ref == ref) {
-                _state.update { it.copy(lastCommits = it.lastCommits + map) }
             }
         }
     }
