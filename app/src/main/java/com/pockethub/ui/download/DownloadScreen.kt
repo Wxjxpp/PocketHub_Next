@@ -2,6 +2,7 @@ package com.pockethub.ui.download
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -241,7 +242,7 @@ private fun DoneDownloadItem(
     onRemove: () -> Unit,
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().clickable { onOpen() },
         shape = RoundedCornerShape(14.dp),
     ) {
         Row(
@@ -277,13 +278,6 @@ private fun DoneDownloadItem(
                 )
             }
             Spacer(Modifier.width(6.dp))
-            IconButton(onClick = onOpen) {
-                Icon(
-                    Icons.Outlined.TaskAlt,
-                    contentDescription = stringResource(R.string.download_action_open),
-                    tint = MaterialTheme.colorScheme.primary,
-                )
-            }
             IconButton(onClick = onRemove) {
                 Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.download_action_delete))
             }

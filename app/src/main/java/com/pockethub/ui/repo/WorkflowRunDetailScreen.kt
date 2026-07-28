@@ -256,7 +256,7 @@ private fun JobCard(
     dateFmt: DateFormat,
     onOpenLogs: () -> Unit,
 ) {
-    var expanded by remember(job.id) { mutableStateOf(false) }
+    var expanded by remember(job.id) { mutableStateOf(true) }
     Column(
         Modifier.fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
