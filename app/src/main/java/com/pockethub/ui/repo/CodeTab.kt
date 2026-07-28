@@ -173,6 +173,7 @@ fun CodeTab(
                 items(state.entries, key = { it.path + it.sha + it.type }) { entry ->
                     ContentRow(
                         entry = entry,
+                        lastCommit = state.lastCommits[entry.path],
                         onClick = {
                             if (entry.type == "dir") vm.openDir(entry.name) else vm.openFile(entry)
                         },
@@ -317,6 +318,7 @@ private fun BreadcrumbBar(
 @Composable
 private fun ContentRow(
     entry: com.pockethub.data.remote.GitHubApi.ContentEntry,
+    lastCommit: CodeBrowserViewModel.LastCommit? = null,
     onClick: () -> Unit,
     onDownload: (() -> Unit)? = null,
 ) {
@@ -332,7 +334,15 @@ private fun ContentRow(
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Text(entry.name, style = MaterialTheme.typography.bodyMedium)
-            if (entry.type == "file" && entry.size > 0) {
+            if (lastCommit != null) {
+                Text(
+                    "${lastCommit.message} · ${relativeTime(lastCommit.dateIso)}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            } else if (entry.type == "file" && entry.size > 0) {
                 Text(humanReadableSize(entry.size), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
@@ -417,6 +427,31 @@ private fun humanReadableSize(bytes: Long): String = when {
     bytes >= 1_048_576 -> "%.1f MB".format(bytes / 1_048_576.0)
     bytes >= 1024 -> "%.1f KB".format(bytes / 1024.0)
     else -> "$bytes B"
+}
+
+/**
+ * GitHub-style relative time, e.g. "now", "3 minutes ago", "5 days ago", "2 months ago".
+ * Falls back to a short absolute date for anything older than a year.
+ */
+private fun relativeTime(iso: String): String {
+    val fmt = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US).apply {
+        timeZone = java.util.TimeZone.getTimeZone("UTC")
+    }
+    val then = runCatching { fmt.parse(iso) }.getOrNull() ?: return iso
+    val diffMs = System.currentTimeMillis() - then.time
+    if (diffMs < 0) return "now"
+    val sec = diffMs / 1000
+    if (sec < 60) return "now"
+    val min = sec / 60
+    if (min < 60) return if (min == 1L) "1 minute ago" else "$min minutes ago"
+    val hours = min / 60
+    if (hours < 24) return if (hours == 1L) "1 hour ago" else "$hours hours ago"
+    val days = hours / 24
+    if (days < 30) return if (days == 1L) "1 day ago" else "$days days ago"
+    val months = days / 30
+    if (months < 12) return if (months == 1L) "1 month ago" else "$months months ago"
+    val years = days / 365
+    return if (years == 1L) "1 year ago" else "$years years ago"
 }
 
 /** Files larger than this render without highlighting to keep the UI responsive. */

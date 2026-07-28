@@ -739,6 +739,7 @@ interface GitHubApi {
         @Query("page") page: Int = 1,
         @Query("per_page") perPage: Int = 30,
         @Query("sha") sha: String? = null, // branch or commit SHA
+        @Query("path") path: String? = null, // filter by file/dir path
     ): List<Commit>
 
     /** Single commit detail (includes files diff). */

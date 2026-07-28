@@ -5,17 +5,27 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.pockethub.data.remote.GitHubApi
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonArray
 import javax.inject.Inject
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.TimeZone
 
 /**
  * Simple file-tree browser backed by GitHub's Contents API.
@@ -27,6 +37,12 @@ class CodeBrowserViewModel @Inject constructor(
     private val api: GitHubApi,
     private val json: Json,
 ) : ViewModel() {
+
+    /** Per-path last commit info (message + date), cached across navigations. */
+    data class LastCommit(
+        val message: String,
+        val dateIso: String,
+    )
 
     data class State(
         val owner: String = "",
@@ -42,10 +58,15 @@ class CodeBrowserViewModel @Inject constructor(
         /** Available branches (lazy-loaded once for the branch switcher). */
         val branches: List<GitHubApi.Branch> = emptyList(),
         val isLoadingBranches: Boolean = false,
+        /** Map of entry.path → last commit for the currently visible directory. */
+        val lastCommits: Map<String, LastCommit> = emptyMap(),
     )
 
     private val _state = MutableStateFlow(State())
     val state: StateFlow<State> = _state.asStateFlow()
+
+    /** Persistent commit cache keyed by `${owner}/${repo}@${ref}::<path>` to avoid refetching. */
+    private val commitCache = mutableMapOf<String, LastCommit>()
 
     fun init(owner: String, repo: String, ref: String? = null) {
         if (_state.value.owner == owner && _state.value.repo == repo) {
@@ -90,6 +111,8 @@ class CodeBrowserViewModel @Inject constructor(
                         isLoading = false,
                     )
                 }
+                // Fire-and-forget: concurrently fetch the last commit for each visible entry.
+                fetchLastCommits(sorted, s.owner, s.repo, s.ref)
             } catch (e: Exception) {
                 _state.update { it.copy(isLoading = false, error = e.localizedMessage ?: "Failed to list contents") }
             }
@@ -174,7 +197,8 @@ class CodeBrowserViewModel @Inject constructor(
     fun switchRef(ref: String) {
         val s = _state.value
         if (s.ref == ref) return
-        _state.update { it.copy(ref = ref, viewingFile = null, fileContent = null) }
+        commitCache.clear() // ref changed → cached commit info is stale
+        _state.update { it.copy(ref = ref, viewingFile = null, fileContent = null, lastCommits = emptyMap()) }
         listDir("")
     }
 
@@ -188,5 +212,63 @@ class CodeBrowserViewModel @Inject constructor(
             stack.add(acc)
         }
         return stack
+    }
+
+    private val isoParser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply {
+        timeZone = TimeZone.getTimeZone("UTC")
+    }
+
+    /**
+     * Concurrently fetch the last commit for each entry (limited to 5 parallel requests).
+     * Results land in [_state].lastCommits and [commitCache]. Failures silently produce
+     * no entry — the UI just falls back to the size-only subtitle.
+     */
+    private fun fetchLastCommits(
+        entries: List<GitHubApi.ContentEntry>,
+        owner: String,
+        repo: String,
+        ref: String?,
+    ) {
+        if (entries.isEmpty()) return
+        val cacheKey = { path: String -> "${owner}/${repo}@${ref ?: "HEAD"}::$path" }
+        // Anything already cached is applied immediately; the rest gets fetched.
+        val cached = entries.mapNotNull { e ->
+            commitCache[cacheKey(e.path)]?.let { e.path to it }
+        }.toMap()
+        if (cached.isNotEmpty()) {
+            _state.update { it.copy(lastCommits = it.lastCommits + cached) }
+        }
+        val toFetch = entries.filter { cacheKey(it.path) !in commitCache }
+        if (toFetch.isEmpty()) return
+
+        viewModelScope.launch {
+            val sem = Semaphore(5)
+            val results = withContext(Dispatchers.IO) {
+                coroutineScope {
+                    toFetch.map { entry ->
+                        async {
+                            sem.withPermit {
+                                runCatching {
+                                    val commits = api.getCommits(owner, repo, perPage = 1, sha = ref, path = entry.path)
+                                    commits.firstOrNull()?.commit?.committer?.date?.let { date ->
+                                        val msg = commits.first().commit?.message.orEmpty().lineSequence().firstOrNull().orEmpty()
+                                        LastCommit(message = msg, dateIso = date)
+                                    }
+                                }.getOrNull()?.let { entry.path to it }
+                            }
+                        }
+                    }.awaitAll().filterNotNull()
+                }
+            }
+            if (results.isEmpty()) return@launch
+            val map = results.toMap()
+            // Persist to in-memory cache
+            map.forEach { (path, lc) -> commitCache[cacheKey(path)] = lc }
+            // Only apply if the user is still on the same directory.
+            val cur = _state.value
+            if (cur.owner == owner && cur.repo == repo && cur.ref == ref) {
+                _state.update { it.copy(lastCommits = it.lastCommits + map) }
+            }
+        }
     }
 }
