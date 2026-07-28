@@ -1,105 +1,43 @@
 package com.pockethub.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 
 /**
- * App-wide theme mode choice. The [Default] (Linear-inspired dark) is the default; users can
- * override to light / system in settings.
+ * Back-compat theme-mode choice (System/Dark/Light). With multi-style support this now maps
+ * to a style pair: Dark→LinearDark, Light→PrimerLight, System→follow system. The full
+ * style picker in Settings overrides this via [AppStyle].
  */
 enum class ThemeMode { System, Dark, Light }
 
-/**
- * The Linear-inspired dark palette — calm accent, compact, focused on information density.
- *
- * Channels deliberately calm: a single accent violet is used for key actions; everything else
- * stays in neutral greys.
- */
-private val LinearDarkColors = darkColorScheme(
-    primary = Color(0xFF7C8BFF),
-    onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFF2A3140),
-    onPrimaryContainer = Color(0xFFD6DEFF),
-    secondary = Color(0xFF8FAEFF),
-    onSecondary = Color(0xFF0E1116),
-    secondaryContainer = Color(0xFF1E2230),
-    onSecondaryContainer = Color(0xFFC0C9FF),
-    tertiary = Color(0xFF5BC8A8),
-    onTertiary = Color(0xFF001A14),
-    tertiaryContainer = Color(0xFF1B2D2A),
-    onTertiaryContainer = Color(0xFF9AEFDE),
-    background = Color(0xFF0B0E14),
-    onBackground = Color(0xFFE7EAEE),
-    surface = Color(0xFF11131A),
-    onSurface = Color(0xFFE7EAEE),
-    surfaceVariant = Color(0xFF1A1D26),
-    onSurfaceVariant = Color(0xFFB3B8C3),
-    surfaceTint = Color(0xFF7C8BFF),
-    inverseSurface = Color(0xFFE7EAEE),
-    inverseOnSurface = Color(0xFF0B0E14),
-    error = Color(0xFFE75B5B),
-    onError = Color(0xFFFFFFFF),
-    errorContainer = Color(0xFF2A1518),
-    onErrorContainer = Color(0xFFFFD0D0),
-    outline = Color(0xFF4A4F5A),
-    outlineVariant = Color(0xFF2A2D38),
-    scrim = Color(0xFF000000),
+/** Complete visual definition of one style: palette + typography + shapes + tokens. */
+data class AppStyleDef(
+    val style: AppStyle,
+    val isDark: Boolean,
+    val colors: ColorScheme,
+    val typography: Typography,
+    val shapes: Shapes,
+    val tokens: StyleTokens,
 )
 
-/**
- * The GitHub Primer-inspired light palette — airy white cards, warm ink, accent indigo
- * inherited from github.com.
- */
-private val PrimerLightColors = lightColorScheme(
-    primary = Color(0xFF0969DA),
-    onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFFDDEEFF),
-    onPrimaryContainer = Color(0xFF07418A),
-    secondary = Color(0xFF57606A),
-    onSecondary = Color(0xFFFFFFFF),
-    secondaryContainer = Color(0xFFEAEEF2),
-    onSecondaryContainer = Color(0xFF2F363D),
-    tertiary = Color(0xFF1A7F37),
-    onTertiary = Color(0xFFFFFFFF),
-    tertiaryContainer = Color(0xFFD6F3DE),
-    onTertiaryContainer = Color(0xFF0B5A26),
-    background = Color(0xFFFFFFFF),
-    onBackground = Color(0xFF1F2328),
-    surface = Color(0xFFFFFFFF),
-    onSurface = Color(0xFF1F2328),
-    surfaceVariant = Color(0xFFEFF1F4),
-    onSurfaceVariant = Color(0xFF57606A),
-    surfaceTint = Color(0xFF0969DA),
-    inverseSurface = Color(0xFF1F2328),
-    inverseOnSurface = Color(0xFFE7EAEE),
-    error = Color(0xFFCF222E),
-    onError = Color(0xFFFFFFFF),
-    errorContainer = Color(0xFFFFE3E3),
-    onErrorContainer = Color(0xFF6E0E16),
-    outline = Color(0xFF8C959F),
-    outlineVariant = Color(0xFFD0D7DE),
-    scrim = Color(0xFF000000),
-)
+// ── Typography builders ──────────────────────────────────────────────────────
 
-/**
- * English-style typography suite shared between the two themes — tight heading sizes, slightly
- * condensed body, and one monospace slot used by code viewers.
- */
-val PocketHubTypography = Typography(
+private fun linearTypography() = Typography(
     displayLarge = TextStyle(fontSize = 28.sp, fontWeight = FontWeight.SemiBold, lineHeight = 34.sp, letterSpacing = (-0.5).sp),
     displayMedium = TextStyle(fontSize = 24.sp, fontWeight = FontWeight.SemiBold, lineHeight = 30.sp, letterSpacing = (-0.25).sp),
     displaySmall = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.SemiBold, lineHeight = 26.sp),
@@ -117,35 +55,184 @@ val PocketHubTypography = Typography(
     labelSmall = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Medium, lineHeight = 14.sp, letterSpacing = 0.3.sp),
 )
 
+/** Paper: bookish serif-leaning — larger body, generous leading, slightly warm weight. */
+private fun paperTypography() = Typography(
+    displayLarge = TextStyle(fontSize = 30.sp, fontWeight = FontWeight.Bold, lineHeight = 38.sp, letterSpacing = (-0.3).sp),
+    displayMedium = TextStyle(fontSize = 26.sp, fontWeight = FontWeight.Bold, lineHeight = 33.sp),
+    displaySmall = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Bold, lineHeight = 28.sp),
+    headlineLarge = TextStyle(fontSize = 23.sp, fontWeight = FontWeight.Bold, lineHeight = 30.sp),
+    headlineMedium = TextStyle(fontSize = 19.sp, fontWeight = FontWeight.SemiBold, lineHeight = 26.sp),
+    headlineSmall = TextStyle(fontSize = 17.sp, fontWeight = FontWeight.SemiBold, lineHeight = 23.sp),
+    titleLarge = TextStyle(fontSize = 17.sp, fontWeight = FontWeight.SemiBold, lineHeight = 24.sp),
+    titleMedium = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.SemiBold, lineHeight = 21.sp, letterSpacing = 0.15.sp),
+    titleSmall = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Medium, lineHeight = 19.sp, letterSpacing = 0.15.sp),
+    bodyLarge = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.Normal, lineHeight = 25.sp, letterSpacing = 0.2.sp),
+    bodyMedium = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Normal, lineHeight = 22.sp, letterSpacing = 0.15.sp),
+    bodySmall = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Normal, lineHeight = 18.sp),
+    labelLarge = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Medium, lineHeight = 19.sp, letterSpacing = 0.4.sp),
+    labelMedium = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Medium, lineHeight = 17.sp, letterSpacing = 0.4.sp),
+    labelSmall = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Medium, lineHeight = 15.sp, letterSpacing = 0.6.sp),
+)
+
+/** Neon: terminal mono voice — tight, condensed, uppercase-flavored labels, wide tracking. */
+private fun neonTypography(mono: FontFamily) = Typography(
+    displayLarge = TextStyle(fontFamily = mono, fontSize = 27.sp, fontWeight = FontWeight.Bold, lineHeight = 32.sp, letterSpacing = 0.sp),
+    displayMedium = TextStyle(fontFamily = mono, fontSize = 23.sp, fontWeight = FontWeight.Bold, lineHeight = 28.sp, letterSpacing = 0.sp),
+    displaySmall = TextStyle(fontFamily = mono, fontSize = 19.sp, fontWeight = FontWeight.Bold, lineHeight = 25.sp, letterSpacing = 0.5.sp),
+    headlineLarge = TextStyle(fontFamily = mono, fontSize = 21.sp, fontWeight = FontWeight.Bold, lineHeight = 27.sp, letterSpacing = 0.5.sp),
+    headlineMedium = TextStyle(fontFamily = mono, fontSize = 17.sp, fontWeight = FontWeight.Bold, lineHeight = 23.sp, letterSpacing = 0.5.sp),
+    headlineSmall = TextStyle(fontFamily = mono, fontSize = 15.sp, fontWeight = FontWeight.Bold, lineHeight = 21.sp, letterSpacing = 0.5.sp),
+    titleLarge = TextStyle(fontFamily = mono, fontSize = 15.sp, fontWeight = FontWeight.Bold, lineHeight = 21.sp, letterSpacing = 0.5.sp),
+    titleMedium = TextStyle(fontFamily = mono, fontSize = 13.sp, fontWeight = FontWeight.Bold, lineHeight = 19.sp, letterSpacing = 1.sp),
+    titleSmall = TextStyle(fontFamily = mono, fontSize = 12.sp, fontWeight = FontWeight.Bold, lineHeight = 17.sp, letterSpacing = 1.sp),
+    bodyLarge = TextStyle(fontFamily = mono, fontSize = 14.sp, fontWeight = FontWeight.Normal, lineHeight = 21.sp, letterSpacing = 0.3.sp),
+    bodyMedium = TextStyle(fontFamily = mono, fontSize = 13.sp, fontWeight = FontWeight.Normal, lineHeight = 19.sp, letterSpacing = 0.3.sp),
+    bodySmall = TextStyle(fontFamily = mono, fontSize = 11.sp, fontWeight = FontWeight.Normal, lineHeight = 15.sp, letterSpacing = 0.3.sp),
+    labelLarge = TextStyle(fontFamily = mono, fontSize = 12.sp, fontWeight = FontWeight.Bold, lineHeight = 17.sp, letterSpacing = 1.5.sp),
+    labelMedium = TextStyle(fontFamily = mono, fontSize = 11.sp, fontWeight = FontWeight.Bold, lineHeight = 15.sp, letterSpacing = 1.5.sp),
+    labelSmall = TextStyle(fontFamily = mono, fontSize = 10.sp, fontWeight = FontWeight.Bold, lineHeight = 13.sp, letterSpacing = 1.5.sp),
+)
+
+/** Lavender: rounded friendly — soft weights, slightly larger titles, open tracking. */
+private fun lavenderTypography() = Typography(
+    displayLarge = TextStyle(fontSize = 30.sp, fontWeight = FontWeight.Bold, lineHeight = 37.sp, letterSpacing = (-0.2).sp),
+    displayMedium = TextStyle(fontSize = 25.sp, fontWeight = FontWeight.Bold, lineHeight = 32.sp),
+    displaySmall = TextStyle(fontSize = 21.sp, fontWeight = FontWeight.Bold, lineHeight = 27.sp),
+    headlineLarge = TextStyle(fontSize = 23.sp, fontWeight = FontWeight.Bold, lineHeight = 29.sp),
+    headlineMedium = TextStyle(fontSize = 19.sp, fontWeight = FontWeight.Bold, lineHeight = 25.sp),
+    headlineSmall = TextStyle(fontSize = 17.sp, fontWeight = FontWeight.SemiBold, lineHeight = 23.sp),
+    titleLarge = TextStyle(fontSize = 17.sp, fontWeight = FontWeight.Bold, lineHeight = 23.sp),
+    titleMedium = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.SemiBold, lineHeight = 21.sp, letterSpacing = 0.2.sp),
+    titleSmall = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.SemiBold, lineHeight = 19.sp, letterSpacing = 0.2.sp),
+    bodyLarge = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.Normal, lineHeight = 23.sp, letterSpacing = 0.2.sp),
+    bodyMedium = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Normal, lineHeight = 20.sp, letterSpacing = 0.15.sp),
+    bodySmall = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Normal, lineHeight = 17.sp),
+    labelLarge = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.SemiBold, lineHeight = 19.sp, letterSpacing = 0.3.sp),
+    labelMedium = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.SemiBold, lineHeight = 17.sp, letterSpacing = 0.3.sp),
+    labelSmall = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Medium, lineHeight = 15.sp, letterSpacing = 0.5.sp),
+)
+
+/** Forest: organic editorial — medium weight titles, airy leading, calm rhythm. */
+private fun forestTypography() = Typography(
+    displayLarge = TextStyle(fontSize = 29.sp, fontWeight = FontWeight.Medium, lineHeight = 36.sp, letterSpacing = (-0.3).sp),
+    displayMedium = TextStyle(fontSize = 25.sp, fontWeight = FontWeight.Medium, lineHeight = 31.sp),
+    displaySmall = TextStyle(fontSize = 21.sp, fontWeight = FontWeight.Medium, lineHeight = 27.sp),
+    headlineLarge = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Medium, lineHeight = 29.sp),
+    headlineMedium = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.Medium, lineHeight = 25.sp),
+    headlineSmall = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.SemiBold, lineHeight = 22.sp),
+    titleLarge = TextStyle(fontSize = 17.sp, fontWeight = FontWeight.SemiBold, lineHeight = 23.sp),
+    titleMedium = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Medium, lineHeight = 21.sp, letterSpacing = 0.3.sp),
+    titleSmall = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Medium, lineHeight = 19.sp, letterSpacing = 0.3.sp),
+    bodyLarge = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.Normal, lineHeight = 24.sp, letterSpacing = 0.2.sp),
+    bodyMedium = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Normal, lineHeight = 21.sp, letterSpacing = 0.15.sp),
+    bodySmall = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Normal, lineHeight = 17.sp),
+    labelLarge = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Medium, lineHeight = 19.sp, letterSpacing = 0.6.sp),
+    labelMedium = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Medium, lineHeight = 17.sp, letterSpacing = 0.6.sp),
+    labelSmall = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Medium, lineHeight = 15.sp, letterSpacing = 0.8.sp),
+)
+
+// ── Shape systems ────────────────────────────────────────────────────────────
+
+private fun linearShapes() = Shapes(
+    extraSmall = RoundedCornerShape(6.dp), small = RoundedCornerShape(8.dp),
+    medium = RoundedCornerShape(10.dp), large = RoundedCornerShape(14.dp),
+    extraLarge = RoundedCornerShape(18.dp),
+)
+private fun paperShapes() = Shapes(
+    extraSmall = RoundedCornerShape(3.dp), small = RoundedCornerShape(4.dp),
+    medium = RoundedCornerShape(6.dp), large = RoundedCornerShape(8.dp),
+    extraLarge = RoundedCornerShape(12.dp),
+)
+private fun neonShapes() = Shapes(
+    extraSmall = RoundedCornerShape(0.dp), small = RoundedCornerShape(0.dp),
+    medium = RoundedCornerShape(0.dp), large = RoundedCornerShape(0.dp),
+    extraLarge = RoundedCornerShape(0.dp),
+)
+private fun lavenderShapes() = Shapes(
+    extraSmall = RoundedCornerShape(12.dp), small = RoundedCornerShape(16.dp),
+    medium = RoundedCornerShape(20.dp), large = RoundedCornerShape(26.dp),
+    extraLarge = RoundedCornerShape(32.dp),
+)
+private fun forestShapes() = Shapes(
+    extraSmall = RoundedCornerShape(8.dp), small = RoundedCornerShape(12.dp),
+    medium = RoundedCornerShape(16.dp), large = RoundedCornerShape(20.dp),
+    extraLarge = RoundedCornerShape(28.dp),
+)
+
+// ── Style registry ───────────────────────────────────────────────────────────
+
+fun styleDef(style: AppStyle): AppStyleDef = when (style) {
+    AppStyle.LinearDark -> AppStyleDef(
+        style, isDark = true, colors = LinearDarkColors, typography = linearTypography(),
+        shapes = linearShapes(),
+        tokens = StyleTokens(1.0f, FontFamily.Monospace, null, Color(0xFF7C8BFF), Color(0xFF7C8BFF)),
+    )
+    AppStyle.PrimerLight -> AppStyleDef(
+        style, isDark = false, colors = PrimerLightColors, typography = linearTypography(),
+        shapes = linearShapes(),
+        tokens = StyleTokens(1.0f, FontFamily.Monospace, null, Color(0xFF0969DA), Color(0xFF0969DA)),
+    )
+    AppStyle.Paper -> AppStyleDef(
+        style, isDark = false, colors = PaperColors, typography = paperTypography(),
+        shapes = paperShapes(),
+        tokens = StyleTokens(0.6f, FontFamily.Monospace, FontFamily.Serif, Color(0xFF8A6D3B), Color(0xFFB05C4A)),
+    )
+    AppStyle.Neon -> AppStyleDef(
+        style, isDark = true, colors = NeonColors, typography = neonTypography(FontFamily.Monospace),
+        shapes = neonShapes(),
+        tokens = StyleTokens(0.0f, FontFamily.Monospace, FontFamily.Monospace, Color(0xFF00E5FF), Color(0xFFFF2FD6)),
+    )
+    AppStyle.Lavender -> AppStyleDef(
+        style, isDark = false, colors = LavenderColors, typography = lavenderTypography(),
+        shapes = lavenderShapes(),
+        tokens = StyleTokens(2.0f, FontFamily.Monospace, FontFamily.SansSerif, Color(0xFF7B5CE0), Color(0xFFD05CB8)),
+    )
+    AppStyle.Forest -> AppStyleDef(
+        style, isDark = true, colors = ForestColors, typography = forestTypography(),
+        shapes = forestShapes(),
+        tokens = StyleTokens(1.4f, FontFamily.Monospace, FontFamily.SansSerif, Color(0xFF8FBC7A), Color(0xFFD8B25C)),
+    )
+}
+
+/** Resolve the active style: explicit override wins, else map from legacy [mode]. */
+fun resolveStyle(styleOverride: AppStyle?, mode: ThemeMode, systemDark: Boolean): AppStyle =
+    styleOverride ?: when (mode) {
+        ThemeMode.Dark -> AppStyle.LinearDark
+        ThemeMode.Light -> AppStyle.PrimerLight
+        ThemeMode.System -> if (systemDark) AppStyle.LinearDark else AppStyle.PrimerLight
+    }
+
 /** Color used for the status / navigation bars. Default dark — matches Linear dark theme. */
 private val LocalSystemBarsDark = compositionLocalOf { true }
 
 @Composable
 fun PocketHubTheme(
     mode: ThemeMode = ThemeMode.Dark,
+    styleOverride: AppStyle? = null,
     content: @Composable () -> Unit
 ) {
     val systemDark = isSystemInDarkTheme()
-    val isDark = when (mode) {
-        ThemeMode.System -> systemDark
-        ThemeMode.Dark -> true
-        ThemeMode.Light -> false
-    }
-    val colors = if (isDark) LinearDarkColors else PrimerLightColors
-    val view = LocalView.current
+    val style = resolveStyle(styleOverride, mode, systemDark)
+    val def = styleDef(style)
+    val view = androidx.compose.ui.platform.LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as? android.app.Activity)?.window
             window?.let {
-                WindowCompat.getInsetsController(it, view).isAppearanceLightStatusBars = !isDark
-                WindowCompat.getInsetsController(it, view).isAppearanceLightNavigationBars = !isDark
+                WindowCompat.getInsetsController(it, view).isAppearanceLightStatusBars = !def.isDark
+                WindowCompat.getInsetsController(it, view).isAppearanceLightNavigationBars = !def.isDark
             }
         }
     }
-    CompositionLocalProvider(LocalSystemBarsDark provides isDark) {
+    CompositionLocalProvider(
+        LocalSystemBarsDark provides def.isDark,
+        LocalStyleTokens provides def.tokens,
+        LocalAppStyle provides style,
+    ) {
         MaterialTheme(
-            colorScheme = colors,
-            typography = PocketHubTypography,
+            colorScheme = def.colors,
+            typography = def.typography,
+            shapes = def.shapes,
             content = content,
         )
     }

@@ -376,6 +376,14 @@
     <string name="theme_dark">深色（Linear 风格）</string>
     <string name="theme_light">浅色（Primer 风格）</string>
     <string name="theme_system">跟随系统</string>
+    <string name="app_style">风格</string>
+    <string name="app_style_default">默认（跟随主题）</string>
+    <string name="style_linear_dark">Linear 暗夜</string>
+    <string name="style_primer_light">Primer 明亮</string>
+    <string name="style_paper">纸张阅读</string>
+    <string name="style_neon">霓虹终端</string>
+    <string name="style_lavender">薰衣草梦境</string>
+    <string name="style_forest">森林秘境</string>
     <string name="section_notifications">通知</string>
     <string name="section_explore">发现</string>
     <string name="polling_cadence">轮询频率</string>

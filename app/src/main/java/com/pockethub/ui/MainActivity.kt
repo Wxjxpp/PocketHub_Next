@@ -57,6 +57,7 @@ class MainActivity : AppCompatActivity() {
             CompositionLocalProvider(LocalAppImageLoader provides imageLoader) {
                 val settingsVm: SettingsViewModel = hiltViewModel()
                 val themeMode by settingsVm.themeMode.collectAsState()
+                val appStyle by settingsVm.appStyle.collectAsState()
                 val loginVm: LoginViewModel = hiltViewModel()
 
                 // Process OAuth callback if launched via the pockethub://oauth/callback deep link,
@@ -82,6 +83,7 @@ class MainActivity : AppCompatActivity() {
 
                 PocketHubApp(
                     themeMode = themeMode,
+                    appStyle = appStyle,
                     deepLinkUri = deepLinkUri.value,
                     onDeepLinkConsumed = { deepLinkUri.value = null },
                 )

@@ -6,6 +6,8 @@ import androidx.compose.ui.res.stringResource
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,6 +28,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Brightness2
+import androidx.compose.material.icons.outlined.Brush
 import androidx.compose.material.icons.outlined.CleaningServices
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Info
@@ -80,6 +83,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.pockethub.BuildConfig
+import com.pockethub.ui.theme.AppStyle
 import com.pockethub.ui.theme.ThemeMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -95,6 +99,7 @@ fun SettingsScreen(
     vm: SettingsViewModel = hiltViewModel(),
 ) {
     val themeMode by vm.themeMode.collectAsState()
+    val appStyle by vm.appStyle.collectAsState()
     val appLocale by vm.appLocale.collectAsState()
     val customClientId by vm.customClientId.collectAsState()
     val customClientSecret by vm.customClientSecret.collectAsState()
@@ -103,6 +108,7 @@ fun SettingsScreen(
     val cacheSizeBytes by vm.cacheSizeBytes.collectAsState()
     val translateTarget by vm.translateTarget.collectAsState()
     var showThemeSheet by remember { mutableStateOf(false) }
+    var showStyleSheet by remember { mutableStateOf(false) }
     var showLanguageSheet by remember { mutableStateOf(false) }
     var showTranslateSheet by remember { mutableStateOf(false) }
     var showOAuthSheet by remember { mutableStateOf(false) }
@@ -148,6 +154,12 @@ fun SettingsScreen(
                     Text(when (themeMode) { ThemeMode.Dark -> stringResource(R.string.theme_dark); ThemeMode.Light -> stringResource(R.string.theme_light); ThemeMode.System -> stringResource(R.string.theme_system) })
                 },
                 modifier = Modifier.clickable { showThemeSheet = true },
+            )
+            ListItem(
+                leadingContent = { Icon(Icons.Outlined.Brush, contentDescription = null) },
+                headlineContent = { Text(stringResource(R.string.app_style)) },
+                supportingContent = { Text(styleLabel(appStyle)) },
+                modifier = Modifier.clickable { showStyleSheet = true },
             )
             HorizontalDivider()
 
@@ -398,6 +410,18 @@ fun SettingsScreen(
                 ThemeOption(stringResource(R.string.theme_dark), themeMode == ThemeMode.Dark) { vm.setThemeMode(ThemeMode.Dark); showThemeSheet = false }
                 ThemeOption(stringResource(R.string.theme_light), themeMode == ThemeMode.Light) { vm.setThemeMode(ThemeMode.Light); showThemeSheet = false }
                 ThemeOption(stringResource(R.string.theme_system), themeMode == ThemeMode.System) { vm.setThemeMode(ThemeMode.System); showThemeSheet = false }
+            }
+        }
+    }
+
+    if (showStyleSheet) {
+        ModalBottomSheet(onDismissRequest = { showStyleSheet = false }, sheetState = rememberModalBottomSheetState()) {
+            Column(Modifier.padding(bottom = 24.dp)) {
+                Text(stringResource(R.string.app_style), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(16.dp))
+                ThemeOption(stringResource(R.string.app_style_default), appStyle == null) { vm.setAppStyle(null); showStyleSheet = false }
+                AppStyle.entries.forEach { style ->
+                    StyleOption(style, appStyle == style) { vm.setAppStyle(style); showStyleSheet = false }
+                }
             }
         }
     }
@@ -697,6 +721,50 @@ private fun ThemeOption(label: String, selected: Boolean, onClick: () -> Unit) {
         RadioButton(selected = selected, onClick = onClick)
         Spacer(Modifier.height(0.dp))
         Text(label, modifier = Modifier.padding(start = 12.dp))
+    }
+}
+
+@Composable
+private fun styleLabel(style: AppStyle?): String = when (style) {
+    null -> stringResource(R.string.app_style_default)
+    AppStyle.LinearDark -> stringResource(R.string.style_linear_dark)
+    AppStyle.PrimerLight -> stringResource(R.string.style_primer_light)
+    AppStyle.Paper -> stringResource(R.string.style_paper)
+    AppStyle.Neon -> stringResource(R.string.style_neon)
+    AppStyle.Lavender -> stringResource(R.string.style_lavender)
+    AppStyle.Forest -> stringResource(R.string.style_forest)
+}
+
+/** Visual style picker row — shows the style's palette as swatches plus a shape hint. */
+@Composable
+private fun StyleOption(style: AppStyle, selected: Boolean, onClick: () -> Unit) {
+    val def = com.pockethub.ui.theme.styleDef(style)
+    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+        RadioButton(selected = selected, onClick = onClick)
+        // Palette swatches: background / surfaceVariant / primary / secondary / tertiary
+        Row(Modifier.padding(start = 12.dp)) {
+            val swatches = listOf(
+                def.colors.background, def.colors.surfaceVariant,
+                def.colors.primary, def.colors.secondary, def.colors.tertiary,
+            )
+            swatches.forEachIndexed { i, c ->
+                Box(
+                    Modifier
+                        .padding(start = if (i == 0) 0.dp else 4.dp)
+                        .size(20.dp)
+                        .background(c, def.shapes.small)
+                        .border(1.dp, def.colors.outline.copy(alpha = 0.4f), def.shapes.small)
+                )
+            }
+        }
+        Column(Modifier.padding(start = 16.dp)) {
+            Text(styleLabel(style), style = MaterialTheme.typography.bodyLarge)
+            Text(
+                if (def.isDark) stringResource(R.string.theme_dark) else stringResource(R.string.theme_light),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 

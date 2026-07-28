@@ -392,6 +392,14 @@
     <string name="theme_dark">Dark (Linear-inspired)</string>
     <string name="theme_light">Light (Primer-inspired)</string>
     <string name="theme_system">Follow system</string>
+    <string name="app_style">Style</string>
+    <string name="app_style_default">Default (follows theme)</string>
+    <string name="style_linear_dark">Linear Dark</string>
+    <string name="style_primer_light">Primer Light</string>
+    <string name="style_paper">Paper</string>
+    <string name="style_neon">Neon Terminal</string>
+    <string name="style_lavender">Lavender Dream</string>
+    <string name="style_forest">Forest</string>
     <string name="section_notifications">Notifications</string>
     <string name="section_explore">Explore</string>
     <string name="polling_cadence">Polling cadence</string>

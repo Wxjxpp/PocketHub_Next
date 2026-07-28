@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.pockethub.ui.theme.AppStyle
 import com.pockethub.ui.theme.ThemeMode
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
@@ -31,6 +32,7 @@ class SettingsRepository @Inject constructor(
     // ── Keys ──────────────────────────────────────────────
     private object Keys {
         val THEME_MODE = stringPreferencesKey("theme_mode")
+        val APP_STYLE = stringPreferencesKey("app_style")
         val APP_LOCALE = stringPreferencesKey("app_locale")
         val CUSTOM_CLIENT_ID = stringPreferencesKey("custom_client_id")
         val CUSTOM_CLIENT_SECRET = stringPreferencesKey("custom_client_secret")
@@ -61,6 +63,18 @@ class SettingsRepository @Inject constructor(
     suspend fun setThemeMode(mode: ThemeMode) {
         context.dataStore.edit { prefs ->
             prefs[Keys.THEME_MODE] = mode.name.lowercase()
+        }
+    }
+
+    // ── App style (full visual identity) ─────────────────
+    /** null = follow the legacy theme-mode mapping. */
+    val appStyle: Flow<AppStyle?> = context.dataStore.data.map { prefs ->
+        prefs[Keys.APP_STYLE]?.let { AppStyle.fromKey(it) }
+    }
+
+    suspend fun setAppStyle(style: AppStyle?) {
+        context.dataStore.edit { prefs ->
+            if (style == null) prefs.remove(Keys.APP_STYLE) else prefs[Keys.APP_STYLE] = style.key
         }
     }
 

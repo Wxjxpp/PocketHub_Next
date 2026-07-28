@@ -34,6 +34,7 @@ import com.pockethub.data.remote.AuthInterceptor
 import com.pockethub.ui.auth.LoginScreen
 import com.pockethub.ui.repo.RepoDetailScreen
 import com.pockethub.ui.settings.SettingsScreen
+import com.pockethub.ui.theme.AppStyle
 import com.pockethub.ui.theme.PocketHubTheme
 import com.pockethub.ui.theme.ThemeMode
 import javax.inject.Inject
@@ -97,6 +98,7 @@ object Routes {
 @Composable
 fun PocketHubApp(
     themeMode: ThemeMode,
+    appStyle: AppStyle? = null,
     deepLinkUri: Uri? = null,
     onDeepLinkConsumed: () -> Unit = {},
 ) {
@@ -166,7 +168,7 @@ fun PocketHubApp(
         }
     }
 
-    PocketHubTheme(mode = themeMode) {
+    PocketHubTheme(mode = themeMode, styleOverride = appStyle) {
         val imagePreviewOpener = remember<(String) -> Unit> {
             { url -> navController.navigate(Routes.imagePreview(url)) }
         }

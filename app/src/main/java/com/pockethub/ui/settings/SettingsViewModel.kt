@@ -10,6 +10,7 @@ import com.pockethub.data.remote.SettingsRepository
 import com.pockethub.data.reporting.IssueKind
 import com.pockethub.data.reporting.IssueReporter
 import com.pockethub.data.reporting.IssueReportScheduler
+import com.pockethub.ui.theme.AppStyle
 import com.pockethub.ui.theme.ThemeMode
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,6 +34,9 @@ class SettingsViewModel @Inject constructor(
 
     val themeMode: StateFlow<ThemeMode> = settings.themeMode
         .stateIn(viewModelScope, SharingStarted.Eagerly, ThemeMode.Dark)
+
+    val appStyle: StateFlow<AppStyle?> = settings.appStyle
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     val appLocale: StateFlow<AppLocale> = settings.appLocale
         .map { AppLocale.fromKey(it) }
@@ -82,6 +86,10 @@ class SettingsViewModel @Inject constructor(
 
     fun setThemeMode(mode: ThemeMode) {
         viewModelScope.launch { settings.setThemeMode(mode) }
+    }
+
+    fun setAppStyle(style: AppStyle?) {
+        viewModelScope.launch { settings.setAppStyle(style) }
     }
 
     fun setAppLocale(locale: AppLocale) {
