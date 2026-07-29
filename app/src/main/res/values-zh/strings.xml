@@ -538,6 +538,12 @@
     <string name="delete_repo_confirm_label">输入 %1$s 以确认</string>
     <string name="delete_repo_confirm">删除</string>
 
+    <!-- Release 删除 -->
+    <string name="delete_release">删除 release</string>
+    <string name="delete_release_title">删除 release？</string>
+    <string name="delete_release_warning">将删除 release %1$s 及其所有附件，标签仍会保留在仓库中。此操作无法撤销。</string>
+    <string name="delete_release_confirm">删除</string>
+
     <!-- 代码浏览 -->
     <string name="cd_switch_branch">切换分支</string>
     <string name="branch_load_failed">分支加载失败</string>

@@ -93,6 +93,23 @@ class RepoDetailViewModel @Inject constructor(
     private val _releases = MutableStateFlow<List<GitHubApi.Release>>(emptyList())
     val releases: StateFlow<List<GitHubApi.Release>> = _releases
 
+    // ── Release delete state ───────────────────────────────
+    private val _isDeletingRelease = MutableStateFlow(false)
+    val isDeletingRelease: StateFlow<Boolean> = _isDeletingRelease
+
+    private val _releaseDeleteMessage = MutableStateFlow<String?>(null)
+    val releaseDeleteMessage: StateFlow<String?> = _releaseDeleteMessage
+
+    /** Whether the signed-in user can delete releases on the current repo. */
+    val canManageReleases: StateFlow<Boolean> =
+        combine(_repo, accountRepository.activeAccount) { r, account ->
+            if (r == null || account == null) {
+                false
+            } else {
+                r.owner.login == account.login || r.permissions?.admin == true
+            }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
     private val _workflowRuns = MutableStateFlow<List<GitHubApi.WorkflowRun>>(emptyList())
     val workflowRuns: StateFlow<List<GitHubApi.WorkflowRun>> = _workflowRuns
 
@@ -527,6 +544,45 @@ class RepoDetailViewModel @Inject constructor(
 
     fun clearDeleteMessage() {
         _deleteMessage.update { null }
+    }
+
+    fun clearReleaseDeleteMessage() {
+        _releaseDeleteMessage.update { null }
+    }
+
+    /**
+     * Delete a release. GitHub's release-delete endpoint requires the same
+     * repo owner/admin permission as deleting the repo, but does NOT need the
+     * `delete_repo` token scope. Returns 204 on success.
+     */
+    fun deleteRelease(owner: String, repo: String, releaseId: Long) {
+        viewModelScope.launch {
+            if (_isDeletingRelease.value) return@launch
+            _isDeletingRelease.update { true }
+            _releaseDeleteMessage.update { null }
+            try {
+                val resp = api.deleteRelease(owner, repo, releaseId)
+                if (resp.isSuccessful) {
+                    cache.invalidateReleases(owner, repo)
+                    // Remove the deleted release from the live list so the UI
+                    // reflects the change immediately without a refetch.
+                    _releases.update { list -> list.filterNot { it.id == releaseId } }
+                    _releaseDeleteMessage.update { "Deleted" }
+                } else {
+                    val err = resp.errorBody()?.string()
+                    val reason = when (resp.code()) {
+                        403 -> "Forbidden: only the repo owner or admin can delete releases"
+                        404 -> "Release not found or no access"
+                        else -> "Delete failed (${resp.code()}): ${err?.take(200)}"
+                    }
+                    _releaseDeleteMessage.update { reason }
+                }
+            } catch (e: Exception) {
+                _releaseDeleteMessage.update { e.localizedMessage ?: "Delete failed" }
+            } finally {
+                _isDeletingRelease.update { false }
+            }
+        }
     }
 
     // ── Translation ──────────────────────────────────────────

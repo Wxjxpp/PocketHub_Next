@@ -81,6 +81,11 @@ class CachedRepository @Inject constructor(
         }
     }
 
+    /** Invalidate cached release pages so the next fetch hits the network. */
+    suspend fun invalidateReleases(owner: String, repo: String) {
+        cacheDao.evictContaining("releases:$owner/$repo")
+    }
+
     // ── Feed / Trending ─────────────────────────────────
 
     suspend fun searchTrending(query: String, sort: String = "stars", perPage: Int = 20): GitHubApi.SearchRepoResult {

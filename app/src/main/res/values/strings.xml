@@ -554,6 +554,12 @@
     <string name="delete_repo_confirm_label">Type %1$s to confirm</string>
     <string name="delete_repo_confirm">DELETE</string>
 
+    <!-- Release delete -->
+    <string name="delete_release">Delete release</string>
+    <string name="delete_release_title">Delete release?</string>
+    <string name="delete_release_warning">This will delete the release %1$s and all its attached assets. The tag is NOT removed from the repository. This action cannot be undone.</string>
+    <string name="delete_release_confirm">DELETE</string>
+
     <!-- Code browser -->
     <string name="cd_switch_branch">Switch branch</string>
     <string name="branch_load_failed">Failed to load branches</string>

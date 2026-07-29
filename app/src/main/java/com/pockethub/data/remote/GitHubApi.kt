@@ -883,6 +883,18 @@ interface GitHubApi {
         @Query("page") page: Int = 1,
     ): List<Release>
 
+    /**
+     * Delete a release. Requires the authenticated user to be the repo owner or
+     * have admin permission (the `delete_repo` scope is NOT required for releases).
+     * Returns 204 on success; 403 / 404 for permission / not-found cases.
+     */
+    @DELETE("repos/{owner}/{repo}/releases/{release_id}")
+    suspend fun deleteRelease(
+        @Path("owner") owner: String,
+        @Path("repo") repo: String,
+        @Path("release_id") releaseId: Long,
+    ): Response<Unit>
+
     /** GitHub Actions workflow runs for a repo. */
     @GET("repos/{owner}/{repo}/actions/runs")
     suspend fun getWorkflowRuns(

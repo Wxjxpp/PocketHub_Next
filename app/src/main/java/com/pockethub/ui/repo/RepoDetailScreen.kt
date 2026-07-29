@@ -122,6 +122,9 @@ fun RepoDetailScreen(
     val isDeleting by vm.isDeleting.collectAsState()
     val deleteMessage by vm.deleteMessage.collectAsState()
     val deleteSuccess by vm.deleteSuccess.collectAsState()
+    val canManageReleases by vm.canManageReleases.collectAsState()
+    val isDeletingRelease by vm.isDeletingRelease.collectAsState()
+    val releaseDeleteMessage by vm.releaseDeleteMessage.collectAsState()
     val error by vm.error.collectAsState()
     val tab by vm.currentTab.collectAsState()
     val workflows by vm.workflows.collectAsState()
@@ -161,6 +164,13 @@ fun RepoDetailScreen(
         deleteMessage?.let {
             snackbarHostState.showSnackbar(it)
             vm.clearDeleteMessage()
+        }
+    }
+
+    LaunchedEffect(releaseDeleteMessage) {
+        releaseDeleteMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            vm.clearReleaseDeleteMessage()
         }
     }
 
@@ -394,6 +404,8 @@ fun RepoDetailScreen(
                     releases,
                     repoContext = "$owner/$repo",
                     defaultBranch = repoData?.defaultBranch,
+                    canDelete = canManageReleases,
+                    isDeletingRelease = isDeletingRelease,
                     onLinkClick = rememberMarkdownLinkHandler(owner, repo, onNavigateToRepo, onNavigateToUser, onNavigateToIssue, downloadVm = downloadVm, onNavigateToDownloads = onNavigateToDownloads),
                     onNavigateToUser = onNavigateToUser,
                     onDownloadAsset = { asset ->
@@ -409,6 +421,7 @@ fun RepoDetailScreen(
                         )
                         onNavigateToDownloads("active")
                     },
+                    onDeleteRelease = { releaseId -> vm.deleteRelease(owner, repo, releaseId) },
                 )
                 RepoTab.COMMITS -> CommitsTab(owner, repo, onNavigateToUser = onNavigateToUser, onCommitClick = onNavigateToCommit)
                 RepoTab.WORKFLOWS -> WorkflowsTab(
@@ -919,9 +932,12 @@ private fun ReleasesTab(
     releases: List<GitHubApi.Release>,
     repoContext: String,
     defaultBranch: String? = null,
+    canDelete: Boolean = false,
+    isDeletingRelease: Boolean = false,
     onLinkClick: (String, com.pockethub.ui.markdown.LinkKind) -> Unit,
     onNavigateToUser: (String) -> Unit = {},
     onDownloadAsset: (GitHubApi.Release.ReleaseAsset) -> Unit = {},
+    onDeleteRelease: (Long) -> Unit = {},
 ) {
     if (releases.isEmpty()) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -940,6 +956,7 @@ private fun ReleasesTab(
     }
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
         items(releases, key = { it.id }) { release ->
+            var showDeleteConfirm by remember { mutableStateOf(false) }
             Column(Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(release.tagName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
@@ -950,6 +967,21 @@ private fun ReleasesTab(
                             label = { Text(stringResource(R.string.pre_release), style = MaterialTheme.typography.labelSmall) },
                             colors = AssistChipDefaults.assistChipColors(containerColor = MaterialTheme.colorScheme.errorContainer),
                         )
+                    }
+                    Spacer(Modifier.weight(1f))
+                    if (canDelete) {
+                        IconButton(
+                            onClick = { showDeleteConfirm = true },
+                            enabled = !isDeletingRelease,
+                            modifier = Modifier.size(28.dp),
+                        ) {
+                            Icon(
+                                Icons.Outlined.Delete,
+                                contentDescription = stringResource(R.string.delete_release),
+                                modifier = Modifier.size(18.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 }
                 release.name?.let { if (it != release.tagName) Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
@@ -1015,12 +1047,39 @@ private fun ReleasesTab(
                 }
             }
             HorizontalDivider()
+
+            if (showDeleteConfirm) {
+                AlertDialog(
+                    onDismissRequest = { if (!isDeletingRelease) showDeleteConfirm = false },
+                    title = { Text(stringResource(R.string.delete_release_title)) },
+                    text = {
+                        Column {
+                            Text(
+                                stringResource(R.string.delete_release_warning, release.tagName),
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                showDeleteConfirm = false
+                                onDeleteRelease(release.id)
+                            },
+                            enabled = !isDeletingRelease,
+                        ) { Text(stringResource(R.string.delete_release_confirm), color = MaterialTheme.colorScheme.error) }
+                    },
+                    dismissButton = {
+                        TextButton(
+                            onClick = { showDeleteConfirm = false },
+                            enabled = !isDeletingRelease,
+                        ) { Text(stringResource(R.string.action_cancel)) }
+                    },
+                )
+            }
         }
     }
 }
-
-@Composable
-private fun WorkflowsTab(
     runs: List<GitHubApi.WorkflowRun>,
     onNavigateToUser: (String) -> Unit = {},
     onNavigateToWorkflowRun: (Long) -> Unit = {},
