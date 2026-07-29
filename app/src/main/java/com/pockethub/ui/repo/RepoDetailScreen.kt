@@ -1080,6 +1080,9 @@ private fun ReleasesTab(
         }
     }
 }
+
+@Composable
+private fun WorkflowsTab(
     runs: List<GitHubApi.WorkflowRun>,
     onNavigateToUser: (String) -> Unit = {},
     onNavigateToWorkflowRun: (Long) -> Unit = {},
