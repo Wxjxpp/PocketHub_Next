@@ -40,6 +40,19 @@ class CommitDetailViewModel @Inject constructor(
     private val _actionMessage = MutableStateFlow<String?>(null)
     val actionMessage: StateFlow<String?> = _actionMessage
 
+    /**
+     * Repository record for the loaded commit — fetched once alongside the
+     * commit so the screen can decide whether to show the "revert" button
+     * (needs the default branch name + the authenticated user's push
+     * permission). `null` until [load] completes the parallel repo fetch.
+     */
+    private val _repoInfo = MutableStateFlow<com.pockethub.data.model.Repository?>(null)
+    val repoInfo: StateFlow<com.pockethub.data.model.Repository?> = _repoInfo.asStateFlow()
+
+    /** True while a revert-to-parent request is in flight. */
+    private val _isReverting = MutableStateFlow(false)
+    val isReverting: StateFlow<Boolean> = _isReverting.asStateFlow()
+
     private var loadedSha: String? = null
 
     fun load(owner: String, repo: String, sha: String) {
@@ -57,12 +70,22 @@ class CommitDetailViewModel @Inject constructor(
                 _isLoading.update { false }
             }
         }
+        // Fetch repository (for default branch + push permission) in parallel —
+        // the revert button on the screen gates on repoInfo.permissions.push.
+        viewModelScope.launch {
+            try {
+                _repoInfo.update { api.getRepository(owner, repo) }
+            } catch (_: Exception) {
+                // Non-fatal: revert button simply stays disabled.
+            }
+        }
         // Load commit comments in parallel — independent of the commit itself.
         loadComments(owner, repo, sha)
     }
 
     fun retry(owner: String, repo: String, sha: String) {
         loadedSha = null
+        _repoInfo.update { null }
         load(owner, repo, sha)
     }
 
@@ -129,4 +152,37 @@ class CommitDetailViewModel @Inject constructor(
     fun clearActionMessage() { _actionMessage.update { null } }
     fun clearCommentError() { _commentError.update { null } }
     fun retryComments(owner: String, repo: String, sha: String) = loadComments(owner, repo, sha)
+
+    /**
+     * Roll the repository's default branch back one step: move the branch ref to
+     * this commit's first parent, discarding this commit (and anything after it
+     * on the default branch). This mirrors `git reset --hard HEAD~1` on the
+     * default branch rather than `git revert` — it actually drops the commit,
+     * so it only makes sense on the user's own repo where they have push rights.
+     *
+     * Requires the commit to have at least one parent (initial commits cannot be
+     * reverted this way) and the authenticated user to have push permission,
+     * which the screen gates on before enabling the button.
+     *
+     * @return `null` on success, an error message string on failure (the screen
+     * shows it via snackbar).
+     */
+    suspend fun revert(owner: String, repo: String, sha: String): String? {
+        if (_isReverting.value) return null
+        val parentSha = _commit.value?.parents?.firstOrNull()?.sha
+            ?: return "This commit has no parent to revert to."
+        val branch = _repoInfo.value?.defaultBranch
+            ?: return "Repository info not loaded yet."
+        _isReverting.update { true }
+        try {
+            val resp = api.updateRef(owner, repo, "heads/$branch", GitHubApi.UpdateRefRequest(parentSha, force = true))
+            if (resp.isSuccessful) return null
+            return "Revert failed: HTTP ${resp.code()}"
+        } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
+            return e.localizedMessage ?: "Revert failed"
+        } finally {
+            _isReverting.update { false }
+        }
+    }
 }
