@@ -814,6 +814,31 @@ interface GitHubApi {
         val line: Int? = null,
     )
 
+    /**
+     * Force-update a Git ref (branch/tag) to point at a given SHA.
+     *
+     * Used by the commit-detail "revert to parent" action: we move the default
+     * branch ref back to the commit's parent, effectively discarding the commit
+     * on the user's own repository. `force = true` is required because rewinding
+     * a branch ref is a non-fast-forward update.
+     *
+     * GitHub REST: `PATCH /repos/{owner}/{repo}/git/refs/{ref}` where `{ref}` is
+     * e.g. `heads/main` (no leading `refs/`).
+     */
+    @PATCH("repos/{owner}/{repo}/git/refs/{ref}")
+    suspend fun updateRef(
+        @Path("owner") owner: String,
+        @Path("repo") repo: String,
+        @Path("ref") ref: String,
+        @Body body: UpdateRefRequest,
+    ): Response<Unit>
+
+    @kotlinx.serialization.Serializable
+    data class UpdateRefRequest(
+        val sha: String,
+        val force: Boolean = false,
+    )
+
     @kotlinx.serialization.Serializable
     data class CommitComment(
         val id: Long = 0,
