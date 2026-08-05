@@ -316,6 +316,14 @@
     <string name="repo_forks">Forks: %1$d</string>
     <string name="repo_issues">Issues: %1$d</string>
     <string name="repo_updated">更新于 %1$s</string>
+    <string name="repo_forked_from">fork 自 %1$s</string>
+
+    <!-- 可见性切换 -->
+    <string name="visibility_dialog_title">修改仓库可见性</string>
+    <string name="visibility_to_private_warning">将 %1$s 设为私有后会从公开搜索与个人主页中隐藏，已有的 star / 关注者会被保留。此操作需再次请求才能切回公开 — 是否继续？</string>
+    <string name="visibility_to_public_warning">将 %1$s 设为公开后，所有分支、Issue 和 Pull Request 都会对所有人可见，互联网上任何人都可以读取该仓库 — 是否继续？</string>
+    <string name="visibility_action_private">设为私有</string>
+    <string name="visibility_action_public">设为公开</string>
 
     <!-- Repo filter chips -->
     <string name="repo_filter_all">全部</string>

@@ -32,6 +32,8 @@ import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Campaign
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.LockOpen
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.NotificationsOff
 import androidx.compose.material.icons.outlined.Share
@@ -124,6 +126,8 @@ fun RepoDetailScreen(
     val isDeleting by vm.isDeleting.collectAsState()
     val deleteMessage by vm.deleteMessage.collectAsState()
     val deleteSuccess by vm.deleteSuccess.collectAsState()
+    val isTogglingVisibility by vm.isTogglingVisibility.collectAsState()
+    val visibilityMessage by vm.visibilityMessage.collectAsState()
     val canManageReleases by vm.canManageReleases.collectAsState()
     val isDeletingRelease by vm.isDeletingRelease.collectAsState()
     val releaseDeleteMessage by vm.releaseDeleteMessage.collectAsState()
@@ -145,6 +149,7 @@ fun RepoDetailScreen(
     var showForkDialog by remember { mutableStateOf(false) }
     var showDispatchDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showVisibilityDialog by remember { mutableStateOf(false) }
     var deleteInput by remember { mutableStateOf("") }
 
     LaunchedEffect(owner, repo) { vm.loadRepo(owner, repo) }
@@ -166,6 +171,13 @@ fun RepoDetailScreen(
         deleteMessage?.let {
             snackbarHostState.showSnackbar(it)
             vm.clearDeleteMessage()
+        }
+    }
+
+    LaunchedEffect(visibilityMessage) {
+        visibilityMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            vm.clearVisibilityMessage()
         }
     }
 
@@ -279,6 +291,21 @@ fun RepoDetailScreen(
                         )
                     }
                     if (canDelete) {
+                        // Visibility toggle — only available on repos the user owns / has admin on.
+                        // Shows a closed lock for private repos, an open lock for public ones;
+                        // tapping it opens a confirmation dialog because switching visibility
+                        // on GitHub can have side effects (branch protection refresh, watchers'
+                        // feeds) and an accidental flip should be a deliberate choice.
+                        IconButton(
+                            onClick = { showVisibilityDialog = true },
+                            enabled = !isTogglingVisibility && !isDeleting,
+                        ) {
+                            Icon(
+                                if (repoData?.private == true) Icons.Outlined.Lock else Icons.Outlined.LockOpen,
+                                contentDescription = stringResource(R.string.cd_toggle_visibility),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                         IconButton(
                             onClick = {
                                 deleteInput = "$owner/$repo"
@@ -380,6 +407,7 @@ fun RepoDetailScreen(
                     translateTarget = translateTarget,
                     onToggleTranslation = { vm.toggleTranslation() },
                     onTopicClick = { topic -> onNavigateToSearch(topic) },
+                    onNavigateToRepo = onNavigateToRepo,
                     onLinkClick = rememberMarkdownLinkHandler(owner, repo, onNavigateToRepo, onNavigateToUser, onNavigateToIssue, downloadVm = downloadVm, onNavigateToDownloads = onNavigateToDownloads),
                 )
                 RepoTab.CODE -> CodeTab(
@@ -470,6 +498,44 @@ fun RepoDetailScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showForkDialog = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+        )
+    }
+
+    if (showVisibilityDialog) {
+        val goingPrivate = repoData?.private != true
+        AlertDialog(
+            onDismissRequest = { if (!isTogglingVisibility) showVisibilityDialog = false },
+            title = { Text(stringResource(R.string.visibility_dialog_title)) },
+            text = {
+                Text(
+                    stringResource(
+                        if (goingPrivate) R.string.visibility_to_private_warning
+                        else R.string.visibility_to_public_warning,
+                        "$owner/$repo",
+                    ),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showVisibilityDialog = false
+                        vm.toggleVisibility(owner, repo)
+                    },
+                    enabled = !isTogglingVisibility,
+                ) {
+                    Text(
+                        if (goingPrivate) stringResource(R.string.visibility_action_private)
+                        else stringResource(R.string.visibility_action_public),
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showVisibilityDialog = false }, enabled = !isTogglingVisibility) {
                     Text(stringResource(R.string.action_cancel))
                 }
             },
@@ -594,6 +660,7 @@ private fun OverviewTab(
     translateTarget: String? = null,
     onToggleTranslation: () -> Unit = {},
     onTopicClick: (String) -> Unit = {},
+    onNavigateToRepo: (String, String) -> Unit = { _, _ -> },
     onLinkClick: (String, com.pockethub.ui.markdown.LinkKind) -> Unit,
 ) {
     if (isLoading && repoData == null) {
@@ -607,6 +674,40 @@ private fun OverviewTab(
         ) {
             if (!data.description.isNullOrBlank()) {
                 Text(data.description, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+            }
+            // Fork source chip — shown only when this repo is itself a fork and
+            // the upstream parent slug is available, matching GitHub's
+            // "forked from owner/repo" affordance. Tapping navigates into the
+            // parent detail screen within the app (not an external browser), so
+            // users can keep browsing without losing context.
+            if (data.fork && data.parent != null) {
+                val p = data.parent
+                val parentOwner = p.owner.login
+                val parentName = p.name
+                Box(
+                    modifier = Modifier
+                        .clip(MaterialTheme.shapes.small)
+                        .background(MaterialTheme.colorScheme.secondaryContainer)
+                        .clickable { onNavigateToRepo(parentOwner, parentName) },
+                ) {
+                    Row(
+                        Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            Icons.Outlined.ForkRight,
+                            null,
+                            modifier = Modifier.size(13.dp),
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            stringResource(R.string.repo_forked_from, "$parentOwner/$parentName"),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        )
+                    }
+                }
             }
             if (!data.homepage.isNullOrBlank()) {
                 Text(

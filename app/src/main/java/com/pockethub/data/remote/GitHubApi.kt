@@ -201,6 +201,29 @@ interface GitHubApi {
         @Path("repo") repo: String,
     ): Response<Unit>
 
+    /**
+     * Update repository settings — used here for toggling visibility
+     * (private/public). Requires admin permission on the repo.
+     * PUT-style update of the repo; returns the updated [Repository].
+     * Docs: https://docs.github.com/en/rest/repos/repos#update-a-repository
+     */
+    @PATCH("repos/{owner}/{repo}")
+    suspend fun updateRepository(
+        @Path("owner") owner: String,
+        @Path("repo") repo: String,
+        @Body body: RepoUpdateRequest,
+    ): Response<Repository>
+
+    @kotlinx.serialization.Serializable
+    data class RepoUpdateRequest(
+        /** `private: true` makes the repo private; GitHub treats this field as authoritative for pub/priv toggle. */
+        val `private`: Boolean? = null,
+        /** Optional name update — pass-through only, left null for visibility changes. */
+        val name: String? = null,
+        /** Optional description update — left null for visibility changes. */
+        val description: String? = null,
+    )
+
     // ──────────────────────────────────────────────
     //  File browsing (content API)
     // ──────────────────────────────────────────────

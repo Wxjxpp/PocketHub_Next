@@ -186,6 +186,20 @@ private fun RepoCard(
                 Spacer(Modifier.width(6.dp))
                 Text(stringResource(R.string.repo_private), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+            if (repo.fork) {
+                // FORK badge — same lightweight label style as the private badge.
+                // Even though list responses include `parent.full_name`, we keep
+                // the list badge informational only; tapping the card opens the
+                // detail page where the parent navigation chip lives (avoids
+                // navigating away from the list via a small embedded link).
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    "FORK",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.tertiary,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
         }
 
         // Description

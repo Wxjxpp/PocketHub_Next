@@ -332,6 +332,14 @@
     <string name="repo_forks">Forks: %1$d</string>
     <string name="repo_issues">Issues: %1$d</string>
     <string name="repo_updated">Updated %1$s</string>
+    <string name="repo_forked_from">forked from %1$s</string>
+
+    <!-- Visibility toggle -->
+    <string name="visibility_dialog_title">Change repository visibility</string>
+    <string name="visibility_to_private_warning">Setting %1$s to private hides it from public search and profiles. Existing stars/watchers are kept. This cannot be undone from a private state without another request — proceed?</string>
+    <string name="visibility_to_public_warning">Setting %1$s to public will make all branches, issues and pull requests visible to everyone. Anyone on the internet can read this repo — proceed?</string>
+    <string name="visibility_action_private">Make private</string>
+    <string name="visibility_action_public">Make public</string>
 
     <!-- Repo filter chips -->
     <string name="repo_filter_all">All</string>

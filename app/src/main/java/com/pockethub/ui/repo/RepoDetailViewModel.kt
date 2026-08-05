@@ -595,6 +595,58 @@ class RepoDetailViewModel @Inject constructor(
         _releaseDeleteMessage.update { null }
     }
 
+    // ── Visibility toggle (private ⇄ public) ──────────────────
+    private val _isTogglingVisibility = MutableStateFlow(false)
+    val isTogglingVisibility: StateFlow<Boolean> = _isTogglingVisibility.asStateFlow()
+
+    private val _visibilityMessage = MutableStateFlow<String?>(null)
+    val visibilityMessage: StateFlow<String?> = _visibilityMessage.asStateFlow()
+
+    /**
+     * Toggle this repository between private and public. Only callable when the
+     * current user has admin rights on the repo (see [canDelete]). Uses the
+     * PATCH /repos/{owner}/{repo} endpoint with the `private` field — GitHub treats
+     * this as the authoritative toggle for visibility. Refreshes the in-memory
+     * repo state on success so the UI locks/unlocks immediately.
+     */
+    fun toggleVisibility(owner: String, repo: String) {
+        val current = _repo.value ?: return
+        if (_isTogglingVisibility.value) return
+        viewModelScope.launch {
+            _isTogglingVisibility.update { true }
+            _visibilityMessage.update { null }
+            try {
+                val target = !current.private
+                val resp = api.updateRepository(
+                    owner,
+                    repo,
+                    GitHubApi.RepoUpdateRequest(private = target),
+                )
+                if (resp.isSuccessful) {
+                    resp.body()?.let { updated ->
+                        _repo.update { updated }
+                        cache.invalidateRepo(owner, repo)
+                    }
+                    _visibilityMessage.update {
+                        if (target) "Repository set to private" else "Repository set to public"
+                    }
+                } else {
+                    _visibilityMessage.update {
+                        "Failed to update visibility (${resp.code()})"
+                    }
+                }
+            } catch (e: Exception) {
+                _visibilityMessage.update { e.localizedMessage ?: "Failed to update visibility" }
+            } finally {
+                _isTogglingVisibility.update { false }
+            }
+        }
+    }
+
+    fun clearVisibilityMessage() {
+        _visibilityMessage.update { null }
+    }
+
     /**
      * Delete a release. GitHub's release-delete endpoint requires the same
      * repo owner/admin permission as deleting the repo, but does NOT need the

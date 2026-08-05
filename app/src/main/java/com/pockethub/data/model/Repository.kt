@@ -26,6 +26,17 @@ data class Repository(
     /** True when this repository is a fork of another. */
     val fork: Boolean = false,
 
+    /**
+     * For fork repositories: a summary view of the upstream source repo. Populated
+     * by the GitHub API on fork endpoints (`fork: true` repos come with `parent`).
+     * `null` for native repos or when the API omits the field (e.g. some list
+     * responses may strip it for non-fork entries).
+     *
+     * Kept as a nested [Repository] so [name]/[fullName]/[owner] are available for
+     * "forked from …" navigation chips without modeling a separate type.
+     */
+    @SerialName("parent") val parent: Repository? = null,
+
     // Language
     val language: String? = null,
     @SerialName("language_color") val languageColor: String? = null,
