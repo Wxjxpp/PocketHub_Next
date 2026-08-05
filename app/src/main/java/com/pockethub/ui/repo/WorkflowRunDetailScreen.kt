@@ -311,12 +311,12 @@ private fun JobCard(
                 Text("No step metadata", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    job.steps.forEach { step ->
+                    job.steps.forEachIndexed { localIndex, step ->
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             StepStatusIcon(status = step.status, conclusion = step.conclusion)
                             Spacer(Modifier.width(8.dp))
                             Text(
-                                "#${step.number} ${step.name}",
+                                "#${localIndex + 1} ${step.name}",
                                 style = MaterialTheme.typography.bodySmall,
                                 fontFamily = FontFamily.Monospace,
                                 modifier = Modifier.weight(1f),

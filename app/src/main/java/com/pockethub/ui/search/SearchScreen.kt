@@ -49,6 +49,8 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
@@ -201,7 +203,14 @@ fun SearchScreen(
             !hasResults -> {
                 EmptyState(title = stringResource(R.string.search_results_empty, searchedQuery))
             }
-            else -> LazyColumn(
+            else -> {
+                val pullState = rememberPullToRefreshState()
+                PullToRefreshBox(
+                    isRefreshing = isLoading,
+                    onRefresh = { vm.search() },
+                    state = pullState,
+                ) {
+                    LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -226,6 +235,8 @@ fun SearchScreen(
                 if (isLoading || isLoadingMore) {
                     item(key = "loading-footer") { LoadingFooter() }
                 }
+                    } // LazyColumn close
+                } // PullToRefreshBox close
             }
         }
     }

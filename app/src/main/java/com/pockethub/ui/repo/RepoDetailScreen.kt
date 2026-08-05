@@ -114,7 +114,6 @@ fun RepoDetailScreen(
     val releases by vm.releases.collectAsState()
     val workflowRuns by vm.workflowRuns.collectAsState()
     val readme by vm.readme.collectAsState()
-    val wiki by vm.wiki.collectAsState()
     val isLoading by vm.isLoading.collectAsState()
     val isRefreshing by vm.isRefreshing.collectAsState()
     val commitsPokeTrigger by vm.commitsPokeTrigger.collectAsState()
@@ -158,7 +157,6 @@ fun RepoDetailScreen(
         if (tab == RepoTab.PRS) vm.loadPulls(owner, repo)
         if (tab == RepoTab.RELEASES) vm.loadReleases(owner, repo)
         if (tab == RepoTab.WORKFLOWS) vm.loadWorkflowRuns(owner, repo)
-        if (tab == RepoTab.WIKI) vm.loadWiki(owner, repo)
     }
     LaunchedEffect(forkMessage) {
         forkMessage?.let {
@@ -374,7 +372,6 @@ fun RepoDetailScreen(
                         RepoTab.RELEASES -> stringResource(R.string.tab_releases)
                         RepoTab.COMMITS -> stringResource(R.string.tab_commits)
                         RepoTab.WORKFLOWS -> stringResource(R.string.tab_workflows)
-                        RepoTab.WIKI -> stringResource(R.string.tab_wiki)
                     }
                     Tab(
                         selected = tab == current,
@@ -473,11 +470,6 @@ fun RepoDetailScreen(
                     workflowRuns,
                     onNavigateToUser = onNavigateToUser,
                     onNavigateToWorkflowRun = onNavigateToWorkflowRun,
-                )
-                RepoTab.WIKI -> WikiTab(
-                    owner = owner,
-                    repo = repo,
-                    wiki = wiki,
                 )
             }
         }
@@ -1479,55 +1471,5 @@ internal fun guessAssetMime(name: String): String {
         "webp" -> "image/webp"
         "md" -> "text/markdown"
         else -> "application/octet-stream"
-    }
-}
-
-/**
- * Repository Wiki tab. Fetches raw.githubusercontent.com/wiki/{owner}/{repo}/Home.md,
- * renders it as markdown. Empty / unavailable wiki shows an informative empty state
- * with a button to open the web wiki in browser (covers wikis that exist but don't follow
- * the default Home.md convention).
- */
-@Composable
-private fun WikiTab(
-    owner: String,
-    repo: String,
-    wiki: String?,
-) {
-    val context = LocalContext.current
-
-    if (wiki == null || wiki.isEmpty()) {
-        Column(
-            Modifier.fillMaxSize().padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            androidx.compose.material3.Text(
-                stringResource(R.string.wiki_empty),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            TextButton(onClick = {
-                val url = "https://github.com/$owner/$repo/wiki"
-                runCatching {
-                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                }
-            }) {
-                Text(stringResource(R.string.wiki_open_in_browser))
-            }
-        }
-        return
-    }
-
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
-        MarkdownText(
-            markdown = wiki,
-            repoContext = "$owner/$repo",
-            onLinkClick = { url, _ ->
-                runCatching {
-                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                }
-            },
-        )
     }
 }

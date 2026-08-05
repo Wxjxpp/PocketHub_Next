@@ -28,7 +28,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import javax.inject.Inject
 
-enum class RepoTab { OVERVIEW, CODE, ISSUES, PRS, RELEASES, COMMITS, WORKFLOWS, WIKI }
+enum class RepoTab { OVERVIEW, CODE, ISSUES, PRS, RELEASES, COMMITS, WORKFLOWS }
 
 /**
  * Three-state watch subscription on a repository — `NOT_WATCHING`, `WATCHING` and `MUTED`.
@@ -232,7 +232,7 @@ class RepoDetailViewModel @Inject constructor(
                     RepoTab.PRS -> loadPulls(owner, repo, force = true)
                     RepoTab.RELEASES -> loadReleases(owner, repo)
                     RepoTab.WORKFLOWS -> loadWorkflowRuns(owner, repo, branch = null)
-                    else -> {}  // OVERVIEW/CODE/COMMITS/WIKI have no extra list to reload here.
+                    else -> {}  // OVERVIEW/CODE/COMMITS have no extra list to reload here.
                 }
             } catch (e: Exception) {
                 _error.update { e.localizedMessage ?: "Failed to refresh repo" }
@@ -274,32 +274,6 @@ class RepoDetailViewModel @Inject constructor(
             _readme.update { markdown }
         } catch (_: Exception) {
             _readme.update { null }
-        }
-    }
-
-    /** Wiki content state: null=unknown/loading, "" = no wiki, otherwise markdown body of Home.md. */
-    private val _wiki = MutableStateFlow<String?>(null)
-    val wiki: StateFlow<String?> = _wiki
-
-    /** Whether the user has explicitly opened the Wiki tab (avoid preloading for repos that have no wiki). */
-    private val _wikiChecked = MutableStateFlow(false)
-
-    fun loadWiki(owner: String, repo: String): Job = viewModelScope.launch {
-        if (_wikiChecked.value && _wiki.value != null) return@launch
-        _wikiChecked.update { true }
-        _wiki.update { "" }  // loading state — empty string distinguishes from null (unknown)
-        val baseUrl = "https://raw.githubusercontent.com/wiki/$owner/$repo/Home.md"
-        try {
-            val md = withContext(Dispatchers.IO) {
-                val req = Request.Builder().url(baseUrl).build()
-                okHttp.newCall(req).execute().use { resp ->
-                    if (!resp.isSuccessful) return@use null
-                    resp.body?.string()
-                }
-            }
-            _wiki.update { md ?: "" }  // md null = 404 -> empty (no wiki)
-        } catch (_: Exception) {
-            _wiki.update { "" }
         }
     }
 

@@ -49,6 +49,8 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -128,10 +130,19 @@ fun ExploreScreen(
         ExploreSection.FOLLOWING -> followingSource
     }
 
-    LazyColumn(
-        modifier = modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+    // Pull-to-refresh: drags the list down to trigger vm.refresh(); while
+    // refreshing the built-in indicator spins above the list so users see
+    // the same affordance they expect from the system pull-refresh pattern.
+    val pullState = rememberPullToRefreshState()
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = { vm.refresh() },
+        state = pullState,
     ) {
+        LazyColumn(
+            modifier = modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             // Section switcher (Trending / Featured / Following)
             item {
                 Spacer(Modifier.height(8.dp))
@@ -710,6 +721,7 @@ private fun DiscoverItemCard(
             }
         }
     }
+    } // PullToRefreshBox
 }
 
 @Composable
