@@ -216,12 +216,25 @@ interface GitHubApi {
 
     @kotlinx.serialization.Serializable
     data class RepoUpdateRequest(
+        /**
+         * `visibility: "public" | "private"` — GitHub's authoritative visibility
+         * field. The legacy boolean `private` field still works but is deprecated
+         * by GitHub; reaching for `visibility` avoids ambiguity (see
+         * https://docs.github.com/en/rest/repos/repos#update-a-repository).
+         */
+        val visibility: String? = null,
         /** `private: true` makes the repo private; GitHub treats this field as authoritative for pub/priv toggle. */
         val `private`: Boolean? = null,
         /** Optional name update — pass-through only, left null for visibility changes. */
         val name: String? = null,
         /** Optional description update — left null for visibility changes. */
         val description: String? = null,
+    )
+
+    @kotlinx.serialization.Serializable
+    data class GitHubErrorBody(
+        val message: String? = null,
+        val documentation_url: String? = null,
     )
 
     // ──────────────────────────────────────────────

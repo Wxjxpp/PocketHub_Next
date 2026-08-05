@@ -617,10 +617,15 @@ class RepoDetailViewModel @Inject constructor(
             _visibilityMessage.update { null }
             try {
                 val target = !current.private
+                val targetVisibility = if (target) "private" else "public"
                 val resp = api.updateRepository(
                     owner,
                     repo,
-                    GitHubApi.RepoUpdateRequest(private = target),
+                    // `visibility` is GitHub's authoritative field (the legacy
+                    // boolean `private` still works but is deprecated and some
+                    // accounts/endpoints reject it without the `visibility`
+                    // counterpart). Send only `visibility` to stay unambiguous.
+                    GitHubApi.RepoUpdateRequest(visibility = targetVisibility),
                 )
                 if (resp.isSuccessful) {
                     resp.body()?.let { updated ->
@@ -631,8 +636,30 @@ class RepoDetailViewModel @Inject constructor(
                         if (target) "Repository set to private" else "Repository set to public"
                     }
                 } else {
+                    // Surface GitHub's actual error message rather than just the
+                    // status code. On 422 ("A previous visibility change is still
+                    // in progress") the user gets a meaningful "wait a moment"
+                    // nudge instead of an opaque "(422)".
+                    val ghMsg = runCatching {
+                        resp.errorBody()?.charStream()?.use { reader ->
+                            kotlinx.serialization.json.Json {
+                                ignoreUnknownKeys = true
+                                isLenient = true
+                            }.decodeFromString(
+                                GitHubApi.GitHubErrorBody.serializer(),
+                                reader.readText(),
+                            ).message
+                        }
+                    }.getOrNull()
                     _visibilityMessage.update {
-                        "Failed to update visibility (${resp.code()})"
+                        when {
+                            // GitHub returns this when a previous visibility
+                            // change is still being processed server-side.
+                            resp.code() == 422 && ghMsg != null ->
+                                "$ghMsg Try again in a few seconds."
+                            ghMsg != null -> "$ghMsg (${resp.code()})"
+                            else -> "Failed to update visibility (${resp.code()})"
+                        }
                     }
                 }
             } catch (e: Exception) {
