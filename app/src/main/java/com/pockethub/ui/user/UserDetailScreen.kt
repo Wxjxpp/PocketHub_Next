@@ -61,6 +61,8 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -160,10 +162,19 @@ fun UserDetailScreen(
         val isLoadingEvents by vm.isLoadingEvents.collectAsState()
         var sectionTab by remember { mutableIntStateOf(0) }
 
-        LazyColumn(
-            modifier = Modifier.padding(padding).fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+        // Pull-to-refresh around the whole user feed list — drags down to
+        // refetch both the profile and recent events; indicator spins while
+        // either profile or events is loading.
+        val pullState = rememberPullToRefreshState()
+        PullToRefreshBox(
+            isRefreshing = isLoading || isLoadingEvents,
+            onRefresh = { vm.refresh() },
+            state = pullState,
         ) {
+            LazyColumn(
+                modifier = Modifier.padding(padding).fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
             // Profile header card
             item {
                 UserHeader(
@@ -290,6 +301,7 @@ fun UserDetailScreen(
                 },
             )
         }
+        } // PullToRefreshBox close
     }
 }
 
