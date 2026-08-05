@@ -37,6 +37,7 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -68,6 +69,7 @@ private fun repoFilterLabel(filter: RepoFilter): String = when (filter) {
     RepoFilter.FORKS  -> stringResource(R.string.repo_filter_forks)
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReposScreen(
     modifier: Modifier = Modifier,
