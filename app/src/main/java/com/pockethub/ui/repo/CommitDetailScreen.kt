@@ -95,9 +95,23 @@ fun CommitDetailScreen(
     val isSendingComment by vm.isSendingComment.collectAsState()
     val commentError by vm.commentError.collectAsState()
     val actionMessage by vm.actionMessage.collectAsState()
+    // Revert-to-parent state: gate the button on push permission + a parent SHA.
+    val repoInfo by vm.repoInfo.collectAsState()
+    val isReverting by vm.isReverting.collectAsState()
     val context = LocalContext.current
     val dateFmt = remember { DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT, Locale.getDefault()) }
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // Confirmation dialog state for the "revert to parent" destructive action.
+    var showRevertDialog by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val revertEnabled = remember(commit, repoInfo) {
+        // Need: a parent SHA to roll back to, and push permission on the repo.
+        // Also require repoInfo to be loaded — its absence just keeps the button
+        // disabled rather than showing a confusing rejection.
+        commit?.parents?.isNotEmpty() == true &&
+            repoInfo?.permissions?.push == true
+    }
 
     LaunchedEffect(owner, repo, sha) { vm.load(owner, repo, sha) }
 
@@ -113,6 +127,39 @@ fun CommitDetailScreen(
             snackbarHostState.showSnackbar(it)
             vm.clearCommentError()
         }
+    }
+
+    if (showRevertDialog) {
+        AlertDialog(
+            onDismissRequest = { if (!isReverting) showRevertDialog = false },
+            title = { Text(stringResource(R.string.cd_revert_title)) },
+            text = { Text(stringResource(R.string.cd_revert_message)) },
+            confirmButton = {
+                TextButton(
+                    enabled = !isReverting,
+                    onClick = {
+                        // Fire the revert from a coroutine scoped to this composable;
+                        // dialog stays open showing the disabled confirm button
+                        // until the suspend call returns, then we dismiss + snackbar.
+                        scope.launch {
+                            val err = vm.revert(owner, repo, sha)
+                            if (err == null) {
+                                showRevertDialog = false
+                                snackbarHostState.showSnackbar(context.getString(R.string.cd_revert_success))
+                            } else {
+                                showRevertDialog = false
+                                snackbarHostState.showSnackbar(err)
+                            }
+                        }
+                    },
+                ) { Text(stringResource(R.string.cd_revert_confirm)) }
+            },
+            dismissButton = {
+                TextButton(enabled = !isReverting, onClick = { showRevertDialog = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+        )
     }
 
     Scaffold(
@@ -136,6 +183,20 @@ fun CommitDetailScreen(
                         refreshing = isLoading && commit != null,
                         enabled = commit != null && !isSendingComment,
                     )
+                    IconButton(onClick = { showRevertDialog = true }, enabled = revertEnabled && !isReverting) {
+                        if (isReverting) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        } else {
+                            // Use AutoMirrored ArrowBack as a "rewind one step" glyph —
+                            // both available in the extended icon set the project already
+                            // pulls in (other screens reuse it for Back) and semantically
+                            // close to "go back to the previous commit".
+                            Icon(
+                                Icons.AutoMirrored.Outlined.ArrowBack,
+                                contentDescription = stringResource(R.string.cd_revert),
+                            )
+                        }
+                    }
                     IconButton(onClick = {
                         val url = commit?.htmlUrl ?: "https://github.com/$owner/$repo/commit/$sha"
                         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
