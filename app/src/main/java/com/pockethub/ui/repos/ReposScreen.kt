@@ -134,10 +134,10 @@ fun ReposScreen(
             else -> {
                     LazyColumn(state = listState, modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(repos, key = { it.id }) { repo ->
-                    RepoCard(
+                    RepositoryRow(
                         repo = repo,
-                        onClick = { onNavigateToRepo(repo.owner.login, repo.name) },
-                        onNavigateToUser = onNavigateToUser,
+                        onOpen = { onNavigateToRepo(repo.owner.login, repo.name) },
+                        onOpenOwner = { onNavigateToUser(repo.owner.login) },
                     )
                 }
                 // Inline error banner when a page/refresh failed but stale data is visible.
@@ -156,78 +156,6 @@ fun ReposScreen(
                 }
                     } // LazyColumn close
             }
-        }
-    }
-}
-
-@Composable
-private fun RepoCard(
-    repo: Repository,
-    onClick: () -> Unit,
-    onNavigateToUser: (String) -> Unit = {},
-) {
-    val ownerClick = Modifier.clickable { onNavigateToUser(repo.owner.login) }
-    Column(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 10.dp),
-    ) {
-        // Repo name
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            AsyncImage(
-                model = repo.owner.avatarUrl,
-                contentDescription = null,
-                modifier = Modifier.size(16.dp).clip(CircleShape).then(ownerClick),
-            )
-            Spacer(Modifier.width(6.dp))
-            Text(
-                repo.owner.login,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = ownerClick,
-            )
-            Text(" / ", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(repo.name, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
-            if (repo.private) {
-                Spacer(Modifier.width(6.dp))
-                Text(stringResource(R.string.repo_private), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            if (repo.fork) {
-                // FORK badge — same lightweight label style as the private badge.
-                // Even though list responses include `parent.full_name`, we keep
-                // the list badge informational only; tapping the card opens the
-                // detail page where the parent navigation chip lives (avoids
-                // navigating away from the list via a small embedded link).
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    "FORK",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.tertiary,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
-        }
-
-        // Description
-        if (!repo.description.isNullOrBlank()) {
-            Spacer(Modifier.height(4.dp))
-            Text(repo.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        }
-
-        // Stats row
-        Spacer(Modifier.height(6.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            if (repo.language != null) {
-                val langColor = parseColorHex(languageColorHex(repo.language)) ?: MaterialTheme.colorScheme.outline
-                Box(Modifier.size(8.dp).clip(CircleShape).background(langColor))
-                Text(" ${repo.language} ", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            Icon(Icons.Outlined.Star, null, modifier = Modifier.size(12.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(" ${repo.stars}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.width(10.dp))
-            Text(stringResource(R.string.repo_forks, repo.forks), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.width(10.dp))
-            Text(stringResource(R.string.repo_issues, repo.openIssues), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.width(10.dp))
-            repo.pushedAt?.let { Text(stringResource(R.string.repo_updated, it.take(10)), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
     }
 }

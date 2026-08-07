@@ -198,16 +198,14 @@ fun PocketHubApp(
                 }
 
                 composable(Routes.HOME) {
-                    val activeAccount by appVm.activeAccount.collectAsState()
                     HomeScreen(
-                        activeAvatarUrl = activeAccount?.avatarUrl,
                         onNavigateToSearch = { q -> navController.navigate(Routes.search(q)) },
                         onNavigateToSettings = { navController.navigate(Routes.SETTINGS) },
                         onNavigateToFeedSources = { navController.navigate(Routes.FEED_SOURCES) },
                         onNavigateToRepo = { owner, repo -> navController.navigate(Routes.repoDetail(owner, repo)) },
+                        onNavigateToIssue = { owner, repo, number -> navController.navigate(Routes.issueDetail(owner, repo, number)) },
+                        onNavigateToPR = { owner, repo, number -> navController.navigate(Routes.prDetail(owner, repo, number)) },
                         onNavigateToUser = { login -> navController.navigate(Routes.userDetail(login)) },
-                        onNavigateToNotifications = { navController.navigate(Routes.NOTIFICATIONS) },
-                        onNavigateToProfile = { navController.navigate(Routes.PROFILE) },
                         onNavigateToHistory = { navController.navigate(Routes.HISTORY) },
                         onNavigateToDownloads = { navController.navigate(Routes.downloads("done")) },
                     )

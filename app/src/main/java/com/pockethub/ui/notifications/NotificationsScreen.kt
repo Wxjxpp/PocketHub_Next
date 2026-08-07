@@ -78,6 +78,7 @@ fun NotificationsScreen(
     onNavigateToIssue: (String, String, Int) -> Unit = { _, _, _ -> },
     onNavigateToPR: (String, String, Int) -> Unit = { _, _, _ -> },
     onBack: () -> Unit = {},
+    showTopBar: Boolean = true,
     vm: NotificationsViewModel = hiltViewModel(),
 ) {
     val notifications by vm.notifications.collectAsState()
@@ -106,14 +107,16 @@ fun NotificationsScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.tab_notifications), fontWeight = FontWeight.SemiBold) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = stringResource(R.string.action_back))
-                    }
-                },
-            )
+            if (showTopBar) {
+                TopAppBar(
+                    title = { Text(stringResource(R.string.tab_notifications), fontWeight = FontWeight.SemiBold) },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = stringResource(R.string.action_back))
+                        }
+                    },
+                )
+            }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->

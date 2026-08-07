@@ -1,16 +1,13 @@
 package com.pockethub.ui.main
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.TrendingUp
@@ -19,6 +16,7 @@ import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Badge
@@ -77,20 +75,19 @@ fun HomeScreen(
     onNavigateToSettings: () -> Unit,
     onNavigateToFeedSources: () -> Unit,
     onNavigateToRepo: (String, String) -> Unit,
+    onNavigateToIssue: (String, String, Int) -> Unit,
+    onNavigateToPR: (String, String, Int) -> Unit,
     onNavigateToUser: (String) -> Unit = {},
-    onNavigateToNotifications: () -> Unit,
-    onNavigateToProfile: () -> Unit,
     onNavigateToHistory: () -> Unit,
     onNavigateToDownloads: () -> Unit,
-    activeAvatarUrl: String?,
 ) {
     val items = listOf(
         BottomNavItem("explore", R.string.tab_explore, Icons.AutoMirrored.Outlined.TrendingUp, Icons.AutoMirrored.Outlined.TrendingUp),
         BottomNavItem("repos", R.string.tab_repos, Icons.Outlined.Code, Icons.Outlined.Code),
+        BottomNavItem("notifications", R.string.tab_notifications, Icons.Outlined.Notifications, Icons.Outlined.Notifications),
+        BottomNavItem("profile", R.string.tab_profile, Icons.Outlined.Person, Icons.Outlined.Person),
     )
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
-
     // Double-tap the selected Explore tab to force-fetch its active section.
     // See [DeepNavTabGesture.pickRound].
     var lastTabClickAtMillis by rememberSaveable { mutableStateOf(0L) }
@@ -106,56 +103,27 @@ fun HomeScreen(
     val unreadCount = notifications.count { it.unread }
 
     Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            LargeTopAppBar(
-                title = {
-                    Text(stringResource(items[selectedTab].labelRes))
-                },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateToProfile) {
-                        if (activeAvatarUrl.isNullOrBlank()) {
-                            Box(
-                                Modifier.size(28.dp).clip(CircleShape),
-                                contentAlignment = androidx.compose.ui.Alignment.Center,
-                            ) {
-                                Text(
-                                    stringResource(R.string.profile_avatar_fallback),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        } else {
-                            AsyncImage(
-                                model = activeAvatarUrl,
-                                contentDescription = stringResource(R.string.tab_profile),
-                                modifier = Modifier.size(28.dp).clip(CircleShape),
-                            )
-                        }
-                    }
-                },
+            androidx.compose.material3.TopAppBar(
+                title = { Text(stringResource(items[selectedTab].labelRes), style = MaterialTheme.typography.titleLarge) },
                 actions = {
-                    IconButton(onClick = onNavigateToSettings) {
-                        Icon(Icons.Outlined.Settings, contentDescription = stringResource(R.string.settings))
-                    }
-                    BadgedBox(badge = {
-                        if (unreadCount > 0) {
-                            Badge { Text(if (unreadCount > 99) "99+" else unreadCount.toString()) }
+                    when (selectedTab) {
+                        0, 1 -> IconButton(onClick = { onNavigateToSearch("") }) {
+                            Icon(Icons.Outlined.Search, contentDescription = stringResource(R.string.action_search))
                         }
-                    }) {
-                        IconButton(onClick = onNavigateToNotifications) {
-                            Icon(Icons.Outlined.Notifications, contentDescription = stringResource(R.string.tab_notifications))
+                        3 -> {
+                            IconButton(onClick = onNavigateToDownloads) {
+                                Icon(Icons.Outlined.Download, contentDescription = stringResource(R.string.cd_open_download))
+                            }
+                            IconButton(onClick = onNavigateToHistory) {
+                                Icon(Icons.Outlined.History, contentDescription = stringResource(R.string.browse_history))
+                            }
+                            IconButton(onClick = onNavigateToSettings) {
+                                Icon(Icons.Outlined.Settings, contentDescription = stringResource(R.string.settings))
+                            }
                         }
-                    }
-                    IconButton(onClick = { onNavigateToSearch("") }) {
-                        Icon(Icons.Outlined.Search, contentDescription = stringResource(R.string.action_search))
                     }
                 },
-                colors = TopAppBarDefaults.largeTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    scrolledContainerColor = MaterialTheme.colorScheme.surface,
-                ),
-                scrollBehavior = scrollBehavior,
             )
         },
         bottomBar = {
@@ -166,12 +134,8 @@ fun HomeScreen(
                         selected = selected,
                         onClick = {
                             val now = System.currentTimeMillis()
-                            // Double-tap on the already-selected tab triggers a refresh.
-                            if (selected && lastClickedTab == index && now - lastTabClickAtMillis < 400) {
-                                when (index) {
-                                    0 -> exploreRefreshTrigger++
-                                    // Add more tabs here as refresh-aware screens appear.
-                                }
+                            if (index == 0 && selected && lastClickedTab == index && now - lastTabClickAtMillis < 400) {
+                                exploreRefreshTrigger++
                                 lastTabClickAtMillis = 0L
                             } else {
                                 lastTabClickAtMillis = now
@@ -180,24 +144,16 @@ fun HomeScreen(
                             }
                         },
                         icon = {
-                            Icon(
-                                imageVector = if (selected) item.selectedIcon else item.unselectedIcon,
-                                contentDescription = stringResource(item.labelRes),
-                            )
+                            if (index == 2 && unreadCount > 0) {
+                                BadgedBox(badge = { Badge { Text(if (unreadCount > 99) "99+" else unreadCount.toString()) } }) {
+                                    Icon(item.selectedIcon, contentDescription = stringResource(item.labelRes))
+                                }
+                            } else {
+                                Icon(if (selected) item.selectedIcon else item.unselectedIcon, contentDescription = stringResource(item.labelRes))
+                            }
                         },
                         label = { Text(stringResource(item.labelRes), style = MaterialTheme.typography.labelSmall) },
                     )
-                }
-            }
-        },
-        floatingActionButton = {
-            Column(horizontalAlignment = Alignment.End) {
-                FloatingActionButton(onClick = onNavigateToDownloads) {
-                    Icon(Icons.Outlined.Download, contentDescription = stringResource(R.string.cd_open_download))
-                }
-                Spacer(Modifier.height(12.dp))
-                FloatingActionButton(onClick = onNavigateToHistory) {
-                    Icon(Icons.Outlined.History, contentDescription = stringResource(R.string.browse_history))
                 }
             }
         },
@@ -210,10 +166,25 @@ fun HomeScreen(
                 onNavigateToFeedSources = onNavigateToFeedSources,
                 refreshTrigger = exploreRefreshTrigger,
             )
-            else -> ReposScreen(
+            1 -> ReposScreen(
                 modifier = Modifier.padding(innerPadding),
                 onNavigateToRepo = onNavigateToRepo,
                 onNavigateToUser = onNavigateToUser,
+            )
+            2 -> com.pockethub.ui.notifications.NotificationsScreen(
+                modifier = Modifier.padding(innerPadding),
+                onNavigateToRepo = onNavigateToRepo,
+                onNavigateToIssue = onNavigateToIssue,
+                onNavigateToPR = onNavigateToPR,
+                showTopBar = false,
+            )
+            else -> com.pockethub.ui.profile.ProfileScreen(
+                modifier = Modifier.padding(innerPadding),
+                onNavigateToSettings = onNavigateToSettings,
+                onNavigateToUserDetail = onNavigateToUser,
+                onNavigateToRepo = onNavigateToRepo,
+                onBack = {},
+                showTopBar = false,
             )
         }
     }

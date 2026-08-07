@@ -84,6 +84,7 @@ fun ProfileScreen(
     onNavigateToPR: (String, String, Int) -> Unit = { _, _, _ -> },
     onNavigateToUser: (String, Int) -> Unit = { _, _ -> },
     onBack: () -> Unit,
+    showTopBar: Boolean = true,
     vm: ProfileViewModel = hiltViewModel(),
 ) {
     val user by vm.user.collectAsState()
@@ -107,24 +108,24 @@ fun ProfileScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.title_profile), fontWeight = FontWeight.SemiBold) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = stringResource(R.string.action_back))
-                    }
-                },
-                actions = {
-                    // Open the public profile of the signed-in user — same surface the
-                    // "people you follow" pages use, so the layout & follow lists match.
-                    IconButton(onClick = { user?.login?.let { onNavigateToUserDetail(it) } }) {
-                        Icon(Icons.AutoMirrored.Outlined.OpenInNew, contentDescription = stringResource(R.string.cd_open_in_browser))
-                    }
-                    IconButton(onClick = onNavigateToSettings) {
-                        Icon(Icons.Outlined.Settings, contentDescription = stringResource(R.string.settings))
-                    }
-                },
-            )
+            if (showTopBar) {
+                TopAppBar(
+                    title = { Text(stringResource(R.string.title_profile), fontWeight = FontWeight.SemiBold) },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = stringResource(R.string.action_back))
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = { user?.login?.let { onNavigateToUserDetail(it) } }) {
+                            Icon(Icons.AutoMirrored.Outlined.OpenInNew, contentDescription = stringResource(R.string.cd_open_in_browser))
+                        }
+                        IconButton(onClick = onNavigateToSettings) {
+                            Icon(Icons.Outlined.Settings, contentDescription = stringResource(R.string.settings))
+                        }
+                    },
+                )
+            }
         },
     ) { padding ->
         LazyColumn(
