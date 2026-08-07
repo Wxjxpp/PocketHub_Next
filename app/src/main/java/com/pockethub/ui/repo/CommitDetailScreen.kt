@@ -179,11 +179,6 @@ fun CommitDetailScreen(
                     }
                 },
                 actions = {
-                    com.pockethub.ui.components.RefreshIconButton(
-                        onClick = { vm.refresh(owner, repo, sha) },
-                        refreshing = isLoading && commit != null,
-                        enabled = commit != null && !isSendingComment,
-                    )
                     IconButton(onClick = { showRevertDialog = true }, enabled = revertEnabled && !isReverting) {
                         if (isReverting) {
                             CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)

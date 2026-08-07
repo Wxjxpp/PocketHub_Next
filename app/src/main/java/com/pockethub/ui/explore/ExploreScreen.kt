@@ -49,9 +49,6 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -101,7 +98,6 @@ fun ExploreScreen(
 ) {
     val section by vm.section.collectAsState()
     val isLoading by vm.isLoading.collectAsState()
-    val isRefreshing by vm.isRefreshing.collectAsState()
     val error by vm.error.collectAsState()
     val trending by vm.trending.collectAsState()
     val featured by vm.featured.collectAsState()
@@ -131,15 +127,6 @@ fun ExploreScreen(
         ExploreSection.FOLLOWING -> followingSource
     }
 
-    // Pull-to-refresh: drags the list down to trigger vm.refresh(); while
-    // refreshing the built-in indicator spins above the list so users see
-    // the same affordance they expect from the system pull-refresh pattern.
-    val pullState = rememberPullToRefreshState()
-    PullToRefreshBox(
-        isRefreshing = isRefreshing,
-        onRefresh = { vm.refresh() },
-        state = pullState,
-    ) {
         LazyColumn(
             modifier = modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -378,7 +365,6 @@ fun ExploreScreen(
             }
         }
     }
-    } // PullToRefreshBox close — ExploreScreen's list wraps in pull-to-refresh.
 
 @Composable
 private fun sourceDisplayName(source: FeedSourceOption): String = when (source) {

@@ -115,8 +115,6 @@ fun RepoDetailScreen(
     val workflowRuns by vm.workflowRuns.collectAsState()
     val readme by vm.readme.collectAsState()
     val isLoading by vm.isLoading.collectAsState()
-    val isRefreshing by vm.isRefreshing.collectAsState()
-    val commitsPokeTrigger by vm.commitsPokeTrigger.collectAsState()
     val isStarred by vm.isStarred.collectAsState()
     val isPinned by vm.isPinned.collectAsState()
     val isForking by vm.isForking.collectAsState()
@@ -236,15 +234,6 @@ fun RepoDetailScreen(
                 },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = stringResource(R.string.action_back)) } },
                 actions = {
-                    // Manual refresh — re-fetches the repo, readme, and whichever sub-tab
-                    // is currently on-screen. Disabled along with the mutating actions
-                    // while a fork/star/delete request is in flight; disabled itself while
-                    // a refresh is already spinning so two refreshes can't pile up.
-                    com.pockethub.ui.components.RefreshIconButton(
-                        onClick = { vm.refresh(owner, repo) },
-                        refreshing = isRefreshing,
-                        enabled = !isForking && !isDeleting && !isTranslating && !isDispatching,
-                    )
                     IconButton(onClick = { showForkDialog = true }, enabled = !isForking) {
                         Icon(
                             Icons.Outlined.ForkRight,
@@ -464,7 +453,6 @@ fun RepoDetailScreen(
                     repo = repo,
                     onNavigateToUser = onNavigateToUser,
                     onCommitClick = onNavigateToCommit,
-                    refreshTrigger = commitsPokeTrigger,
                 )
                 RepoTab.WORKFLOWS -> WorkflowsTab(
                     workflowRuns,

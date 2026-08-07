@@ -35,8 +35,6 @@ import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -134,12 +132,6 @@ fun ReposScreen(
             repos.isEmpty() ->
                 com.pockethub.ui.components.EmptyState(title = stringResource(R.string.no_repositories_found))
             else -> {
-                val pullState = rememberPullToRefreshState()
-                PullToRefreshBox(
-                    isRefreshing = isLoading,
-                    onRefresh = { vm.refresh() },
-                    state = pullState,
-                ) {
                     LazyColumn(state = listState, modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(repos, key = { it.id }) { repo ->
                     RepoCard(
@@ -163,7 +155,6 @@ fun ReposScreen(
                     item(key = "loading-footer") { Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
                 }
                     } // LazyColumn close
-                } // PullToRefreshBox close
             }
         }
     }

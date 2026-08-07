@@ -61,8 +61,6 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -123,11 +121,6 @@ fun UserDetailScreen(
                 title = { Text("@$login", style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold) },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = stringResource(R.string.action_back)) } },
                 actions = {
-                    com.pockethub.ui.components.RefreshIconButton(
-                        onClick = { vm.refresh() },
-                        refreshing = isLoading && user != null,
-                        enabled = user != null && !followActionInProgress,
-                    )
                     IconButton(onClick = {
                         val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/$login"))
                         context.startActivity(intent)
@@ -162,19 +155,10 @@ fun UserDetailScreen(
         val isLoadingEvents by vm.isLoadingEvents.collectAsState()
         var sectionTab by remember { mutableIntStateOf(0) }
 
-        // Pull-to-refresh around the whole user feed list — drags down to
-        // refetch both the profile and recent events; indicator spins while
-        // either profile or events is loading.
-        val pullState = rememberPullToRefreshState()
-        PullToRefreshBox(
-            isRefreshing = isLoading || isLoadingEvents,
-            onRefresh = { vm.refresh() },
-            state = pullState,
+        LazyColumn(
+            modifier = Modifier.padding(padding).fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            LazyColumn(
-                modifier = Modifier.padding(padding).fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
             // Profile header card
             item {
                 UserHeader(
@@ -301,7 +285,6 @@ fun UserDetailScreen(
                 },
             )
         }
-        } // PullToRefreshBox close
     }
 }
 
