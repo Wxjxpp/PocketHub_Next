@@ -89,9 +89,8 @@ fun ExploreScreen(
     onNavigateToFeedSources: () -> Unit = {},
     /**
      * Incremented by the host (HomeScreen) when the user double-taps the
-     * Explore bottom-nav tab. We react with a LaunchedEffect to call
-     * [ExploreViewModel.refresh]. Replaces pull-to-refresh, which conflicted
-     * with horizontal scrollers inside rows and the LazyColumn nested scroll.
+     * Explore bottom-nav tab. We react with a LaunchedEffect to force-fetch
+     * the active section through [ExploreViewModel.refresh].
      */
     refreshTrigger: Int = 0,
     vm: ExploreViewModel = hiltViewModel(),

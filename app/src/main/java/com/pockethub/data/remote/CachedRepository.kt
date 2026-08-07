@@ -97,9 +97,8 @@ class CachedRepository @Inject constructor(
 
     /**
      * Same as [searchTrending] but bypasses the in-room cache entirely. The
-     * Explore pull-to-refresh path calls this so a downward swipe always hits
-     * the network and refreshes immediately even when the cached entry is
-     * still within its TTL.
+     * Explore tab's double-tap refresh uses this path so the request reaches
+     * the network even while the cached entry is within its TTL.
      */
     @OptIn(ExperimentalSerializationApi::class)
     suspend fun searchTrendingFresh(query: String, sort: String = "stars", perPage: Int = 20): GitHubApi.SearchRepoResult {

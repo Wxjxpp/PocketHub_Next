@@ -46,9 +46,6 @@ class ExploreViewModel @Inject constructor(
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
-    private val _isRefreshing = MutableStateFlow(false)
-    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
-
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
 
@@ -126,11 +123,10 @@ class ExploreViewModel @Inject constructor(
         }
     }
 
-    /** Pull-to-refresh path — forces fresh fetches, swaps the spinner flag. */
+    /** Forces a fresh fetch for the active section (used by the Explore tab double-tap). */
     fun refresh() {
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
-            _isRefreshing.value = true
             _error.update { null }
             try {
                 when (_section.value) {
@@ -140,8 +136,6 @@ class ExploreViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 _error.value = e.localizedMessage ?: "Failed to load feed."
-            } finally {
-                _isRefreshing.value = false
             }
         }
     }

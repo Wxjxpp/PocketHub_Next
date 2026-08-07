@@ -6,16 +6,16 @@ import com.pockethub.data.local.DownloadDao
 import com.pockethub.data.local.DownloadEntity
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import java.util.concurrent.ConcurrentHashMap
+import okhttp3.Call
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
@@ -40,10 +40,19 @@ class DownloadManager @Inject constructor(
     )
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val _events = MutableSharedFlow<DownloadEvent>(extraBufferCapacity = 32)
-    val events: SharedFlow<DownloadEvent> = _events.asSharedFlow()
+    private val queueSignals = Channel<Unit>(Channel.CONFLATED)
+    private val cancelledUrls = ConcurrentHashMap.newKeySet<String>()
 
-    private var currentJob: Job? = null
+    @Volatile private var currentJob: Job? = null
+    @Volatile private var currentUrl: String? = null
+    @Volatile private var currentCall: Call? = null
+
+    init {
+        scope.launch {
+            for (ignored in queueSignals) drainQueue()
+        }
+        queueSignals.trySend(Unit)
+    }
 
     fun allFlow(): Flow<List<DownloadEntity>> = dao.allFlow()
     fun activeFlow(): Flow<List<DownloadEntity>> =
@@ -53,6 +62,7 @@ class DownloadManager @Inject constructor(
     suspend fun get(url: String): DownloadEntity? = dao.byUrl(url)
 
     suspend fun enqueue(req: EnqueueRequest) {
+        cancelledUrls.remove(req.url)
         val dir = File(workRoot(), req.repoKey.ifBlank { "common" })
         val destFile = File(dir, req.fileName)
         val existing = dao.byUrl(req.url)
@@ -74,11 +84,11 @@ class DownloadManager @Inject constructor(
                 updatedAt = now,
             )
         )
-        _events.tryEmit(DownloadEvent.Started(req.url))
         runNextIfIdle()
     }
 
     suspend fun retry(url: String) {
+        cancelledUrls.remove(url)
         val existing = dao.byUrl(url) ?: return
         destFileOrNull(existing)?.delete()
         dao.upsert(
@@ -91,23 +101,25 @@ class DownloadManager @Inject constructor(
                 updatedAt = System.currentTimeMillis(),
             )
         )
-        _events.tryEmit(DownloadEvent.Started(url))
         runNextIfIdle()
     }
 
     suspend fun cancel(url: String) {
         val existing = dao.byUrl(url) ?: return
-        if (existing.status == "IN_PROGRESS" && currentJob != null) currentJob?.cancel()
+        if (currentUrl == url) {
+            cancelledUrls += url
+            currentCall?.cancel()
+            currentJob?.cancel()
+        }
         destFileOrNull(existing)?.delete()
         dao.deleteByUrl(url)
-        _events.tryEmit(DownloadEvent.Removed(url))
+        runNextIfIdle()
     }
 
     suspend fun removeCompleted(url: String) {
         val existing = dao.byUrl(url) ?: return
         destFileOrNull(existing)?.delete()
         dao.deleteByUrl(url)
-        _events.tryEmit(DownloadEvent.Removed(url))
     }
 
     private fun destFileOrNull(entity: DownloadEntity): File? =
@@ -123,106 +135,85 @@ class DownloadManager @Inject constructor(
     }
 
     private fun runNextIfIdle() {
-        if (currentJob?.isActive == true) return
-        scope.launch {
+        queueSignals.trySend(Unit)
+    }
+
+    private suspend fun drainQueue() {
+        while (true) {
             val queued = dao.flowByStates(listOf("QUEUED", "IN_PROGRESS", "FAILED")).first()
-                .firstOrNull { it.status == "QUEUED" } ?: return@launch
+                .firstOrNull { it.status == "QUEUED" }
+                ?: return
             executeDownload(queued)
-            runNextIfIdle()
         }
     }
 
     private suspend fun executeDownload(entity: DownloadEntity) {
         val targetFile = File(entity.localPath)
         targetFile.parentFile?.mkdirs()
-        val currentUrl = entity.url
+        val url = entity.url
         val destFile = File(targetFile.parentFile, "${targetFile.name}.part")
-        val job = scope.launch {
+        val job = scope.launch(start = CoroutineStart.LAZY) {
             try {
-                val request = Request.Builder().url(currentUrl).build()
-                val dlClient = client.newBuilder().followRedirects(true).build()
-                val response = withContext(Dispatchers.IO) { dlClient.newCall(request).execute() }
-                if (!response.isSuccessful) {
-                    dao.upsert(
-                        entity.copy(
-                            status = "FAILED",
-                            errorMsg = "HTTP ${response.code}",
-                            updatedAt = System.currentTimeMillis(),
-                        )
-                    )
-                    _events.tryEmit(DownloadEvent.Failed(currentUrl, "HTTP ${response.code}"))
-                    return@launch
-                }
+                val request = Request.Builder().url(url).build()
+                val call = client.newBuilder().followRedirects(true).build().newCall(request)
+                currentCall = call
+                val response = call.execute()
+                response.use {
+                    if (!it.isSuccessful) {
+                        dao.upsert(entity.copy(status = "FAILED", errorMsg = "HTTP ${it.code}", updatedAt = System.currentTimeMillis()))
+                        return@launch
+                    }
 
-                val reportedTotal: Long = response.body?.contentLength() ?: -1
-                val totalBytes = if (reportedTotal > 0) reportedTotal else entity.sizeBytes
-                val body = response.body ?: throw IOException("No body in response")
+                    val totalBytes = it.body?.contentLength()?.takeIf { size -> size > 0 } ?: entity.sizeBytes
+                    val body = it.body ?: throw IOException("No body in response")
+                    dao.upsert(entity.copy(status = "IN_PROGRESS", sizeBytes = totalBytes, updatedAt = System.currentTimeMillis()))
 
-                dao.upsert(entity.copy(status = "IN_PROGRESS", sizeBytes = totalBytes, updatedAt = System.currentTimeMillis()))
-
-                withContext(Dispatchers.IO) {
                     body.byteStream().use { input ->
                         destFile.outputStream().use { output ->
                             val buffer = ByteArray(16 * 1024)
                             var totalRead = 0L
-                            var lastReport = 0L
+                            var lastReported = 0L
                             while (true) {
                                 val read = input.read(buffer)
                                 if (read == -1) break
                                 output.write(buffer, 0, read)
                                 totalRead += read
-                                if (totalRead - lastReport >= 100 * 1024) {
-                                    val pct = if (totalBytes > 0) ((totalRead * 100) / totalBytes).toInt() else 0
-                                    dao.upsert(
-                                        entity.copy(
-                                            status = "IN_PROGRESS",
-                                            downloadedBytes = totalRead,
-                                            progressPct = pct.coerceIn(0, 100),
-                                            updatedAt = System.currentTimeMillis(),
-                                        )
-                                    )
-                                    lastReport = totalRead
+                                if (totalRead - lastReported >= 100 * 1024) {
+                                    val progress = if (totalBytes > 0) ((totalRead * 100) / totalBytes).toInt() else 0
+                                    dao.upsert(entity.copy(status = "IN_PROGRESS", downloadedBytes = totalRead, progressPct = progress.coerceIn(0, 100), updatedAt = System.currentTimeMillis()))
+                                    lastReported = totalRead
                                 }
                             }
                         }
                     }
-                }
 
-                if (targetFile.exists()) targetFile.delete()
-                if (!destFile.renameTo(targetFile)) {
-                    destFile.copyTo(targetFile, overwrite = true)
-                    destFile.delete()
+                    if (targetFile.exists()) targetFile.delete()
+                    if (!destFile.renameTo(targetFile)) {
+                        destFile.copyTo(targetFile, overwrite = true)
+                        destFile.delete()
+                    }
+                    dao.upsert(entity.copy(status = "DONE", downloadedBytes = totalBytes, progressPct = 100, updatedAt = System.currentTimeMillis()))
                 }
-
-                dao.upsert(
-                    entity.copy(
-                        status = "DONE",
-                        downloadedBytes = totalBytes,
-                        progressPct = 100,
-                        updatedAt = System.currentTimeMillis(),
-                    )
-                )
-                _events.tryEmit(DownloadEvent.Done(currentUrl, targetFile.absolutePath))
             } catch (e: kotlinx.coroutines.CancellationException) {
                 destFile.delete()
-                dao.upsert(entity.copy(status = "FAILED", errorMsg = "Cancelled", updatedAt = System.currentTimeMillis()))
+                if (!cancelledUrls.remove(url)) {
+                    dao.upsert(entity.copy(status = "FAILED", errorMsg = "Cancelled", updatedAt = System.currentTimeMillis()))
+                }
                 throw e
             } catch (e: Throwable) {
                 destFile.delete()
-                val msg = e.localizedMessage ?: e.javaClass.simpleName
-                dao.upsert(entity.copy(status = "FAILED", errorMsg = msg, updatedAt = System.currentTimeMillis()))
-                _events.tryEmit(DownloadEvent.Failed(currentUrl, msg))
+                if (!cancelledUrls.remove(url)) {
+                    val message = e.localizedMessage ?: e.javaClass.simpleName
+                    dao.upsert(entity.copy(status = "FAILED", errorMsg = message, updatedAt = System.currentTimeMillis()))
+                }
             }
         }
+        currentUrl = url
         currentJob = job
+        job.start()
         job.join()
+        currentCall = null
         currentJob = null
+        currentUrl = null
     }
-}
-
-sealed class DownloadEvent {
-    data class Started(val url: String) : DownloadEvent()
-    data class Done(val url: String, val path: String) : DownloadEvent()
-    data class Failed(val url: String, val reason: String) : DownloadEvent()
-    data class Removed(val url: String) : DownloadEvent()
 }

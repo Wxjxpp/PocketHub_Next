@@ -91,10 +91,8 @@ fun HomeScreen(
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
-    // Double-tap-to-refresh on a bottom-nav tab — instead of pull-to-refresh on
-    // the explore tab (which clashes with row horizontal scroll and lazy list
-    // vertical scroll), the user double-taps the already-selected tab to trigger
-    // a refresh. See [DeepNavTabGesture.pickRound].
+    // Double-tap the selected Explore tab to force-fetch its active section.
+    // See [DeepNavTabGesture.pickRound].
     var lastTabClickAtMillis by rememberSaveable { mutableStateOf(0L) }
     var lastClickedTab by rememberSaveable { mutableIntStateOf(0) }
     // Bumps whenever a refresh is requested by double-tapping. Screens read it via

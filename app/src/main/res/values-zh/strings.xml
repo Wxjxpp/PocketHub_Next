@@ -23,8 +23,6 @@
     <string name="action_sign_in">登录</string>
     <string name="action_sign_out">登出</string>
     <string name="action_retry">重试</string>
-    <!-- 顶栏刷新按钮——详情和列表页拉取最新数据 -->
-    <string name="action_refresh">刷新</string>
     <string name="action_dismiss">关闭</string>
     <string name="action_switch">切换</string>
     <string name="action_remove">移除</string>
@@ -96,7 +94,7 @@
     <string name="feed_empty_subtitle">你关注的人有新活动时会显示在这里。</string>
     <string name="no_repositories_found">未找到仓库</string>
     <string name="no_repositories_subtitle">试试其他语言或时间范围。</string>
-    <string name="no_discover_items_subtitle">换个信息源、语言或时间范围，再下拉刷新试试。</string>
+    <string name="no_discover_items_subtitle">换个信息源、语言或时间范围，再双击发现 Tab 刷新试试。</string>
     <string name="feed_someone">某人</string>
     <string name="feed_source_label">来源：%1$s</string>
     <string name="feed_source_change">更改</string>
@@ -203,9 +201,6 @@
     <string name="tab_prs">PRs</string>
     <string name="tab_releases">Releases</string>
     <string name="tab_workflows">工作流</string>
-    <string name="tab_wiki">Wiki</string>
-    <string name="wiki_empty">此仓库未启用 wiki，或 wiki 首页不是默认的 Home.md。</string>
-    <string name="wiki_open_in_browser">在浏览器打开 Wiki</string>
     <string name="stats_by">%1$s</string>
     <string name="stat_forks">forks</string>
     <string name="repo_issues_header">%1$d issues</string>

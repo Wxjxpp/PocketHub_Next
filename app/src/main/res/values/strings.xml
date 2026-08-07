@@ -23,8 +23,6 @@
     <string name="action_sign_in">Sign in</string>
     <string name="action_sign_out">Sign out</string>
     <string name="action_retry">Retry</string>
-    <!-- Top-app-bar refresh — used on detail/list screens to re-fetch data from the network. -->
-    <string name="action_refresh">Refresh</string>
     <string name="action_dismiss">Dismiss</string>
     <string name="action_switch">Switch</string>
     <string name="action_remove">Remove</string>
@@ -111,7 +109,7 @@
     <string name="feed_empty_subtitle">Activity from people you follow will appear here.</string>
     <string name="no_repositories_found">No repositories found</string>
     <string name="no_repositories_subtitle">Try a different language or time window.</string>
-    <string name="no_discover_items_subtitle">Pick a different source, language or time window, then pull down to refresh.</string>
+    <string name="no_discover_items_subtitle">Pick a different source, language or time window, then double-tap the Explore tab to refresh.</string>
     <string name="feed_someone">someone</string>
     <string name="feed_source_label">Source: %1$s</string>
     <string name="feed_source_change">Change</string>
@@ -218,9 +216,6 @@
     <string name="tab_prs">PRs</string>
     <string name="tab_releases">Releases</string>
     <string name="tab_workflows">Workflows</string>
-    <string name="tab_wiki">Wiki</string>
-    <string name="wiki_empty">This repository has no wiki, or it doesn\'t follow the default Home.md layout.</string>
-    <string name="wiki_open_in_browser">Open wiki in browser</string>
     <string name="stats_by">by %1$s</string>
     <string name="stat_forks">forks</string>
     <string name="repo_issues_header">%1$d issues</string>
