@@ -30,7 +30,7 @@ import androidx.compose.material.icons.automirrored.outlined.Article
 import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.DeveloperMode
-import androidx.compose.material.icons.outlined.Storage
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.ForkRight
 import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.PushPin
@@ -349,7 +349,7 @@ fun ExploreScreen(
                     horizontalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
                 ) {
                     Icon(
-                        Icons.Outlined.Storage,
+                        Icons.Outlined.Refresh,
                         null,
                         modifier = Modifier.size(12.dp),
                         tint = MaterialTheme.colorScheme.outline,
