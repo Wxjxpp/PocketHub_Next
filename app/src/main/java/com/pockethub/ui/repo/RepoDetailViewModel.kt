@@ -492,6 +492,10 @@ class RepoDetailViewModel @Inject constructor(
                 val resp = api.deleteRepository(owner, repo)
                 if (resp.isSuccessful) {
                     cache.invalidateRepo(owner, repo)
+                    // The list endpoint is cached independently from the repo detail.
+                    // Without this eviction, navigating back can show the deleted row
+                    // until the five-minute repository-list TTL expires.
+                    cache.invalidateMyRepositories()
                     _deleteSuccess.update { true }
                 } else {
                     val err = resp.errorBody()?.string()
@@ -558,6 +562,8 @@ class RepoDetailViewModel @Inject constructor(
                     resp.body()?.let { updated ->
                         _repo.update { updated }
                         cache.invalidateRepo(owner, repo)
+                        // Visibility changes can move the repo in or out of a filtered list.
+                        cache.invalidateMyRepositories()
                     }
                     _visibilityMessage.update {
                         if (target) "Repository set to private" else "Repository set to public"

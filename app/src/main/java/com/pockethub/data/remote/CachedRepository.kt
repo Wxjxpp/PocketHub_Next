@@ -146,6 +146,11 @@ class CachedRepository @Inject constructor(
         cacheDao.evictContaining("repos:starred:")
     }
 
+    /** Drop every page of the signed-in user's repository list after a repo mutation. */
+    suspend fun invalidateMyRepositories() {
+        cacheDao.evictContaining("repos:mine:")
+    }
+
     /** Evict items older than [maxAge]. Called periodically or on manual refresh. */
     suspend fun evictOlderThan(maxAge: Long) {
         cacheDao.evictOlderThan(maxAge)

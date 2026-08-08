@@ -22,6 +22,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonArray
+import retrofit2.HttpException
 import javax.inject.Inject
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -113,6 +114,24 @@ class CodeBrowserViewModel @Inject constructor(
                 }
                 // Fire-and-forget: concurrently fetch the last commit for each visible entry.
                 fetchLastCommits(sorted, s.owner, s.repo, s.ref)
+            } catch (e: HttpException) {
+                // GitHub returns 409 ("Git Repository is empty") for the Contents
+                // API root of a newly-created repository. It is a valid empty
+                // directory, not an error placeholder.
+                if (e.code() == 409) {
+                    _state.update {
+                        it.copy(
+                            entries = emptyList(),
+                            currentPath = path,
+                            pathStack = buildPathStack(path),
+                            isLoading = false,
+                            error = null,
+                            lastCommits = emptyMap(),
+                        )
+                    }
+                } else {
+                    _state.update { it.copy(isLoading = false, error = e.localizedMessage ?: "Failed to list contents") }
+                }
             } catch (e: Exception) {
                 _state.update { it.copy(isLoading = false, error = e.localizedMessage ?: "Failed to list contents") }
             }

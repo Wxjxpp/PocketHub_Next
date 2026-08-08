@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -38,6 +39,8 @@ class ReposViewModel @Inject constructor(
     var currentPage = 1
         private set
     private var canLoadMore = true
+    private var loadJob: Job? = null
+    private var loadRequestId = 0
 
     init {
         load()
@@ -65,7 +68,12 @@ class ReposViewModel @Inject constructor(
 
     private fun load(append: Boolean = false) {
         val page = currentPage
-        viewModelScope.launch {
+        // A filter or tab switch supersedes the current first-page request. Retrofit
+        // cancellation alone is not enough: a completed old response could otherwise
+        // win the race and replace the newly selected list.
+        if (!append) loadJob?.cancel()
+        val requestId = ++loadRequestId
+        loadJob = viewModelScope.launch {
             _isLoading.update { true }
             _error.update { null }
             try {
@@ -84,10 +92,9 @@ class ReposViewModel @Inject constructor(
                         }
                         cache.getMyRepositories(page = page, type = type, visibility = vis)
                     }
-                    RepoTab.STARRED -> {
-                        cache.getStarredRepositories(page = page)
-                    }
+                    RepoTab.STARRED -> cache.getStarredRepositories(page = page)
                 }
+                if (requestId != loadRequestId) return@launch
                 // Client-side filtering for filters the API can't express.
                 val filtered = when (currentFilter.value) {
                     RepoFilter.FORKS -> result.filter { it.fork }
@@ -101,11 +108,12 @@ class ReposViewModel @Inject constructor(
                 else
                     filtered.size >= PER_PAGE
             } catch (e: Exception) {
+                if (requestId != loadRequestId) return@launch
                 _error.update { e.localizedMessage ?: "Failed to load" }
                 // Roll back the page counter so the next loadMore retries this page.
                 if (append && currentPage == page) currentPage--
             } finally {
-                _isLoading.update { false }
+                if (requestId == loadRequestId) _isLoading.update { false }
             }
         }
     }
