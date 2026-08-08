@@ -6,6 +6,7 @@ import com.pockethub.R
 import androidx.compose.ui.res.stringResource
 
 import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -859,7 +860,7 @@ private fun IssuesTab(
                     Modifier
                         .size(8.dp)
                         .clip(CircleShape)
-                        .then(Modifier.padding(0.dp)),
+                        .background(if (issue.state == "open") Color(0xFF2EA043) else Color(0xFF8957E5)),
                 )
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
@@ -963,10 +964,14 @@ private fun PullsTab(
                 Modifier.fillMaxWidth().clickable { onClick(pr.number) }.padding(vertical = 10.dp),
                 verticalAlignment = Alignment.Top,
             ) {
-                Icon(
-                    Icons.Outlined.Campaign, null,
-                    modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.primary,
+                // State indicator dot — green=open, purple=closed, violet-red=merged
+                val prColor = when {
+                    pr.state == "open" -> Color(0xFF2EA043)
+                    pr.pullRequest != null && pr.stateReason == "completed" -> Color(0xFF8957E5)
+                    else -> Color(0xFFBD2C00)
+                }
+                Box(
+                    Modifier.size(8.dp).clip(CircleShape).background(prColor),
                 )
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
