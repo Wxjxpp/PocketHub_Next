@@ -182,6 +182,7 @@
     <string name="notif_reason_manual">Manual</string>
     <string name="notif_reason_subscribed">Subscribed</string>
     <string name="cd_toggle_visibility">Toggle visibility</string>
+    <string name="cd_repo_actions">Repository actions</string>
 
     <!-- Profile -->
     <string name="title_profile">Me</string>

@@ -167,6 +167,7 @@
     <string name="notif_reason_manual">手动</string>
     <string name="notif_reason_subscribed">已订阅</string>
     <string name="cd_toggle_visibility">切换可见性</string>
+    <string name="cd_repo_actions">仓库操作</string>
 
     <!-- Profile -->
     <string name="title_profile">我</string>

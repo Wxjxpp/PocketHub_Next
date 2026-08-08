@@ -36,6 +36,7 @@ import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.LockOpen
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.NotificationsOff
+import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.ForkRight
 import androidx.compose.material.icons.outlined.PlayArrow
@@ -54,6 +55,8 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -147,6 +150,7 @@ fun RepoDetailScreen(
     var showDispatchDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showVisibilityDialog by remember { mutableStateOf(false) }
+    var showActionsMenu by remember { mutableStateOf(false) }
     var deleteInput by remember { mutableStateOf("") }
 
     LaunchedEffect(owner, repo) { vm.loadRepo(owner, repo) }
@@ -234,13 +238,7 @@ fun RepoDetailScreen(
                 },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = stringResource(R.string.action_back)) } },
                 actions = {
-                    IconButton(onClick = { showForkDialog = true }, enabled = !isForking) {
-                        Icon(
-                            Icons.Outlined.ForkRight,
-                            contentDescription = stringResource(R.string.action_fork),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+                    val watchState by vm.watchState.collectAsState()
                     IconButton(onClick = { vm.toggleStar(owner, repo) }) {
                         Icon(
                             if (isStarred) Icons.Outlined.Star else Icons.Outlined.StarBorder,
@@ -248,63 +246,59 @@ fun RepoDetailScreen(
                             tint = if (isStarred) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    // Watch / Mute toggle — long-press the mute variant.
-                    val watchState by vm.watchState.collectAsState()
-                    IconButton(onClick = { vm.toggleWatch(owner, repo) }, enabled = watchState != WatchState.UNKNOWN) {
-                        when (watchState) {
-                            WatchState.WATCHING -> Icon(
-                                Icons.Outlined.Notifications,
-                                contentDescription = stringResource(R.string.cd_unwatch),
-                                tint = MaterialTheme.colorScheme.primary,
-                            )
-                            WatchState.MUTED -> Icon(
-                                Icons.Outlined.NotificationsOff,
-                                contentDescription = stringResource(R.string.cd_muted),
-                                tint = MaterialTheme.colorScheme.error,
-                            )
-                            else -> Icon(
-                                Icons.Outlined.NotificationsOff,
-                                contentDescription = stringResource(R.string.cd_watch),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                    // Pin / unpin locally — quick access from the home Explore tab.
                     IconButton(onClick = { vm.togglePin() }) {
                         Icon(
-                            if (isPinned) Icons.Outlined.PushPin else Icons.Outlined.PushPin,
+                            Icons.Outlined.PushPin,
                             contentDescription = if (isPinned) stringResource(R.string.cd_unpin) else stringResource(R.string.cd_pin),
                             tint = if (isPinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    if (canDelete) {
-                        // Visibility toggle — only available on repos the user owns / has admin on.
-                        // Shows a closed lock for private repos, an open lock for public ones;
-                        // tapping it opens a confirmation dialog because switching visibility
-                        // on GitHub can have side effects (branch protection refresh, watchers'
-                        // feeds) and an accidental flip should be a deliberate choice.
-                        IconButton(
-                            onClick = { showVisibilityDialog = true },
-                            enabled = !isTogglingVisibility && !isDeleting,
-                        ) {
-                            Icon(
-                                if (repoData?.private == true) Icons.Outlined.Lock else Icons.Outlined.LockOpen,
-                                contentDescription = stringResource(R.string.cd_toggle_visibility),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                    Box {
+                        IconButton(onClick = { showActionsMenu = true }) {
+                            Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.cd_repo_actions))
                         }
-                        IconButton(
-                            onClick = {
-                                deleteInput = "$owner/$repo"
-                                showDeleteDialog = true
-                            },
-                            enabled = !isDeleting,
-                        ) {
-                            Icon(
-                                Icons.Outlined.Delete,
-                                contentDescription = stringResource(R.string.delete_repo_action),
-                                tint = MaterialTheme.colorScheme.error,
+                        DropdownMenu(expanded = showActionsMenu, onDismissRequest = { showActionsMenu = false }) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.action_fork)) },
+                                leadingIcon = { Icon(Icons.Outlined.ForkRight, null) },
+                                onClick = { showActionsMenu = false; showForkDialog = true },
+                                enabled = !isForking,
                             )
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        stringResource(
+                                            if (watchState == WatchState.WATCHING) R.string.cd_unwatch else R.string.cd_watch,
+                                        ),
+                                    )
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        if (watchState == WatchState.WATCHING) Icons.Outlined.Notifications else Icons.Outlined.NotificationsOff,
+                                        null,
+                                    )
+                                },
+                                onClick = { showActionsMenu = false; vm.toggleWatch(owner, repo) },
+                                enabled = watchState != WatchState.UNKNOWN,
+                            )
+                            if (canDelete) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.cd_toggle_visibility)) },
+                                    leadingIcon = { Icon(if (repoData?.private == true) Icons.Outlined.Lock else Icons.Outlined.LockOpen, null) },
+                                    onClick = { showActionsMenu = false; showVisibilityDialog = true },
+                                    enabled = !isTogglingVisibility && !isDeleting,
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.delete_repo_action), color = MaterialTheme.colorScheme.error) },
+                                    leadingIcon = { Icon(Icons.Outlined.Delete, null, tint = MaterialTheme.colorScheme.error) },
+                                    onClick = {
+                                        showActionsMenu = false
+                                        deleteInput = "$owner/$repo"
+                                        showDeleteDialog = true
+                                    },
+                                    enabled = !isDeleting,
+                                )
+                            }
                         }
                     }
                 },
@@ -411,7 +405,7 @@ fun RepoDetailScreen(
                     issues,
                     stateFilter = issueStateFilter,
                     isLoadingMore = isLoadingMoreIssues,
-                    onCycleFilter = { vm.cycleIssueStateFilter(owner, repo) },
+                    onSelectFilter = { filter -> vm.setIssueStateFilter(owner, repo, filter) },
                     onLoadMore = { vm.loadMoreIssues(owner, repo) },
                     onClick = onNavigateToIssue,
                     onNavigateToUser = onNavigateToUser,
@@ -420,7 +414,7 @@ fun RepoDetailScreen(
                     pulls,
                     stateFilter = issueStateFilter,
                     isLoadingMore = isLoadingMoreIssues,
-                    onCycleFilter = { vm.cycleIssueStateFilter(owner, repo) },
+                    onSelectFilter = { filter -> vm.setIssueStateFilter(owner, repo, filter) },
                     onLoadMore = { vm.loadMoreIssues(owner, repo) },
                     onClick = onNavigateToPR,
                     onNavigateToUser = onNavigateToUser,
@@ -824,7 +818,7 @@ private fun IssuesTab(
     issues: List<Issue>,
     stateFilter: IssueStateFilter,
     isLoadingMore: Boolean,
-    onCycleFilter: () -> Unit,
+    onSelectFilter: (IssueStateFilter) -> Unit,
     onLoadMore: () -> Unit,
     onClick: (Int) -> Unit,
     onNavigateToUser: (String) -> Unit = {},
@@ -841,8 +835,7 @@ private fun IssuesTab(
     }
 
     Column(Modifier.fillMaxSize()) {
-        // Cycle through filters with a single tap on the chips row.
-        IssueStateFilterChips(selected = stateFilter, onSelect = { if (it != stateFilter) onCycleFilter() })
+        IssueStateFilterChips(selected = stateFilter, onSelect = onSelectFilter)
 
         if (issues.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -934,7 +927,7 @@ private fun PullsTab(
     pulls: List<Issue>,
     stateFilter: IssueStateFilter,
     isLoadingMore: Boolean,
-    onCycleFilter: () -> Unit,
+    onSelectFilter: (IssueStateFilter) -> Unit,
     onLoadMore: () -> Unit,
     onClick: (Int) -> Unit,
     onNavigateToUser: (String) -> Unit = {},
@@ -951,7 +944,7 @@ private fun PullsTab(
     }
 
     Column(Modifier.fillMaxSize()) {
-        IssueStateFilterChips(selected = stateFilter, onSelect = { if (it != stateFilter) onCycleFilter() })
+        IssueStateFilterChips(selected = stateFilter, onSelect = onSelectFilter)
 
         if (pulls.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

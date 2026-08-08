@@ -43,9 +43,7 @@ enum class WatchState {
 
 /** Issue / PR list state filter. Maps to the GitHub `state` query param. */
 enum class IssueStateFilter(val apiValue: String) {
-    OPEN("open"), CLOSED("closed"), ALL("all");
-
-    fun next(): IssueStateFilter = entries[(ordinal + 1) % entries.size]
+    OPEN("open"), CLOSED("closed"), ALL("all"),
 }
 
 @HiltViewModel
@@ -80,11 +78,11 @@ class RepoDetailViewModel @Inject constructor(
     private var issuesCanLoadMore = true
     private var loadedIssueState: String? = null
 
-    /** Cycle OPEN → CLOSED → ALL and reload both lists. */
-    fun cycleIssueStateFilter(owner: String, repo: String) {
-        _issueStateFilter.update { it.next() }
+    /** Select a state explicitly and reload the current issue/PR source. */
+    fun setIssueStateFilter(owner: String, repo: String, filter: IssueStateFilter) {
+        if (_issueStateFilter.value == filter) return
+        _issueStateFilter.value = filter
         loadIssues(owner, repo, force = true)
-        loadPulls(owner, repo, force = true)
     }
 
     private val _error = MutableStateFlow<String?>(null)
