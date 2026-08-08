@@ -111,11 +111,13 @@ fun SettingsScreen(
     var showStyleSheet by remember { mutableStateOf(false) }
     var showLanguageSheet by remember { mutableStateOf(false) }
     var showTranslateSheet by remember { mutableStateOf(false) }
+    var showNotifPollSheet by remember { mutableStateOf(false) }
     var showOAuthSheet by remember { mutableStateOf(false) }
     var showAbout by remember { mutableStateOf(false) }
     var showSignOutDialog by remember { mutableStateOf(false) }
     var showIssueEmailSheet by remember { mutableStateOf(false) }
     var showIssueTargetRepoSheet by remember { mutableStateOf(false) }
+    var showIssueIntervalSheet by remember { mutableStateOf(false) }
     val issueReportEnabled by vm.issueReportEnabled.collectAsState()
     val issueReportIntervalDays by vm.issueReportIntervalDays.collectAsState()
     val issueReportEmail by vm.issueReportEmail.collectAsState()
@@ -192,13 +194,7 @@ fun SettingsScreen(
                 leadingContent = { Icon(Icons.Outlined.Notifications, contentDescription = null) },
                 headlineContent = { Text(stringResource(R.string.polling_cadence)) },
                 supportingContent = { Text(notificationCadenceLabel(notifPollMinutes)) },
-                modifier = Modifier.clickable {
-                    // Cycle through the shared presets Off → 15m → 1h → 1d → Off.
-                    val presets = listOf(0, 15, 60, 1440)
-                    val currentIdx = presets.indexOf(notifPollMinutes).let { if (it == -1) presets.lastIndex else it }
-                    val nextIdx = (currentIdx + 1) % presets.size
-                    vm.setNotifPollMinutes(presets[nextIdx])
-                },
+                modifier = Modifier.clickable { showNotifPollSheet = true },
             )
             ListItem(
                 leadingContent = { Icon(Icons.Outlined.Brightness2, contentDescription = null) },
@@ -323,11 +319,7 @@ fun SettingsScreen(
                 leadingContent = { Icon(Icons.Outlined.Brightness2, contentDescription = null) },
                 headlineContent = { Text(stringResource(R.string.severe_issues_interval)) },
                 supportingContent = { Text(issueCadenceLabel(issueReportIntervalDays)) },
-                modifier = Modifier.clickable {
-                    val presets = listOf(1, 3, 7)
-                    val idx = presets.indexOf(issueReportIntervalDays).let { if (it == -1) 0 else it }
-                    vm.setIssueReportIntervalDays(presets[(idx + 1) % presets.size])
-                },
+                modifier = Modifier.clickable { showIssueIntervalSheet = true },
             )
             ListItem(
                 leadingContent = { Icon(Icons.Outlined.Info, contentDescription = null) },
@@ -488,6 +480,48 @@ fun SettingsScreen(
     if (showAbout) {
         ModalBottomSheet(onDismissRequest = { showAbout = false }, sheetState = rememberModalBottomSheetState()) {
             AboutContent()
+        }
+    }
+
+    if (showNotifPollSheet) {
+        ModalBottomSheet(onDismissRequest = { showNotifPollSheet = false }, sheetState = rememberModalBottomSheetState()) {
+            Column(Modifier.padding(bottom = 24.dp)) {
+                Text(stringResource(R.string.polling_cadence), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(16.dp))
+                listOf(0, 15, 60, 1440).forEach { minutes ->
+                    Row(
+                        Modifier.fillMaxWidth().clickable {
+                            vm.setNotifPollMinutes(minutes)
+                            showNotifPollSheet = false
+                        }.padding(vertical = 8.dp).padding(horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = notifPollMinutes == minutes, onClick = null)
+                        Spacer(Modifier.width(12.dp))
+                        Text(notificationCadenceLabel(minutes))
+                    }
+                }
+            }
+        }
+    }
+
+    if (showIssueIntervalSheet) {
+        ModalBottomSheet(onDismissRequest = { showIssueIntervalSheet = false }, sheetState = rememberModalBottomSheetState()) {
+            Column(Modifier.padding(bottom = 24.dp)) {
+                Text(stringResource(R.string.severe_issues_interval), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(16.dp))
+                listOf(1, 3, 7).forEach { days ->
+                    Row(
+                        Modifier.fillMaxWidth().clickable {
+                            vm.setIssueReportIntervalDays(days)
+                            showIssueIntervalSheet = false
+                        }.padding(vertical = 8.dp).padding(horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = issueReportIntervalDays == days, onClick = null)
+                        Spacer(Modifier.width(12.dp))
+                        Text(issueCadenceLabel(days))
+                    }
+                }
+            }
         }
     }
 
