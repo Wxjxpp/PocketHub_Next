@@ -240,13 +240,6 @@ fun RepoDetailScreen(
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = stringResource(R.string.action_back)) } },
                 actions = {
                     val watchState by vm.watchState.collectAsState()
-                    IconButton(onClick = { vm.toggleStar(owner, repo) }) {
-                        Icon(
-                            if (isStarred) Icons.Outlined.Star else Icons.Outlined.StarBorder,
-                            contentDescription = if (isStarred) stringResource(R.string.cd_unstar) else stringResource(R.string.cd_star),
-                            tint = if (isStarred) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
                     IconButton(onClick = { vm.togglePin() }) {
                         Icon(
                             Icons.Outlined.PushPin,
@@ -259,12 +252,6 @@ fun RepoDetailScreen(
                             Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.cd_repo_actions))
                         }
                         DropdownMenu(expanded = showActionsMenu, onDismissRequest = { showActionsMenu = false }) {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.action_fork)) },
-                                leadingIcon = { Icon(Icons.Outlined.ForkRight, null) },
-                                onClick = { showActionsMenu = false; showForkDialog = true },
-                                enabled = !isForking,
-                            )
                             DropdownMenuItem(
                                 text = {
                                     Text(
@@ -342,8 +329,17 @@ fun RepoDetailScreen(
         },
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
-            // Stats row
-            repoData?.let { data -> StatsRow(data, onNavigateToUser = onNavigateToUser) }
+            // Stats row — star/fork chips are tappable to toggle star / open fork dialog.
+            repoData?.let { data ->
+                StatsRow(
+                    data,
+                    onNavigateToUser = onNavigateToUser,
+                    isStarred = isStarred,
+                    isForking = isForking,
+                    onToggleStar = { vm.toggleStar(owner, repo) },
+                    onFork = { showForkDialog = true },
+                )
+            }
 
             val tabs = RepoTab.entries
             ScrollableTabRow(selectedTabIndex = tabs.indexOf(tab), edgePadding = 0.dp) {
@@ -576,6 +572,10 @@ fun RepoDetailScreen(
 private fun StatsRow(
     data: Repository,
     onNavigateToUser: (String) -> Unit = {},
+    isStarred: Boolean = false,
+    isForking: Boolean = false,
+    onToggleStar: () -> Unit = {},
+    onFork: () -> Unit = {},
 ) {
     val userClickModifier = Modifier.clickable { onNavigateToUser(data.owner.login) }
     Row(
@@ -595,29 +595,47 @@ private fun StatsRow(
             modifier = userClickModifier,
         )
         Spacer(Modifier.weight(1f))
-        StatChip(star = true, count = data.stars)
+        // Star chip — tappable to toggle star. Filled star when starred.
+        Row(
+            modifier = Modifier
+                .clip(MaterialTheme.shapes.small)
+                .clickable(onClick = onToggleStar)
+                .padding(horizontal = 6.dp, vertical = 3.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                if (isStarred) Icons.Outlined.Star else Icons.Outlined.StarBorder,
+                contentDescription = if (isStarred) stringResource(R.string.cd_unstar) else stringResource(R.string.cd_star),
+                modifier = Modifier.size(14.dp),
+                tint = if (isStarred) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.width(3.dp))
+            Text(data.stars.toString(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
         Spacer(Modifier.width(8.dp))
-        StatChip(star = false, count = data.forks, label = stringResource(R.string.stat_forks))
+        // Fork chip — tappable to fork. Shows loading state while forking.
+        Row(
+            modifier = Modifier
+                .clip(MaterialTheme.shapes.small)
+                .clickable(onClick = onFork, enabled = !isForking)
+                .padding(horizontal = 6.dp, vertical = 3.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                if (isForking) Icons.Outlined.ForkRight else Icons.Outlined.ForkRight,
+                contentDescription = stringResource(R.string.action_fork),
+                modifier = Modifier.size(14.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.width(3.dp))
+            Text(
+                "${data.forks} ${stringResource(R.string.stat_forks)}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         Spacer(Modifier.width(8.dp))
         Text(stringResource(R.string.repo_issues_header, data.openIssues), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
-@Composable
-private fun StatChip(star: Boolean, count: Int, label: String = "") {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-            if (star) Icons.Outlined.Star else Icons.Outlined.ForkRight,
-            null,
-            modifier = Modifier.size(14.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.width(3.dp))
-        Text(
-            if (label.isEmpty()) "$count" else "$count $label",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
 

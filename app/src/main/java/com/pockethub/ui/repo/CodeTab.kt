@@ -25,6 +25,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.Article
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.AccountTree
 import androidx.compose.material.icons.outlined.ArrowDropDown
 import androidx.compose.material.icons.outlined.ContentCopy
@@ -177,9 +178,6 @@ fun CodeTab(
                         onClick = {
                             if (entry.type == "dir") vm.openDir(entry.name) else vm.openFile(entry)
                         },
-                        onDownload = if (entry.type == "file") {
-                            { downloadFile(entry) }
-                        } else null,
                     )
                 }
                 if (state.entries.isEmpty()) {
@@ -310,7 +308,7 @@ private fun BreadcrumbBar(
             Icon(Icons.Outlined.FolderZip, contentDescription = stringResource(R.string.cd_download_zip))
         }
         IconButton(onClick = onOpenInBrowser) {
-            Icon(Icons.Outlined.Share, contentDescription = stringResource(R.string.cd_open_in_browser))
+            Icon(Icons.AutoMirrored.Outlined.OpenInNew, contentDescription = stringResource(R.string.cd_open_in_browser))
         }
     }
 }
@@ -320,7 +318,6 @@ private fun ContentRow(
     entry: com.pockethub.data.remote.GitHubApi.ContentEntry,
     lastCommit: CodeBrowserViewModel.LastCommit? = null,
     onClick: () -> Unit,
-    onDownload: (() -> Unit)? = null,
 ) {
     Row(
         modifier = Modifier
@@ -347,17 +344,6 @@ private fun ContentRow(
                 fontSize = 11.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-        }
-        if (onDownload != null) {
-            Spacer(Modifier.width(6.dp))
-            IconButton(onClick = onDownload) {
-                Icon(
-                    Icons.Outlined.Download,
-                    contentDescription = stringResource(R.string.cd_download_file),
-                    modifier = Modifier.size(18.dp),
-                    tint = MaterialTheme.colorScheme.primary,
-                )
-            }
         }
     }
 }

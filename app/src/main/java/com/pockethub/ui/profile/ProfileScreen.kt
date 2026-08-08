@@ -299,6 +299,7 @@ private fun ProfileHeader(user: User?, activeAccount: AccountEntity?) {
             AsyncImage(
                 model = user?.avatarUrl ?: activeAccount?.avatarUrl,
                 contentDescription = null,
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
                 modifier = Modifier
                     .size(88.dp)
                     .clip(CircleShape)

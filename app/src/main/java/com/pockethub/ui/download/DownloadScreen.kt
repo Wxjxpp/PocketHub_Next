@@ -32,13 +32,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ScrollableTabRow
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -71,6 +72,17 @@ fun DownloadScreen(
 ) {
     var selectedTab by rememberSaveable { mutableIntStateOf(if (initialTab == DownloadTab.DONE) 1 else 0) }
 
+    val active by vm.activeList.collectAsState()
+
+    // Auto-switch to the Done tab when the last active download completes.
+    var hadActive by remember { mutableStateOf(active.isNotEmpty()) }
+    LaunchedEffect(active.size) {
+        if (active.isEmpty() && hadActive) {
+            selectedTab = 1
+        }
+        hadActive = active.isNotEmpty()
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -87,7 +99,7 @@ fun DownloadScreen(
         },
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
-            ScrollableTabRow(selectedTabIndex = selectedTab, edgePadding = 0.dp) {
+            TabRow(selectedTabIndex = selectedTab) {
                 Tab(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },

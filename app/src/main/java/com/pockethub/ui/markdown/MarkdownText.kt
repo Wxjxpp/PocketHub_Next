@@ -204,18 +204,17 @@ fun MarkdownText(
                         else -> MaterialTheme.typography.labelLarge
                     }
                     if (block.level <= 2) Spacer(Modifier.height(if (block.level == 1) 10.dp else 6.dp))
-                    Text(
-                        text = block.text,
-                        style = style.copy(
-                            fontWeight = FontWeight.SemiBold,
-                            lineHeight = when (block.level) {
-                                1 -> 32.sp
-                                2 -> 28.sp
-                                else -> 24.sp
-                            },
-                        ),
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
+                    // Render inline markdown (links, code, bold) inside headings so `## Getting `code``
+                    // shows a code chip instead of literal backticks.
+                    val parts = renderRichInline(block.text, linkResolver, imageResolver, codeBackgroundColor, linkColor, downloadColor, imageLinkColor, externalColor)
+                    RenderInlineParts(parts, style.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        lineHeight = when (block.level) {
+                            1 -> 32.sp
+                            2 -> 28.sp
+                            else -> 24.sp
+                        },
+                    ), onTap)
                     if (block.level <= 2) Spacer(Modifier.height(2.dp))
                 }
 
@@ -331,6 +330,27 @@ private sealed class InlineToken {
     data class Text(val span: AnnotatedString) : InlineToken()
     /** Standalone image. `wrapUrl` non-null → image is wrapped in a link (render with hover style). */
     data class Image(val src: String, val alt: String, val wrapUrl: String?) : InlineToken()
+}
+
+@Composable
+private fun RenderInlineParts(parts: List<InlineToken>, style: androidx.compose.ui.text.TextStyle, onTap: (String, LinkKind) -> Unit) {
+    parts.forEach { part ->
+        when (part) {
+            is InlineToken.Text -> ClickableText(
+                text = part.span,
+                style = style.copy(color = MaterialTheme.colorScheme.onSurface),
+                onClick = { offset ->
+                    part.span.getStringAnnotations(LINK_TAG, offset, offset).firstOrNull()?.let { annotation ->
+                        val kind = part.span.getStringAnnotations(LINK_KIND_TAG, offset, offset)
+                            .firstOrNull()?.item?.let { runCatching { LinkKind.valueOf(it) }.getOrNull() }
+                            ?: LinkKind.EXTERNAL
+                        onTap(annotation.item, kind)
+                    }
+                },
+            )
+            is InlineToken.Image -> RenderImageRun(listOf(part), onTap)
+        }
+    }
 }
 
 @Composable
@@ -749,6 +769,19 @@ private fun parseMarkdown(src: String): List<MdBlock> {
             val level = headingMatch.groupValues[1].length
             blocks.add(MdBlock.Heading(level, headingMatch.groupValues[2].trim()))
             i++; continue
+        }
+
+        // Setext heading: non-blank line followed by === (H1) or --- (H2)
+        if (i + 1 < lines.size && line.isNotBlank() && !line.startsWith("#")) {
+            val next = lines[i + 1]
+            if (next.matches(Regex("^=+\\s*$")) && line.isNotBlank()) {
+                blocks.add(MdBlock.Heading(1, line.trim()))
+                i += 2; continue
+            }
+            if (next.matches(Regex("^-+\\s*$")) && line.isNotBlank() && !line.matches(Regex("^-{3,}\\s*$"))) {
+                blocks.add(MdBlock.Heading(2, line.trim()))
+                i += 2; continue
+            }
         }
 
         if (line.trim().startsWith("```")) {
