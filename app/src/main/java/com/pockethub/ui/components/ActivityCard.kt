@@ -41,6 +41,21 @@ import androidx.compose.ui.unit.dp
 import com.pockethub.R
 import com.pockethub.data.model.FeedEvent
 
+/** Format an ISO-8601 timestamp as a compact relative-time string. */
+private fun formatRelativeTime(iso: String): String = try {
+    val ts = java.time.OffsetDateTime.parse(iso.trim().replace("Z", "+00:00")).toInstant().toEpochMilli()
+    val diffMs = (System.currentTimeMillis() - ts).coerceAtLeast(0)
+    val mins = diffMs / 60_000
+    when {
+        mins < 1L    -> "now"
+        mins < 60L   -> "${mins}m"
+        mins < 1440L -> "${mins / 60}h"
+        else         -> "${mins / 1440}d"
+    }
+} catch (_: Exception) {
+    iso.take(10)
+}
+
 /**
  * One card per public GitHub activity event (PushEvent / WatchEvent / ForkEvent / …).
  * Shared between ProfileScreen ("my activity") and UserDetailScreen ("their activity")
@@ -76,7 +91,7 @@ fun ActivityCard(
         "IssuesEvent" -> event.payload?.action ?: ""
         else -> ""
     }
-    val createdAt = event.createdAt?.take(10) ?: ""
+    val createdAt = event.createdAt?.let { formatRelativeTime(it) } ?: ""
 
     Column(
         Modifier

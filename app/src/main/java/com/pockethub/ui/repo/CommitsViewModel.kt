@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -29,6 +30,8 @@ class CommitsViewModel @Inject constructor(
     private var canLoadMore = true
     private var loadedOwner: String? = null
     private var loadedRepo: String? = null
+    private var loadJob: Job? = null
+    private var loadRequestId = 0
 
     fun loadCommits(owner: String, repo: String) {
         if (loadedOwner == owner && loadedRepo == repo && _commits.value.isNotEmpty()) return
@@ -51,18 +54,22 @@ class CommitsViewModel @Inject constructor(
     }
 
     private fun fetchCommits(owner: String, repo: String, append: Boolean) {
-        viewModelScope.launch {
+        if (!append) loadJob?.cancel()
+        val requestId = ++loadRequestId
+        loadJob = viewModelScope.launch {
             _isLoading.update { true }
             _error.update { null }
             try {
                 val result = api.getCommits(owner, repo, page = currentPage, perPage = 30)
+                if (requestId != loadRequestId) return@launch
                 _commits.update { if (append) it + result else result }
                 canLoadMore = result.size >= 30
             } catch (e: Exception) {
+                if (requestId != loadRequestId) return@launch
                 _error.update { e.localizedMessage ?: "Failed to load commits" }
                 if (!append) _commits.update { emptyList() }
             } finally {
-                _isLoading.update { false }
+                if (requestId == loadRequestId) _isLoading.update { false }
             }
         }
     }

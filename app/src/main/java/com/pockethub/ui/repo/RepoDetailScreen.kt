@@ -721,8 +721,12 @@ private fun OverviewTab(
                 }
             }
             HorizontalDivider()
-            // README header with optional translation toggle
-            Row(
+            // README header with optional translation toggle — hidden entirely
+            // when there is no README and we're not still loading it, so empty
+            // repos don't show a dangling "README" title followed by "unavailable".
+            val showReadmeSection = readme != null || isLoading
+            if (showReadmeSection) {
+                Row(
                 Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -795,13 +799,8 @@ private fun OverviewTab(
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(R.string.readme_loading), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-            } else {
-                Text(
-                    stringResource(R.string.readme_unavailable, "$owner/$repo"),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
+            } // showReadmeSection
             Spacer(Modifier.height(40.dp))
         }
     }

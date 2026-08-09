@@ -45,7 +45,28 @@ class CachedRepository @Inject constructor(
     suspend fun getStarredRepositories(page: Int = 1): List<Repository> {
         val key = "repos:starred:$page"
         return cacheFirst(key, FIVE_MIN) {
-            api.getStarredRepositories(page = page)
+            api.getStarredRepositories(page = page).body().orEmpty()
+        }
+    }
+
+    /**
+     * Fetch only the total count of starred repos by requesting per_page=1 and
+     * parsing the last-page number from the GitHub Link header.  Falls back to
+     * the body size when the header is absent (single page).
+     */
+    suspend fun getStarredTotalCount(): Int {
+        return try {
+            val resp = api.getStarredRepositories(page = 1, perPage = 1)
+            val link = resp.headers()["link"]
+            if (link != null) {
+                // Link: <...&page=2>; rel="next", <...&page=42>; rel="last"
+                val lastMatch = Regex("""page=(\d+)>;\s*rel="last"""").find(link)
+                lastMatch?.groupValues?.get(1)?.toIntOrNull() ?: resp.body().orEmpty().size
+            } else {
+                resp.body().orEmpty().size
+            }
+        } catch (_: Exception) {
+            0
         }
     }
 

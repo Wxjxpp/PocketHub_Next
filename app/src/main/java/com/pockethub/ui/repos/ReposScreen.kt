@@ -37,7 +37,6 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -49,9 +48,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.lifecycle.LifecycleEventObserver
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.pockethub.data.model.Repository
@@ -85,17 +81,14 @@ fun ReposScreen(
     val tab by vm.currentTab.collectAsState()
     val filter by vm.currentFilter.collectAsState()
     val listState = rememberLazyListState()
-    val lifecycleOwner = LocalLifecycleOwner.current
 
-    // Home stays in the navigation stack behind repository details. Its NavBackStackEntry
-    // resumes when the user returns, which is when a delete must be reflected.
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) vm.refresh()
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
+    // ReposScreen is disposed when the user leaves the Repos tab and recomposed
+    // on return (HomeScreen uses `when(selectedTab)` to switch content).  A fresh
+    // composition is the signal that the user came back — reload so any mutation
+    // (delete / visibility toggle) done on RepoDetail is reflected immediately.
+    // The cache was already invalidated by the mutation, so this is a cheap
+    // cache-miss → single network fetch; no mutation means a fast cache hit.
+    LaunchedEffect(Unit) { vm.refresh() }
 
     // Infinite scroll
     val shouldLoadMore by remember {

@@ -258,6 +258,7 @@ class CodeBrowserViewModel @Inject constructor(
             _state.update { it.copy(lastCommits = it.lastCommits + cached) }
         }
         val toFetch = entries.filter { cacheKey(it.path) !in commitCache }
+            .take(15) // Cap at 15 to avoid burning the API rate limit on large directories.
         if (toFetch.isEmpty()) return
 
         viewModelScope.launch {

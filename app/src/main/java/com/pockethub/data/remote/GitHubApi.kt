@@ -85,14 +85,15 @@ interface GitHubApi {
         @Query("visibility") visibility: String? = null, // public | private
     ): List<Repository>
 
-    /** Starred repositories. */
+    /** Starred repositories. Returns a Response so the caller can read the
+     *  `link` header to count total pages (the endpoint has no total_count). */
     @GET("user/starred")
     suspend fun getStarredRepositories(
         @Query("page") page: Int = 1,
         @Query("per_page") perPage: Int = 30,
         @Query("sort") sort: String = "created",
         @Query("direction") direction: String = "desc",
-    ): List<Repository>
+    ): Response<List<Repository>>
 
     /** Repository by full name. */
     @GET("repos/{owner}/{repo}")

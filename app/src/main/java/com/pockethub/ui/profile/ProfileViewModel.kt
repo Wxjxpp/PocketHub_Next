@@ -104,7 +104,7 @@ class ProfileViewModel @Inject constructor(
                 _reposPage.value = 1
                 _hasMoreRepos.value = true
                 launch { try { loadMoreRepos(reset = true) } catch (_: Exception) {} }
-                launch { try { _starredTotal.value = cache.getStarredRepositories(page = 1).size } catch (_: Exception) {} }
+                launch { try { _starredTotal.value = cache.getStarredTotalCount() } catch (_: Exception) {} }
                 launch {
                     _isLoadingEvents.update { true }
                     try { _events.value = runCatching { api.getUserEvents(me.login) }.getOrDefault(emptyList()) }
