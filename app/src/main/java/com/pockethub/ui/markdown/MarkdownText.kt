@@ -192,13 +192,13 @@ fun MarkdownText(
     // entire README and were previously called synchronously inside
     // remember(markdown), which blocked the main thread and caused ANRs on
     // large README files.
-    val parseResult by produceState<Result<List<MdBlock>>?>(null, markdown) {
+    val parseResult = produceState<Result<List<MdBlock>>?>(null, markdown) {
         value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
             runCatching { parseMarkdown(cleanMarkdown(markdown)) }
         }
     }
     Column(modifier = modifier) {
-        val result = parseResult
+        val result = parseResult.value
         if (result == null) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
