@@ -29,6 +29,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -187,12 +188,27 @@ fun MarkdownText(
         }
     }
 
-    val parseResult = androidx.compose.runtime.remember(markdown) {
-        runCatching { parseMarkdown(cleanMarkdown(markdown)) }
+    // Parse on a background thread — cleanMarkdown + parseMarkdown walk the
+    // entire README and were previously called synchronously inside
+    // remember(markdown), which blocked the main thread and caused ANRs on
+    // large README files.
+    val parseResult by produceState<Result<List<MdBlock>>?>(null, markdown) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            runCatching { parseMarkdown(cleanMarkdown(markdown)) }
+        }
     }
     Column(modifier = modifier) {
-        parseResult.onFailure { MarkdownErrorBox(it) }
-        parseResult.getOrNull()?.forEach { block ->
+        val result = parseResult
+        if (result == null) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                Spacer(Modifier.width(8.dp))
+                Text("Loading…", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            return@Column
+        }
+        result.onFailure { MarkdownErrorBox(it) }
+        result.getOrNull()?.forEach { block ->
             when (block) {
                 is MdBlock.Heading -> {
                     val style = when (block.level) {
@@ -638,63 +654,82 @@ private fun TableCell(
 
 // ── Markdown cleaning ────────────────────────────────────────────────
 
+// All Regex objects are pre-compiled at file scope. cleanMarkdown runs
+// inside the same background coroutine as parseMarkdown, but pre-compile
+// avoids repeated Regex recompilation for large READMEs with lots of
+// inline HTML.
+private val IMG_HTML_REGEX = Regex(
+    "<\\s*img\\s+[^>]*?src\\s*=\\s*[\"']([^\"']+)[\"'][^>]*?(?:alt\\s*=\\s*[\"']([^\"']*)[\"'])?[^>]*?/?>",
+    RegexOption.IGNORE_CASE,
+)
+private val A_HTML_REGEX = Regex(
+    "<\\s*a\\s+[^>]*?href\\s*=\\s*[\"']([^\"']+)[\"'][^>]*?>(.*?)<\\s*/\\s*a\\s*>",
+    setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
+)
+private val STRONG_HTML_REGEX = Regex(
+    "<\\s*(?:strong|b)\\b[^>]*>(.*?)<\\s*/\\s*(?:strong|b)\\s*>",
+    setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
+)
+private val EM_HTML_REGEX = Regex(
+    "<\\s*(?:em|i)\\b[^>]*>(.*?)<\\s*/\\s*(?:em|i)\\s*>",
+    setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
+)
+private val CODE_HTML_REGEX = Regex(
+    "<\\s*(?:code|kbd)\\b[^>]*>(.*?)<\\s*/\\s*(?:code|kbd)\\s*>",
+    setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
+)
+private val DEL_HTML_REGEX = Regex(
+    "<\\s*(?:del|s|strike)\\b[^>]*>(.*?)<\\s*/\\s*(?:del|s|strike)\\s*>",
+    setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
+)
+private val SUMMARY_HTML_REGEX = Regex(
+    "<\\s*summary\\b[^>]*>(.*?)<\\s*/\\s*summary\\s*>",
+    setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
+)
+private val INLINE_TAG_STRIP_REGEX = Regex("<\\s*/?(?:u|mark|small|big|font|sub|sup)\\b[^>]*>", RegexOption.IGNORE_CASE)
+private val BR_REGEX = Regex("<\\s*br\\s*/?>", RegexOption.IGNORE_CASE)
+private val HR_HTML_REGEX = Regex("<\\s*hr\\s*/?>", RegexOption.IGNORE_CASE)
+private val BLOCK_TAG_STRIP_REGEX = Regex(
+    "<\\s*(/?)\\s*(div|span|p|details|summary|center|section|article|figure|figcaption|picture|source|video|audio|table|thead|tbody|tr|td|th|pre)(\\s[^>]*)?>",
+    RegexOption.IGNORE_CASE,
+)
+private val VOID_TAG_STRIP_REGEX = Regex(
+    "<\\s*(br|hr|input|meta|link|area|base|col|embed|param|track|wbr)(\\s[^>]*)?/?>",
+    RegexOption.IGNORE_CASE,
+)
+private val BLANK_LINE_COLLAPSE_REGEX = Regex("\\n\\s*\\n\\s*\\n")
+
 private fun cleanMarkdown(markdown: String): String {
     return markdown
             // Convert common standalone raw-HTML <img src> into markdown ![](...) so our
             // image rendering kicks in. (<img> tags inside <a> won't convert cleanly here, but
             // those are far less common than markdown form below.)
-            .replace(
-                Regex(
-                    "<\\s*img\\s+[^>]*?src\\s*=\\s*[\"']([^\"']+)[\"'][^>]*?(?:alt\\s*=\\s*[\"']([^\"']*)[\"'])?[^>]*?/?>",
-                    RegexOption.IGNORE_CASE,
-                )
-            ) { m ->
+            .replace(IMG_HTML_REGEX) { m ->
                 val src = m.groupValues[1]
                 val alt = m.groupValues[2]
                 "![${alt}](${src})"
             }
             // Strip common HTML block/inline tags (leave text between pairs) — but keep <a href>
             // as markdown so we don't lose navigation context for legacy README HTML.
-            .replace(
-                Regex(
-                    "<\\s*a\\s+[^>]*?href\\s*=\\s*[\"']([^\"']+)[\"'][^>]*?>(.*?)<\\s*/\\s*a\\s*>",
-                    setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
-                )
-            ) { m ->
+            .replace(A_HTML_REGEX) { m ->
                 "[${m.groupValues[2]}](${m.groupValues[1]})"
             }
             // Convert raw-HTML inline emphasis/code/keystroke/strikethrough into markdown so it
             // renders styled instead of leaking raw tags. Must run before the generic tag strip.
-            .replace(
-                Regex("<\\s*(?:strong|b)\\b[^>]*>(.*?)<\\s*/\\s*(?:strong|b)\\s*>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)),
-            ) { "**${it.groupValues[1]}**" }
-            .replace(
-                Regex("<\\s*(?:em|i)\\b[^>]*>(.*?)<\\s*/\\s*(?:em|i)\\s*>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)),
-            ) { "*${it.groupValues[1]}*" }
-            .replace(
-                Regex("<\\s*(?:code|kbd)\\b[^>]*>(.*?)<\\s*/\\s*(?:code|kbd)\\s*>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)),
-            ) { "`${it.groupValues[1]}`" }
-            .replace(
-                Regex("<\\s*(?:del|s|strike)\\b[^>]*>(.*?)<\\s*/\\s*(?:del|s|strike)\\s*>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)),
-            ) { "~~${it.groupValues[1]}~~" }
+            .replace(STRONG_HTML_REGEX) { "**${it.groupValues[1]}**" }
+            .replace(EM_HTML_REGEX) { "*${it.groupValues[1]}*" }
+            .replace(CODE_HTML_REGEX) { "`${it.groupValues[1]}`" }
+            .replace(DEL_HTML_REGEX) { "~~${it.groupValues[1]}~~" }
             // Collapsible-section titles → bold heading so <details> blocks stay scannable.
-            .replace(
-                Regex("<\\s*summary\\b[^>]*>(.*?)<\\s*/\\s*summary\\s*>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)),
-            ) { "\n**${it.groupValues[1].trim()}**\n" }
+            .replace(SUMMARY_HTML_REGEX) { "\n**${it.groupValues[1].trim()}**\n" }
             // Inline tags with no markdown equivalent — drop the tag, keep inner text.
-            .replace(Regex("<\\s*/?(?:u|mark|small|big|font|sub|sup)\\b[^>]*>", RegexOption.IGNORE_CASE), "")
+            .replace(INLINE_TAG_STRIP_REGEX, "")
             // Block-level line breaks / rules → markdown forms (before the void-tag strip below).
-            .replace(Regex("<\\s*br\\s*/?>", RegexOption.IGNORE_CASE), "\n")
-            .replace(Regex("<\\s*hr\\s*/?>", RegexOption.IGNORE_CASE), "\n\n---\n\n")
-            .replace(
-                Regex("<\\s*(/?)\\s*(div|span|p|details|summary|center|section|article|figure|figcaption|picture|source|video|audio|table|thead|tbody|tr|td|th|pre)(\\s[^>]*)?>", RegexOption.IGNORE_CASE),
-                "",
-            )
+            .replace(BR_REGEX, "\n")
+            .replace(HR_HTML_REGEX, "\n\n---\n\n")
+            .replace(BLOCK_TAG_STRIP_REGEX, "")
             // Self-closing / void tags (img/br/hr already converted above; keep others stripped)
-            .replace(
-                Regex("<\\s*(br|hr|input|meta|link|area|base|col|embed|param|track|wbr)(\\s[^>]*)?/?>", RegexOption.IGNORE_CASE),
-                "",
-            )
+            .replace(VOID_TAG_STRIP_REGEX, "")
             // Decode a few common HTML entities
             .replace("&amp;", "&")
             .replace("&lt;", "<")
@@ -707,12 +742,23 @@ private fun cleanMarkdown(markdown: String): String {
             .replace("&ndash;", "–")
             .replace("&nbsp;", " ")
             // Collapse multiple blank lines left by tag removal
-            .replace(Regex("\\n\\s*\\n\\s*\\n"), "\n\n")
+            .replace(BLANK_LINE_COLLAPSE_REGEX, "\n\n")
 }
 
 // ── Parsing ─────────────────────────────────────────────────────────
 
 private val TABLE_SEP_REGEX = Regex("^\\|?\\s*:?-+:?\\s*(\\|\\s*:?-+:?\\s*)*\\|?$")
+
+// Pre-compiled patterns used inside parseMarkdown — avoids re-creating
+// Regex objects on every line of a large README.
+private val HR_DASH_REGEX = Regex("^-{3,}\\s*$")
+private val HR_STAR_REGEX = Regex("^\\*{3,}\\s*$")
+private val HEADING_REGEX = Regex("^(#{1,6})\\s+(.+)")
+private val SETEXT_H1_REGEX = Regex("^=+\\s*$")
+private val SETEXT_H2_REGEX = Regex("^-+\\s*$")
+private val OLIST_REGEX = Regex("^\\s*\\d+\\.\\s+.+")
+private val ULIST_REGEX = Regex("^\\s*[-*+]\\s+.+")
+private val TASK_REGEX = Regex("^\\[([ xX])]\\s+(.*)")
 
 private fun isTableSeparator(line: String): Boolean {
     val l = line.trim()
@@ -751,8 +797,8 @@ private fun parseMarkdown(src: String): List<MdBlock> {
     val isBlockStart: (String) -> Boolean = { l ->
         l.isBlank() || l.startsWith("#") || l.trim().startsWith("```") ||
             l.trimStart().startsWith(">") ||
-            l.matches(Regex("^\\s*[-*+]\\s+.+")) || l.matches(Regex("^\\s*\\d+\\.\\s+.+")) ||
-            l.matches(Regex("^-{3,}\\s*$")) || l.matches(Regex("^\\*{3,}\\s*$"))
+            l.matches(ULIST_REGEX) || l.matches(OLIST_REGEX) ||
+            l.matches(HR_DASH_REGEX) || l.matches(HR_STAR_REGEX)
     }
 
     while (i < lines.size) {
@@ -760,11 +806,11 @@ private fun parseMarkdown(src: String): List<MdBlock> {
 
         if (line.isBlank()) { i++; continue }
 
-        if (line.matches(Regex("^-{3,}\\s*$")) || line.matches(Regex("^\\*{3,}\\s*$"))) {
+        if (line.matches(HR_DASH_REGEX) || line.matches(HR_STAR_REGEX)) {
             blocks.add(MdBlock.HorizontalRule); i++; continue
         }
 
-        val headingMatch = Regex("^(#{1,6})\\s+(.+)").matchEntire(line)
+        val headingMatch = HEADING_REGEX.matchEntire(line)
         if (headingMatch != null) {
             val level = headingMatch.groupValues[1].length
             blocks.add(MdBlock.Heading(level, headingMatch.groupValues[2].trim()))
@@ -774,11 +820,11 @@ private fun parseMarkdown(src: String): List<MdBlock> {
         // Setext heading: non-blank line followed by === (H1) or --- (H2)
         if (i + 1 < lines.size && line.isNotBlank() && !line.startsWith("#")) {
             val next = lines[i + 1]
-            if (next.matches(Regex("^=+\\s*$")) && line.isNotBlank()) {
+            if (next.matches(SETEXT_H1_REGEX) && line.isNotBlank()) {
                 blocks.add(MdBlock.Heading(1, line.trim()))
                 i += 2; continue
             }
-            if (next.matches(Regex("^-+\\s*$")) && line.isNotBlank() && !line.matches(Regex("^-{3,}\\s*$"))) {
+            if (next.matches(SETEXT_H2_REGEX) && line.isNotBlank() && !line.matches(HR_DASH_REGEX)) {
                 blocks.add(MdBlock.Heading(2, line.trim()))
                 i += 2; continue
             }
@@ -808,9 +854,9 @@ private fun parseMarkdown(src: String): List<MdBlock> {
         }
 
         // Ordered list
-        if (line.matches(Regex("^\\s*\\d+\\.\\s+.+"))) {
+        if (line.matches(OLIST_REGEX)) {
             var orderedIndex = 0
-            while (i < lines.size && lines[i].matches(Regex("^\\s*\\d+\\.\\s+.+"))) {
+            while (i < lines.size && lines[i].matches(OLIST_REGEX)) {
                 orderedIndex++
                 val text = lines[i].trim().substringAfter(". ").trim()
                 blocks.add(MdBlock.ListItem(text, ordered = true, index = orderedIndex, level = listLevel(lines[i])))
@@ -820,10 +866,10 @@ private fun parseMarkdown(src: String): List<MdBlock> {
         }
 
         // Unordered list (with optional GitHub task-list checkbox)
-        if (line.matches(Regex("^\\s*[-*+]\\s+.+"))) {
-            while (i < lines.size && lines[i].matches(Regex("^\\s*[-*+]\\s+.+"))) {
+        if (line.matches(ULIST_REGEX)) {
+            while (i < lines.size && lines[i].matches(ULIST_REGEX)) {
                 val raw = lines[i].trim().substringAfter(" ").trim()
-                val taskMatch = Regex("^\\[([ xX])]\\s+(.*)").matchEntire(raw)
+                val taskMatch = TASK_REGEX.matchEntire(raw)
                 val (text, task) = if (taskMatch != null) {
                     val checked = taskMatch.groupValues[1].equals("x", ignoreCase = true)
                     taskMatch.groupValues[2] to (if (checked) 'x' else ' ')
@@ -885,24 +931,24 @@ private fun rememberLinkResolver(repoContext: String?): LinkResolver = LinkResol
     val gh = "https://github.com"
     if (raw.startsWith("#")) {
         val num = raw.removePrefix("#").trim()
-        if (repoContext != null && num.matches(Regex("\\d+"))) return@LinkResolver "$gh/$repoContext/issues/$num"
+        if (repoContext != null && num.matches(ISSUE_NUM_PATTERN)) return@LinkResolver "$gh/$repoContext/issues/$num"
         return@LinkResolver null
     }
     if (raw.startsWith("@")) {
         val user = raw.removePrefix("@")
-        if (user.matches(Regex("^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$"))) return@LinkResolver "$gh/$user"
+        if (user.matches(AT_USER_PATTERN_LINK)) return@LinkResolver "$gh/$user"
         return@LinkResolver null
     }
     // Treat the URL as relative to repo if it starts with `/` or `./` or `../`
     if ((raw.startsWith("/") || raw.startsWith("./") || raw.startsWith("../")) && repoContext != null) {
         return@LinkResolver "$gh/$repoContext/${raw.removePrefix("./")}"
     }
-    val repoIssue = Regex("^([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)(?:#(\\d+))?$").matchEntire(raw)
+    val repoIssue = OWNER_REPO_PATTERN.matchEntire(raw)
     if (repoIssue != null) {
         val (owner, name, num) = repoIssue.destructured
         return@LinkResolver if (num.isNotEmpty()) "$gh/$owner/$name/issues/$num" else "$gh/$owner/$name"
     }
-    if (raw.matches(Regex("^[0-9a-f]{40}$")) && repoContext != null) {
+    if (raw.matches(SHA_PATTERN) && repoContext != null) {
         return@LinkResolver "$gh/$repoContext/commit/$raw"
     }
     null
@@ -934,7 +980,7 @@ private fun rememberImageResolver(repoContext: String?, defaultBranch: String?):
     val repo = parts.getOrNull(1)
     if (owner.isNullOrBlank() || repo.isNullOrBlank()) return@ImageResolver raw
     val branch = defaultBranch?.ifBlank { null } ?: "main"
-    val path = raw.removePrefix("./").removePrefix("/").replace(Regex("(?:\\.\\./)+"), "")
+    val path = raw.removePrefix("./").removePrefix("/").replace(DOTDOT_PATTERN, "")
     "https://raw.githubusercontent.com/$owner/$repo/$branch/$path"
 }
 
@@ -955,13 +1001,20 @@ private fun isBadgeUrl(url: String): Boolean {
     return false
 }
 
-// ── Rich inline rendering ───────────────────────────────────────────
+private val ISSUE_NUM_PATTERN = Regex("\\d+")
+private val AT_USER_PATTERN_LINK = Regex("^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$")
+private val OWNER_REPO_PATTERN = Regex("^([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)(?:#(\\d+))?$")
+private val SHA_PATTERN = Regex("^[0-9a-f]{40}$")
+private val DOTDOT_PATTERN = Regex("(?:\\.\\./)+")
 
-// Patterns pre-compiled once per rendering call. Each uses the *anchor at start*
-// semantic by requiring the match to begin at position 0 of the substring passed.
-// In the loop we slice off the part from i onward and try matching.
-private val WRAPPED_IMG_PATTERN = Regex("^\\[!?\\[([^\\]]*)\\]\\(([^)]+)\\)\\]\\(([^)]+)\\)")
-private val STANDALONE_IMG_PATTERN = Regex("^!\\[([^\\]]*)\\]\\(([^)]+)\\)")
+// Patterns pre-compiled at file scope. Anchors are checked in the loop via
+// `match.range.first == i` instead of using `^` + substring(i), which
+// avoids an O(n) string copy on every character position and eliminates
+// the O(n²) hotspot that caused ANRs on large READMEs.
+private val WRAPPED_IMG_PATTERN = Regex("\\[!?\\[([^\\]]*)\\]\\(([^)]+)\\)\\]\\(([^)]+)\\)")
+private val STANDALONE_IMG_PATTERN = Regex("!\\[([^\\]]*)\\]\\(([^)]+)\\)")
+private val HASH_NUM_PATTERN = Regex("#(\\d+)")
+private val AT_USER_PATTERN = Regex("@[A-Za-z0-9](?:[A-Za-z0-9-]{0,38}")
 
 /**
  * Render a paragraph/inline text into a mix of [InlineToken]s. Images (`![alt](src)`)
@@ -1003,10 +1056,9 @@ private fun renderRichInline(
     var i = 0
     val len = text.length
     while (i < len) {
-        val rest = text.substring(i)
         // Try wrapped image link [![alt](src)](href) — only if it begins at i.
-        val wrappedMatch = WRAPPED_IMG_PATTERN.find(rest)
-        if (wrappedMatch != null) {
+        val wrappedMatch = WRAPPED_IMG_PATTERN.find(text, i)
+        if (wrappedMatch != null && wrappedMatch.range.first == i) {
             flushText()
             val alt = wrappedMatch.groupValues[1]
             val src = imageResolver(wrappedMatch.groupValues[2].trim())
@@ -1017,8 +1069,8 @@ private fun renderRichInline(
             continue
         }
         // Try standalone image ![alt](src)
-        val imgMatch = STANDALONE_IMG_PATTERN.find(rest)
-        if (imgMatch != null) {
+        val imgMatch = STANDALONE_IMG_PATTERN.find(text, i)
+        if (imgMatch != null && imgMatch.range.first == i) {
             flushText()
             val alt = imgMatch.groupValues[1]
             val src = imageResolver(imgMatch.groupValues[2].trim())
@@ -1087,9 +1139,9 @@ private fun stringFromSource(
         }
         // GitHub shortcut #123 / @user
         if (src[i] == '#' || src[i] == '@') {
-            val m = if (src[i] == '#') Regex("^#(\\d+)").find(src.substring(i))
-            else Regex("^@[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})").find(src.substring(i))
-            if (m != null) {
+            val m = if (src[i] == '#') HASH_NUM_PATTERN.find(src, i)
+            else AT_USER_PATTERN.find(src, i)
+            if (m != null && m.range.first == i) {
                 val ref = m.value
                 val url = resolver(ref)
                 if (url != null) {
