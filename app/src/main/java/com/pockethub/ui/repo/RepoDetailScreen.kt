@@ -137,6 +137,7 @@ fun RepoDetailScreen(
     val tab by vm.currentTab.collectAsState()
     val workflows by vm.workflows.collectAsState()
     val isLoadingWorkflows by vm.isLoadingWorkflows.collectAsState()
+    val isLoadingWorkflowRuns by vm.isLoadingWorkflowRuns.collectAsState()
     val isDispatching by vm.isDispatching.collectAsState()
     val dispatchMessage by vm.dispatchMessage.collectAsState()
     val translatedReadme by vm.translatedReadme.collectAsState()
@@ -458,7 +459,7 @@ fun RepoDetailScreen(
                 )
                 RepoTab.WORKFLOWS -> WorkflowsTab(
                     workflowRuns,
-                    isLoading = isLoadingWorkflows,
+                    isLoading = isLoadingWorkflowRuns,
                     onNavigateToUser = onNavigateToUser,
                     onNavigateToWorkflowRun = onNavigateToWorkflowRun,
                 )

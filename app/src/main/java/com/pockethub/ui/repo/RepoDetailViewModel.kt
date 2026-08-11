@@ -127,6 +127,13 @@ class RepoDetailViewModel @Inject constructor(
     private val _isLoadingWorkflows = MutableStateFlow(false)
     val isLoadingWorkflows: StateFlow<Boolean> = _isLoadingWorkflows.asStateFlow()
 
+    // Ren: drives the spinner on the Workflows *tab* — the existing
+    // _isLoadingWorkflows above is owned by loadWorkflows() (the dispatch
+    // dialog's definitions list), not loadWorkflowRuns() (the tab's run list),
+    // so the tab previously saw a permanently-false flag and never spun.
+    private val _isLoadingWorkflowRuns = MutableStateFlow(false)
+    val isLoadingWorkflowRuns: StateFlow<Boolean> = _isLoadingWorkflowRuns.asStateFlow()
+
     private val _isDispatching = MutableStateFlow(false)
     val isDispatching: StateFlow<Boolean> = _isDispatching.asStateFlow()
 
@@ -444,12 +451,15 @@ class RepoDetailViewModel @Inject constructor(
 
     fun loadWorkflowRuns(owner: String, repo: String, branch: String? = null): Job {
         return viewModelScope.launch {
+            _isLoadingWorkflowRuns.update { true }
             try {
                 val resp = api.getWorkflowRuns(owner, repo, branch = branch)
                 _workflowRuns.update { resp.runs }
             } catch (e: Exception) {
                 _workflowRuns.update { emptyList() }
                 _error.update { e.localizedMessage ?: "Failed to load workflows" }
+            } finally {
+                _isLoadingWorkflowRuns.update { false }
             }
         }
     }
