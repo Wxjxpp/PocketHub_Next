@@ -604,7 +604,7 @@ private fun StatsRow(
         Spacer(Modifier.width(8.dp))
         Text(
             stringResource(R.string.stats_by, data.owner.login),
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = userClickModifier,
         )
@@ -624,7 +624,7 @@ private fun StatsRow(
                 tint = if (isStarred) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.width(4.dp))
-            Text(data.stars.toString(), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(data.stars.toString(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(Modifier.width(10.dp))
         // Fork chip — tappable to fork. Shows loading state while forking.
@@ -644,12 +644,10 @@ private fun StatsRow(
             Spacer(Modifier.width(4.dp))
             Text(
                 "${data.forks} ${stringResource(R.string.stat_forks)}",
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Spacer(Modifier.width(10.dp))
-        Text(stringResource(R.string.repo_issues_header, data.openIssues), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
