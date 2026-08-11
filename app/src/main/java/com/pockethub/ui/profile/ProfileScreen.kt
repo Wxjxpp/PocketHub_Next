@@ -300,7 +300,10 @@ private fun ProfileHeader(user: User?, activeAccount: AccountEntity?) {
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
         elevation = CardDefaults.cardElevation(0.dp),
     ) {
-        Column(Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(
+            Modifier.fillMaxWidth().padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
             // Round avatar with a neutral surface placeholder so the circle is
             // visible even before the asynchronous image resolves.
             AsyncImage(
