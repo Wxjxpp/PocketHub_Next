@@ -146,6 +146,8 @@ fun RepoDetailScreen(
     val translateMessage by vm.translateMessage.collectAsState()
     val issueStateFilter by vm.issueStateFilter.collectAsState()
     val isLoadingMoreIssues by vm.isLoadingMoreIssues.collectAsState()
+    val isLoadingIssues by vm.isLoadingIssues.collectAsState()
+    val isLoadingReleases by vm.isLoadingReleases.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
     var showForkDialog by remember { mutableStateOf(false) }
@@ -407,6 +409,7 @@ fun RepoDetailScreen(
                 RepoTab.ISSUES -> IssuesTab(
                     issues,
                     stateFilter = issueStateFilter,
+                    isLoading = isLoadingIssues,
                     isLoadingMore = isLoadingMoreIssues,
                     onSelectFilter = { filter -> vm.setIssueStateFilter(owner, repo, filter) },
                     onLoadMore = { vm.loadMoreIssues(owner, repo) },
@@ -416,6 +419,7 @@ fun RepoDetailScreen(
                 RepoTab.PRS -> PullsTab(
                     pulls,
                     stateFilter = issueStateFilter,
+                    isLoading = isLoadingIssues,
                     isLoadingMore = isLoadingMoreIssues,
                     onSelectFilter = { filter -> vm.setIssueStateFilter(owner, repo, filter) },
                     onLoadMore = { vm.loadMoreIssues(owner, repo) },
@@ -428,6 +432,7 @@ fun RepoDetailScreen(
                     defaultBranch = repoData?.defaultBranch,
                     canDelete = canManageReleases,
                     isDeletingRelease = isDeletingRelease,
+                    isLoading = isLoadingReleases,
                     onLinkClick = rememberMarkdownLinkHandler(owner, repo, onNavigateToRepo, onNavigateToUser, onNavigateToIssue, downloadVm = downloadVm, onNavigateToDownloads = onNavigateToDownloads),
                     onNavigateToUser = onNavigateToUser,
                     onDownloadAsset = { asset ->
@@ -453,6 +458,7 @@ fun RepoDetailScreen(
                 )
                 RepoTab.WORKFLOWS -> WorkflowsTab(
                     workflowRuns,
+                    isLoading = isLoadingWorkflows,
                     onNavigateToUser = onNavigateToUser,
                     onNavigateToWorkflowRun = onNavigateToWorkflowRun,
                 )
@@ -842,6 +848,7 @@ private fun IssueStateFilterChips(
 private fun IssuesTab(
     issues: List<Issue>,
     stateFilter: IssueStateFilter,
+    isLoading: Boolean,
     isLoadingMore: Boolean,
     onSelectFilter: (IssueStateFilter) -> Unit,
     onLoadMore: () -> Unit,
@@ -862,6 +869,12 @@ private fun IssuesTab(
     Column(Modifier.fillMaxSize()) {
         IssueStateFilterChips(selected = stateFilter, onSelect = onSelectFilter)
 
+        if (isLoading && issues.isEmpty()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+            return@Column
+        }
         if (issues.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 val emptyText = when (stateFilter) {
@@ -951,6 +964,7 @@ private fun IssuesTab(
 private fun PullsTab(
     pulls: List<Issue>,
     stateFilter: IssueStateFilter,
+    isLoading: Boolean,
     isLoadingMore: Boolean,
     onSelectFilter: (IssueStateFilter) -> Unit,
     onLoadMore: () -> Unit,
@@ -971,6 +985,12 @@ private fun PullsTab(
     Column(Modifier.fillMaxSize()) {
         IssueStateFilterChips(selected = stateFilter, onSelect = onSelectFilter)
 
+        if (isLoading && pulls.isEmpty()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+            return@Column
+        }
         if (pulls.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 val emptyText = when (stateFilter) {
@@ -1054,11 +1074,18 @@ private fun ReleasesTab(
     defaultBranch: String? = null,
     canDelete: Boolean = false,
     isDeletingRelease: Boolean = false,
+    isLoading: Boolean = false,
     onLinkClick: (String, com.pockethub.ui.markdown.LinkKind) -> Unit,
     onNavigateToUser: (String) -> Unit = {},
     onDownloadAsset: (GitHubApi.Release.ReleaseAsset) -> Unit = {},
     onDeleteRelease: (Long) -> Unit = {},
 ) {
+    if (isLoading && releases.isEmpty()) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+        return
+    }
     if (releases.isEmpty()) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -1204,9 +1231,16 @@ private fun ReleasesTab(
 @Composable
 private fun WorkflowsTab(
     runs: List<GitHubApi.WorkflowRun>,
+    isLoading: Boolean = false,
     onNavigateToUser: (String) -> Unit = {},
     onNavigateToWorkflowRun: (Long) -> Unit = {},
 ) {
+    if (isLoading && runs.isEmpty()) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+        return
+    }
     if (runs.isEmpty()) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(stringResource(R.string.no_workflow_runs), color = MaterialTheme.colorScheme.onSurfaceVariant)

@@ -73,6 +73,16 @@ class RepoDetailViewModel @Inject constructor(
     private val _isLoadingMoreIssues = MutableStateFlow(false)
     val isLoadingMoreIssues: StateFlow<Boolean> = _isLoadingMoreIssues
 
+    // ── Ren: first-load flags so tabs can show a progress indicator
+    // before the first page arrives. isLoadingMoreIssues only covers append
+    // loads, which left the screen visibly empty for a few seconds on the
+    // first switch to Issues / PRs / Releases.
+    private val _isLoadingIssues = MutableStateFlow(false)
+    val isLoadingIssues: StateFlow<Boolean> = _isLoadingIssues.asStateFlow()
+
+    private val _isLoadingReleases = MutableStateFlow(false)
+    val isLoadingReleases: StateFlow<Boolean> = _isLoadingReleases.asStateFlow()
+
     // Pagination state for the issues/PRs list.
     private var issuePage = 1
     private var issuesCanLoadMore = true
@@ -390,7 +400,7 @@ class RepoDetailViewModel @Inject constructor(
 
     private fun fetchIssuesPage(owner: String, repo: String, state: String, append: Boolean, forceFresh: Boolean = false): Job {
         return viewModelScope.launch {
-            if (append) _isLoadingMoreIssues.update { true }
+            if (append) _isLoadingMoreIssues.update { true } else _isLoadingIssues.update { true }
             try {
                 if (forceFresh) cache.invalidateRepo(owner, repo)
                 val all = cache.getIssues(owner, repo, state = state, page = issuePage)
@@ -413,18 +423,21 @@ class RepoDetailViewModel @Inject constructor(
                 }
                 _error.update { e.localizedMessage ?: "Failed to load issues" }
             } finally {
-                if (append) _isLoadingMoreIssues.update { false }
+                if (append) _isLoadingMoreIssues.update { false } else _isLoadingIssues.update { false }
             }
         }
     }
 
     fun loadReleases(owner: String, repo: String): Job {
         return viewModelScope.launch {
+            _isLoadingReleases.update { true }
             try {
                 _releases.update { cache.getReleases(owner, repo) }
             } catch (e: Exception) {
                 _releases.update { emptyList() }
                 _error.update { e.localizedMessage ?: "Failed to load releases" }
+            } finally {
+                _isLoadingReleases.update { false }
             }
         }
     }
