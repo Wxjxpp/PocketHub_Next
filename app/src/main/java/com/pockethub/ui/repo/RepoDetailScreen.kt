@@ -593,18 +593,18 @@ private fun StatsRow(
 ) {
     val userClickModifier = Modifier.clickable { onNavigateToUser(data.owner.login) }
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AsyncImage(
             model = data.owner.avatarUrl,
             contentDescription = null,
-            modifier = Modifier.size(18.dp).clip(CircleShape).then(userClickModifier),
+            modifier = Modifier.size(28.dp).clip(CircleShape).then(userClickModifier),
         )
-        Spacer(Modifier.width(6.dp))
+        Spacer(Modifier.width(8.dp))
         Text(
             stringResource(R.string.stats_by, data.owner.login),
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = userClickModifier,
         )
@@ -614,42 +614,42 @@ private fun StatsRow(
             modifier = Modifier
                 .clip(MaterialTheme.shapes.small)
                 .clickable(onClick = onToggleStar)
-                .padding(horizontal = 6.dp, vertical = 3.dp),
+                .padding(horizontal = 10.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
                 if (isStarred) Icons.Outlined.Star else Icons.Outlined.StarBorder,
                 contentDescription = if (isStarred) stringResource(R.string.cd_unstar) else stringResource(R.string.cd_star),
-                modifier = Modifier.size(14.dp),
+                modifier = Modifier.size(20.dp),
                 tint = if (isStarred) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(Modifier.width(3.dp))
-            Text(data.stars.toString(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.width(4.dp))
+            Text(data.stars.toString(), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(10.dp))
         // Fork chip — tappable to fork. Shows loading state while forking.
         Row(
             modifier = Modifier
                 .clip(MaterialTheme.shapes.small)
                 .clickable(onClick = onFork, enabled = !isForking)
-                .padding(horizontal = 6.dp, vertical = 3.dp),
+                .padding(horizontal = 10.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
                 if (isForking) Icons.Outlined.ForkRight else Icons.Outlined.ForkRight,
                 contentDescription = stringResource(R.string.action_fork),
-                modifier = Modifier.size(14.dp),
+                modifier = Modifier.size(20.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(Modifier.width(3.dp))
+            Spacer(Modifier.width(4.dp))
             Text(
                 "${data.forks} ${stringResource(R.string.stat_forks)}",
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Spacer(Modifier.width(8.dp))
-        Text(stringResource(R.string.repo_issues_header, data.openIssues), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.width(10.dp))
+        Text(stringResource(R.string.repo_issues_header, data.openIssues), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
