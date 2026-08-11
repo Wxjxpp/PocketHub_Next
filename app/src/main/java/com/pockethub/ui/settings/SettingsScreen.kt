@@ -107,7 +107,6 @@ fun SettingsScreen(
     val accountCount by vm.accountCount.collectAsState()
     val cacheSizeBytes by vm.cacheSizeBytes.collectAsState()
     val translateTarget by vm.translateTarget.collectAsState()
-    var showThemeSheet by remember { mutableStateOf(false) }
     var showStyleSheet by remember { mutableStateOf(false) }
     var showLanguageSheet by remember { mutableStateOf(false) }
     var showTranslateSheet by remember { mutableStateOf(false) }
@@ -149,16 +148,11 @@ fun SettingsScreen(
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState())) {
             SectionHeader(stringResource(R.string.section_appearance))
+            // Single appearance entry — combines the old "theme mode"
+            // (Dark/Light/System) and "app style" pickers into one coherent
+            // list. The available styles double as dark/light theme presets.
             ListItem(
                 leadingContent = { Icon(Icons.Outlined.Palette, contentDescription = null) },
-                headlineContent = { Text(stringResource(R.string.theme)) },
-                supportingContent = {
-                    Text(when (themeMode) { ThemeMode.Dark -> stringResource(R.string.theme_dark); ThemeMode.Light -> stringResource(R.string.theme_light); ThemeMode.System -> stringResource(R.string.theme_system) })
-                },
-                modifier = Modifier.clickable { showThemeSheet = true },
-            )
-            ListItem(
-                leadingContent = { Icon(Icons.Outlined.Brush, contentDescription = null) },
                 headlineContent = { Text(stringResource(R.string.app_style)) },
                 supportingContent = { Text(styleLabel(appStyle)) },
                 modifier = Modifier.clickable { showStyleSheet = true },
@@ -395,24 +389,34 @@ fun SettingsScreen(
         }
     }
 
-    if (showThemeSheet) {
-        ModalBottomSheet(onDismissRequest = { showThemeSheet = false }, sheetState = rememberModalBottomSheetState()) {
-            Column(Modifier.padding(bottom = 24.dp)) {
-                Text(stringResource(R.string.theme), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(16.dp))
-                ThemeOption(stringResource(R.string.theme_dark), themeMode == ThemeMode.Dark) { vm.setThemeMode(ThemeMode.Dark); showThemeSheet = false }
-                ThemeOption(stringResource(R.string.theme_light), themeMode == ThemeMode.Light) { vm.setThemeMode(ThemeMode.Light); showThemeSheet = false }
-                ThemeOption(stringResource(R.string.theme_system), themeMode == ThemeMode.System) { vm.setThemeMode(ThemeMode.System); showThemeSheet = false }
-            }
-        }
-    }
-
     if (showStyleSheet) {
+        // Curated list — drops the old "Default (follows theme)" row so every
+        // option is a concrete style. `appStyle == null` (legacy / first-run)
+        // shows up as Linear Dark selected, because resolveStyle maps null +
+        // ThemeMode.Dark to AppStyle.LinearDark. Removing rows vs. removing the
+        // enum entries themselves keeps any already-persisted preference
+        // (Lavender / Forest) working — those users still see their baseline.
+        val visibleStyles = listOf(
+            AppStyle.LinearDark,
+            AppStyle.PrimerLight,
+            AppStyle.Paper,
+            AppStyle.Neon,
+        )
         ModalBottomSheet(onDismissRequest = { showStyleSheet = false }, sheetState = rememberModalBottomSheetState()) {
             Column(Modifier.padding(bottom = 24.dp)) {
                 Text(stringResource(R.string.app_style), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(16.dp))
-                ThemeOption(stringResource(R.string.app_style_default), appStyle == null) { vm.setAppStyle(null); showStyleSheet = false }
-                AppStyle.entries.forEach { style ->
-                    StyleOption(style, appStyle == style) { vm.setAppStyle(style); showStyleSheet = false }
+                visibleStyles.forEach { style ->
+                    // Null appStyle resolves to LinearDark under the default
+                    // (Dark) theme mode — show that as selected so first-run
+                    // users land on a highlighted row.
+                    val isSelected = appStyle == style || (appStyle == null && style == AppStyle.LinearDark)
+                    StyleOption(style, isSelected) {
+                        vm.setAppStyle(style)
+                        // Keep themeMode consistent: dark styles → Dark, light styles → Light,
+                        // so the legacy status-bar / system-bar tint logic stays correct.
+                        vm.setThemeMode(if (com.pockethub.ui.theme.styleDef(style).isDark) ThemeMode.Dark else ThemeMode.Light)
+                        showStyleSheet = false
+                    }
                 }
             }
         }
@@ -760,8 +764,10 @@ private fun ThemeOption(label: String, selected: Boolean, onClick: () -> Unit) {
 
 @Composable
 private fun styleLabel(style: AppStyle?): String = when (style) {
-    null -> stringResource(R.string.app_style_default)
-    AppStyle.LinearDark -> stringResource(R.string.style_linear_dark)
+    // null = legacy / first-run. resolveStyle maps null + ThemeMode.Dark (the
+    // default) to AppStyle.LinearDark, so the list-row supporting text mirrors
+    // that instead of showing a now-retired "Default" label.
+    null, AppStyle.LinearDark -> stringResource(R.string.style_linear_dark)
     AppStyle.PrimerLight -> stringResource(R.string.style_primer_light)
     AppStyle.Paper -> stringResource(R.string.style_paper)
     AppStyle.Neon -> stringResource(R.string.style_neon)
