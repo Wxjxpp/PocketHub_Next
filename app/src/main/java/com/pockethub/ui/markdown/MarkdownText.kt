@@ -663,6 +663,49 @@ private fun cleanMarkdown(markdown: String): String {
             ) { m ->
                 "[${m.groupValues[2]}](${m.groupValues[1]})"
             }
+            // ── New block-level handlers for tags the original cleaner did not
+            // cover. Converting them to markdown keeps README prose scannable
+            // instead of leaking literal <h1>/<li>/<blockquote> etc. Runs before
+            // the inline-emphasis step so nested <strong>/<em> inside a heading
+            // still get styled — the heading text is processed right after.
+            // <h1>…<h6> → ATX headings ("# title").
+            .replace(
+                Regex(
+                    "<\\s*h([1-6])\\b[^>]*>(.*?)<\\s*/\\s*h[1-6]\\s*>",
+                    setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
+                )
+            ) { m ->
+                val level = m.groupValues[1].toInt()
+                "\n${"#".repeat(level.coerceIn(1, 6))} ${m.groupValues[2].trim()}\n"
+            }
+            // <blockquote> → markdown "> " prefix per line so the existing
+            // blockquote block parser picks it up.
+            .replace(
+                Regex(
+                    "<\\s*blockquote\\b[^>]*>(.*?)<\\s*/\\s*blockquote\\s*>",
+                    setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
+                )
+            ) { m ->
+                m.groupValues[1].trimIndent().lines().joinToString("\n") { "> ${it}".trimEnd() }
+            }
+            // <li> → markdown list item ("- item"). The <ol>/<ul> wrappers are
+            // stripped later; this keeps each bullet on its own line so the
+            // bullet parser renders it.
+            .replace(
+                Regex(
+                    "<\\s*li\\b[^>]*>(.*?)<\\s*/\\s*li\\s*>",
+                    setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
+                )
+            ) { m -> "\n- ${m.groupValues[1].trim()}" }
+            // <script>/<style> → drop block + contents so raw JS/CSS doesn't
+            // leak into rendered text. Must come before the catch-all tag strip.
+            .replace(
+                Regex(
+                    "<\\s*(?:script|style)\\b[^>]*>.*?<\\s*/\\s*(?:script|style)\\s*>",
+                    setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
+                ),
+                "",
+            )
             // Convert raw-HTML inline emphasis/code/keystroke/strikethrough into markdown so it
             // renders styled instead of leaking raw tags. Must run before the generic tag strip.
             .replace(
@@ -687,12 +730,26 @@ private fun cleanMarkdown(markdown: String): String {
             .replace(Regex("<\\s*br\\s*/?>", RegexOption.IGNORE_CASE), "\n")
             .replace(Regex("<\\s*hr\\s*/?>", RegexOption.IGNORE_CASE), "\n\n---\n\n")
             .replace(
-                Regex("<\\s*(/?)\\s*(div|span|p|details|summary|center|section|article|figure|figcaption|picture|source|video|audio|table|thead|tbody|tr|td|th|pre)(\\s[^>]*)?>", RegexOption.IGNORE_CASE),
+                Regex("<\\s*(/?)\\s*(div|span|p|details|summary|center|section|article|figure|figcaption|picture|source|video|audio|table|thead|tbody|tr|td|th|pre|ol|ul|dl|dt|dd|caption|address)(\\s[^>]*)?>", RegexOption.IGNORE_CASE),
                 "",
             )
             // Self-closing / void tags (img/br/hr already converted above; keep others stripped)
             .replace(
                 Regex("<\\s*(br|hr|input|meta|link|area|base|col|embed|param|track|wbr)(\\s[^>]*)?/?>", RegexOption.IGNORE_CASE),
+                "",
+            )
+            // ── New — strip the remaining common HTML block/inline tags the
+            // original list above didn't cover, so the Overview README never
+            // shows literal tags. We name them explicitly rather than using a
+            // broad `<tag>` catch-all so that README prose like "if (a <b) …"
+            // isn't misinterpreted as a tag and stripped. HTML in fenced code
+            // blocks stays visible because cleanMarkdown's list doesn't
+            // include the bare-forward bracket rule.
+            .replace(
+                Regex(
+                    "<\\s*/?(?:iframe|canvas|noscript|ruby|rp|rt|form|fieldset|legend|label|button|select|option|optgroup|object|embed|var|samp|cite|q|abbr|dfn|time|ins|datalist|output|progress|meter|template|slot|dialog|menu|nav|header|footer|main|aside|hgroup|bdi|bdo|wbr|colgroup|col|map|area|math|svg|use|template|portal|slot)\\b[^>]*>",
+                    RegexOption.IGNORE_CASE,
+                ),
                 "",
             )
             // Decode a few common HTML entities
@@ -701,11 +758,46 @@ private fun cleanMarkdown(markdown: String): String {
             .replace("&gt;", ">")
             .replace("&quot;", "\"")
             .replace("&#39;", "'")
+            .replace("'", "'")
             .replace("&rarr;", "→")
             .replace("&larr;", "←")
             .replace("&mdash;", "—")
             .replace("&ndash;", "–")
             .replace("&nbsp;", " ")
+            .replace("&hellip;", "…")
+            .replace("&times;", "×")
+            .replace("&divide;", "÷")
+            .replace("&copy;", "©")
+            .replace("&reg;", "®")
+            .replace("&trade;", "™")
+            .replace("&bull;", "•")
+            .replace("&middot;", "·")
+            .replace("&laquo;", "«")
+            .replace("&raquo;", "»")
+            .replace("&ldquo;", "\u201C")
+            .replace("&rdquo;", "\u201D")
+            .replace("&lsquo;", "\u2018")
+            .replace("&rsquo;", "\u2019")
+            // ── New numeric / hex entity decode (&#8230; / &#x2026;) — single
+            // pass; out-of-range codepoints fall back to the original text.
+            .replace(Regex("&#(\\d+);")) { m ->
+                m.groupValues[1].toIntOrNull()?.let { code ->
+                    if (code in 0..0x10FFFF) {
+                        runCatching { Char(code).toString() }.getOrDefault(m.value)
+                    } else {
+                        m.value
+                    }
+                } ?: m.value
+            }
+            .replace(Regex("&#x([0-9A-Fa-f]+);")) { m ->
+                m.groupValues[1].toIntOrNull(16)?.let { code ->
+                    if (code in 0..0x10FFFF) {
+                        runCatching { Char(code).toString() }.getOrDefault(m.value)
+                    } else {
+                        m.value
+                    }
+                } ?: m.value
+            }
             // Collapse multiple blank lines left by tag removal
             .replace(Regex("\\n\\s*\\n\\s*\\n"), "\n\n")
 }
