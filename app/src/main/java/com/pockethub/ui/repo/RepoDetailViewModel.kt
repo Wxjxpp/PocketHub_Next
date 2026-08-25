@@ -533,8 +533,8 @@ class RepoDetailViewModel @Inject constructor(
             try {
                 val trimmed = newName?.trim().orEmpty()
                 // Empty input means "keep the source name" — send no name field.
-                val body = if (trimmed.isEmpty() || trimmed == repo) ForkRequest()
-                else ForkRequest(name = trimmed)
+                val body = if (trimmed.isEmpty() || trimmed == repo) GitHubApi.ForkRequest()
+                else GitHubApi.ForkRequest(name = trimmed)
                 val resp = api.forkRepository(owner, repo, body)
                 if (resp.isSuccessful) {
                     _forkMessage.update {
