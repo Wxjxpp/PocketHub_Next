@@ -138,6 +138,7 @@ fun RepoDetailScreen(
     val workflows by vm.workflows.collectAsState()
     val isLoadingWorkflows by vm.isLoadingWorkflows.collectAsState()
     val isLoadingWorkflowRuns by vm.isLoadingWorkflowRuns.collectAsState()
+    val commitsRefreshTick by vm.commitsRefreshTick.collectAsState()
     val isDispatching by vm.isDispatching.collectAsState()
     val dispatchMessage by vm.dispatchMessage.collectAsState()
     val translatedReadme by vm.translatedReadme.collectAsState()
@@ -454,6 +455,7 @@ fun RepoDetailScreen(
                 RepoTab.COMMITS -> CommitsTab(
                     owner = owner,
                     repo = repo,
+                    refreshTick = commitsRefreshTick,
                     onNavigateToUser = onNavigateToUser,
                     onCommitClick = onNavigateToCommit,
                 )

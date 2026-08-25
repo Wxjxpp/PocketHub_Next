@@ -7,6 +7,7 @@ import com.pockethub.data.model.NotificationReason
 import com.pockethub.data.remote.CachedRepository
 import com.pockethub.data.remote.GitHubApi
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -59,17 +60,26 @@ class NotificationsViewModel @Inject constructor(
     var currentTab = MutableStateFlow(NotifTab.UNREAD)
     var reasonFilter = MutableStateFlow(ReasonFilter.ALL)
 
+    private var loadJob: Job? = null
+    private var loadRequestId = 0
+
     init { load() }
 
     fun load(all: Boolean? = null) {
         val tab = currentTab.value
         val showAll = all ?: (tab == NotifTab.ALL)
-        viewModelScope.launch {
+        // Cancel any in-flight load: a slow older response (e.g. from a previous
+        // tab) must never land after a newer one, otherwise the spinner is
+        // cleared by stale data or the list shows the wrong tab's content.
+        loadJob?.cancel()
+        val requestId = ++loadRequestId
+        loadJob = viewModelScope.launch {
             _isLoading.update { true }
             _error.update { null }
             try {
                 val participating = (tab == NotifTab.PARTICIPATING)
                 val result = cache.getNotifications(perPage = 80, all = showAll, participating = participating)
+                if (requestId != loadRequestId) return@launch
                 // UNREAD tab falls back to the all=false list and filters to effectively
                 // unread threads client-side; PARTICIPATING / ALL show the server list
                 // as-is (they were already scoped server-side).
@@ -77,9 +87,11 @@ class NotificationsViewModel @Inject constructor(
                     if (tab == NotifTab.UNREAD) result.filter { it.isEffectivelyUnread() } else result
                 }
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                if (requestId != loadRequestId) return@launch
                 _error.update { e.localizedMessage ?: "Failed to load notifications" }
             } finally {
-                _isLoading.update { false }
+                if (requestId == loadRequestId) _isLoading.update { false }
             }
         }
     }

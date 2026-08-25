@@ -35,16 +35,16 @@ class CachedRepository @Inject constructor(
 
     // ── Repositories ────────────────────────────────────
 
-    suspend fun getMyRepositories(page: Int = 1, sort: String = "pushed", type: String? = null, visibility: String? = null): List<Repository> {
+    suspend fun getMyRepositories(page: Int = 1, sort: String = "pushed", type: String? = null, visibility: String? = null, forceFresh: Boolean = false): List<Repository> {
         val key = "repos:mine:$page:$sort:$type:$visibility"
-        return cacheFirst(key, FIVE_MIN) {
+        return cacheFirst(key, FIVE_MIN, forceFresh) {
             api.getMyRepositories(page = page, sort = sort, type = type, visibility = visibility)
         }
     }
 
-    suspend fun getStarredRepositories(page: Int = 1): List<Repository> {
+    suspend fun getStarredRepositories(page: Int = 1, forceFresh: Boolean = false): List<Repository> {
         val key = "repos:starred:$page"
-        return cacheFirst(key, FIVE_MIN) {
+        return cacheFirst(key, FIVE_MIN, forceFresh) {
             api.getStarredRepositories(page = page).body().orEmpty()
         }
     }
@@ -86,18 +86,18 @@ class CachedRepository @Inject constructor(
 
     // ── Issues ──────────────────────────────────────────
 
-    suspend fun getIssues(owner: String, repo: String, state: String = "open", page: Int = 1): List<Issue> {
+    suspend fun getIssues(owner: String, repo: String, state: String = "open", page: Int = 1, forceFresh: Boolean = false): List<Issue> {
         val key = "issues:$owner/$repo:$state:$page"
-        return cacheFirst(key, FIVE_MIN) {
+        return cacheFirst(key, FIVE_MIN, forceFresh) {
             api.getIssues(owner, repo, state = state, page = page)
         }
     }
 
     // ── Releases ────────────────────────────────────────
 
-    suspend fun getReleases(owner: String, repo: String, page: Int = 1): List<GitHubApi.Release> {
+    suspend fun getReleases(owner: String, repo: String, page: Int = 1, forceFresh: Boolean = false): List<GitHubApi.Release> {
         val key = "releases:$owner/$repo:$page"
-        return cacheFirst(key, FIVE_MIN) {
+        return cacheFirst(key, FIVE_MIN, forceFresh) {
             api.getReleases(owner, repo, page = page)
         }
     }
@@ -132,9 +132,9 @@ class CachedRepository @Inject constructor(
         return result
     }
 
-    suspend fun getReceivedEvents(login: String, perPage: Int = 30): List<FeedEvent> {
+    suspend fun getReceivedEvents(login: String, perPage: Int = 30, forceFresh: Boolean = false): List<FeedEvent> {
         val key = "feed:$login:$perPage"
-        return cacheFirst(key, FIVE_MIN) {
+        return cacheFirst(key, FIVE_MIN, forceFresh) {
             api.getReceivedEvents(login, perPage = perPage)
         }
     }
@@ -190,12 +190,16 @@ class CachedRepository @Inject constructor(
     private suspend inline fun <reified T> cacheFirst(
         key: String,
         ttlMs: Long,
+        forceFresh: Boolean = false,
         fetch: suspend () -> T,
     ): T {
-        // 1. Check cache
-        val cached = cacheDao.getIfFresh(key, System.currentTimeMillis() - ttlMs)
-        if (cached != null) {
-            return json.decodeFromString(serializer(), cached)
+        // 1. Check cache (skipped when the caller forces a network refresh —
+        //    pull-to-refresh must never serve a TTL-fresh blob as "new" data).
+        if (!forceFresh) {
+            val cached = cacheDao.getIfFresh(key, System.currentTimeMillis() - ttlMs)
+            if (cached != null) {
+                return json.decodeFromString(serializer(), cached)
+            }
         }
         // 2. Fetch from network
         val result = fetch()

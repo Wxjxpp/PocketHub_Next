@@ -103,9 +103,9 @@ class FeedSourceService @Inject constructor(
     }
 
     // ── Following (handled separately — returns GitHub events, not repos) ──
-    suspend fun loadFollowing(activeLogin: String, perPage: Int = 30): List<com.pockethub.data.model.FeedEvent> {
+    suspend fun loadFollowing(activeLogin: String, perPage: Int = 30, forceFresh: Boolean = false): List<com.pockethub.data.model.FeedEvent> {
         if (activeLogin.isBlank()) return emptyList()
-        return cache.getReceivedEvents(activeLogin, perPage = perPage)
+        return cache.getReceivedEvents(activeLogin, perPage = perPage, forceFresh = forceFresh)
     }
 
     // ── GitHub Search (canonical Repository → DiscoverItem) ────────────────

@@ -289,11 +289,11 @@ fun ExploreScreen(
                         Spacer(Modifier.height(4.dp))
                     }
                     }
-                    repoItems(trending, isLoading, error, { vm.load() }, onNavigateToRepo, onNavigateToUser)
+                    repoItems(trending, isLoading, error, isRefreshing = isLoading, onRetry = { vm.load() }, onNavigateToRepo = onNavigateToRepo, onNavigateToUser = onNavigateToUser)
                 }
 
                 ExploreSection.FEATURED -> {
-                    repoItems(featured, isLoading, error, { vm.load() }, onNavigateToRepo, onNavigateToUser)
+                    repoItems(featured, isLoading, error, isRefreshing = isLoading, onRetry = { vm.load() }, onNavigateToRepo = onNavigateToRepo, onNavigateToUser = onNavigateToUser)
                 }
 
                 ExploreSection.FOLLOWING -> {
@@ -327,9 +327,10 @@ fun ExploreScreen(
                     } else {
                         items(feed, key = { it.id }) { ev -> FeedEventCard(ev, onNavigateToRepo = onNavigateToRepo, onNavigateToUser = onNavigateToUser) }
                     }
-                    if (isLoading && feed.isNotEmpty()) {
-                        item { LoadingFooter() }
-                    }
+                    // The following feed has no pagination: any non-empty reload is a
+                    // pull-to-refresh, whose indicator is already at the top. A footer
+                    // spinner here would duplicate it (double-spinner bug).
+                    // if (isLoading && feed.isNotEmpty()) { item { LoadingFooter() } }
                 }
             }
 
@@ -397,11 +398,14 @@ private fun ErrorState(message: String, onRetry: () -> Unit) {
     }
 }
 
-/** LazyColumn section listing a [DiscoverItem] collection with loading / error / empty states. */
+/** LazyColumn section listing a [DiscoverItem] collection with loading / error / empty states.
+ *  [isRefreshing] is the pull-to-refresh indicator state, tracked separately so a
+ *  pull-to-refresh never ALSO shows the list footer spinner (double spinner). */
 private fun androidx.compose.foundation.lazy.LazyListScope.repoItems(
     repos: List<DiscoverItem>,
     isLoading: Boolean,
     error: String?,
+    isRefreshing: Boolean = false,
     onRetry: () -> Unit,
     onNavigateToRepo: (String, String) -> Unit,
     onNavigateToUser: (String) -> Unit = {},
@@ -429,9 +433,11 @@ private fun androidx.compose.foundation.lazy.LazyListScope.repoItems(
             item { Spacer(Modifier.height(16.dp)) }
         }
     }
-    if (isLoading && repos.isNotEmpty()) { item { LoadingFooter() } }
+    // Footer spinner is for *paging* only. During pull-to-refresh the pull
+    // indicator at the top is already visible — showing this too was the
+    // "two spinners at once" bug.
+    if (isLoading && repos.isNotEmpty() && !isRefreshing) { item { LoadingFooter() } }
 }
-
 @Composable
 private fun FeedEventCard(
     ev: FeedEvent,

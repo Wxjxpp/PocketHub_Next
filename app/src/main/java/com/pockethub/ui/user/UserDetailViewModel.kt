@@ -76,7 +76,12 @@ class UserDetailViewModel @Inject constructor(
                 // Load repos in parallel
                 launch {
                     try {
-                        _repos.update { cache.getUserRepositories(login, sort = "updated") }
+                        // force=true → straight to the network; otherwise cache-first.
+                        if (force) {
+                            _repos.update { api.getUserRepositories(login, sort = "updated") }
+                        } else {
+                            _repos.update { cache.getUserRepositories(login, sort = "updated") }
+                        }
                     } catch (_: Exception) {
                         // Non-fatal
                     }

@@ -285,13 +285,23 @@ class PullRequestDetailViewModel @Inject constructor(
     private val _checkSummary = MutableStateFlow<CheckSummary>(CheckSummary.NONE)
     val checkSummary: StateFlow<CheckSummary> = _checkSummary
 
-    /** Manually re-fetch check runs. Used when the user pulls to refresh CI status. */
+    /** Manually re-fetch check runs. Used when the user pulls to refresh CI status.
+     *  Exposes a loading flag so the refresh button can show inline feedback. */
+    private val _isLoadingCheckRuns = MutableStateFlow(false)
+    val isLoadingCheckRuns: StateFlow<Boolean> = _isLoadingCheckRuns.asStateFlow()
+
     fun refreshCheckRuns(owner: String, repo: String) {
         val sha = _pr.value?.head?.sha ?: return
+        if (_isLoadingCheckRuns.value) return
         viewModelScope.launch {
-            runCatching { api.listCheckRuns(owner, repo, sha) }.onSuccess { resp ->
-                _checkRuns.update { resp.runs }
-                _checkSummary.update { summarize(resp.runs) }
+            _isLoadingCheckRuns.value = true
+            try {
+                runCatching { api.listCheckRuns(owner, repo, sha) }.onSuccess { resp ->
+                    _checkRuns.update { resp.runs }
+                    _checkSummary.update { summarize(resp.runs) }
+                }
+            } finally {
+                _isLoadingCheckRuns.value = false
             }
         }
     }

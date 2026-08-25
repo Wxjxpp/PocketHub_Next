@@ -251,7 +251,16 @@ class RepoDetailViewModel @Inject constructor(
                 when (currentTab.value) {
                     RepoTab.OVERVIEW,
                     RepoTab.CODE,
-                    RepoTab.COMMITS -> loadRepo(owner, repo, force = true)?.join()
+                    RepoTab.COMMITS -> {
+                        loadRepo(owner, repo, force = true)?.join()
+                        // Commits live in a separate ViewModel — the old code only
+                        // reloaded the repo metadata here, so pulling to refresh on
+                        // the Commits tab spun the spinner while the commit list
+                        // never changed (fake refresh). Bump a counter that
+                        // CommitsTab observes and re-fetches on.
+                        _commitsRefreshTick.value++
+                    }
+                    // loadIssues(force=true) already bypasses the cache via fetchIssuesPage.
                     RepoTab.ISSUES -> loadIssues(owner, repo, force = true)?.join()
                     RepoTab.PRS -> loadPulls(owner, repo, force = true)?.join()
                     RepoTab.RELEASES -> {
@@ -265,6 +274,10 @@ class RepoDetailViewModel @Inject constructor(
             }
         }
     }
+
+    /** Incremented when pull-to-refresh should also reload the Commits tab. */
+    private val _commitsRefreshTick = MutableStateFlow(0)
+    val commitsRefreshTick: StateFlow<Int> = _commitsRefreshTick.asStateFlow()
 
     private fun loadReadme(owner: String, repo: String): Job = viewModelScope.launch {
         try {
@@ -390,9 +403,7 @@ class RepoDetailViewModel @Inject constructor(
         issuePage = 1
         issuesCanLoadMore = true
         return fetchIssuesPage(owner, repo, effectiveState, append = false, forceFresh = force)
-    }
-
-    fun loadPulls(owner: String, repo: String, state: String? = null, force: Boolean = false): Job? {
+    }    fun loadPulls(owner: String, repo: String, state: String? = null, force: Boolean = false): Job? {
         // Shares the issues fetch (PRs come from the same endpoint); just ensure loaded.
         return loadIssues(owner, repo, state, force)
     }
@@ -409,8 +420,10 @@ class RepoDetailViewModel @Inject constructor(
         return viewModelScope.launch {
             if (append) _isLoadingMoreIssues.update { true } else _isLoadingIssues.update { true }
             try {
-                if (forceFresh) cache.invalidateRepo(owner, repo)
-                val all = cache.getIssues(owner, repo, state = state, page = issuePage)
+                // forceFresh goes straight to the network (bypassing the 5-min TTL)
+                // so pull-to-refresh always re-fetches instead of serving the same
+                // cached blob — the "spinner spins but nothing changes" bug.
+                val all = cache.getIssues(owner, repo, state = state, page = issuePage, forceFresh = forceFresh)
                 val issuesOnly = all.filter { it.pullRequest == null }
                 val pullsOnly = all.filter { it.pullRequest != null }
                 if (append) {

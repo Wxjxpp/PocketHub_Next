@@ -227,7 +227,10 @@ fun SearchScreen(
                                 )
                             }
                         }
-                        if (isLoading || isLoadingMore) {
+                        // Footer spinner is for *pagination* only. A pull-to-refresh
+                        // already shows the top indicator — showing this footer too
+                        // was the double-spinner bug.
+                        if (isLoadingMore) {
                             item(key = "loading-footer") { LoadingFooter() }
                         }
                     }

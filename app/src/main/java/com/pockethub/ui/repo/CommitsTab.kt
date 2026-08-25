@@ -51,6 +51,7 @@ import java.util.Locale
 fun CommitsTab(
     owner: String,
     repo: String,
+    refreshTick: Int = 0,
     onNavigateToUser: (String) -> Unit = {},
     onCommitClick: (String) -> Unit = {},
     vm: CommitsViewModel = hiltViewModel(),
@@ -61,6 +62,10 @@ fun CommitsTab(
     val listState = rememberLazyListState()
 
     LaunchedEffect(owner, repo) { vm.loadCommits(owner, repo) }
+    // Pull-to-refresh on the repo detail screen bumps [refreshTick]; re-fetch so
+    // the commit list actually updates (previously the spinner spun but this
+    // list never reloaded — fake refresh).
+    LaunchedEffect(refreshTick) { if (refreshTick > 0 && owner.isNotBlank()) vm.refresh(owner, repo) }
 
     // Infinite scroll
     val shouldLoadMore by remember {

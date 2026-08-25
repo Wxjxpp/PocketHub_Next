@@ -31,6 +31,11 @@ class ReposViewModel @Inject constructor(
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
+    /** Pull-to-refresh state, kept separate from [isLoading] so the list footer
+     *  (paging) spinner never shows at the same time as the pull indicator. */
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
 
@@ -66,7 +71,7 @@ class ReposViewModel @Inject constructor(
         load(append = true)
     }
 
-    private fun load(append: Boolean = false) {
+    private fun load(append: Boolean = false, forceFresh: Boolean = false) {
         val page = currentPage
         // A filter or tab switch supersedes the current first-page request. Retrofit
         // cancellation alone is not enough: a completed old response could otherwise
@@ -74,7 +79,7 @@ class ReposViewModel @Inject constructor(
         if (!append) loadJob?.cancel()
         val requestId = ++loadRequestId
         loadJob = viewModelScope.launch {
-            _isLoading.update { true }
+            if (forceFresh && !append) _isRefreshing.value = true else _isLoading.update { true }
             _error.update { null }
             try {
                 val result = when (currentTab.value) {
@@ -90,9 +95,9 @@ class ReposViewModel @Inject constructor(
                             RepoFilter.PRIVATE -> "private"
                             else -> null
                         }
-                        cache.getMyRepositories(page = page, type = type, visibility = vis)
+                        cache.getMyRepositories(page = page, type = type, visibility = vis, forceFresh = forceFresh)
                     }
-                    RepoTab.STARRED -> cache.getStarredRepositories(page = page)
+                    RepoTab.STARRED -> cache.getStarredRepositories(page = page, forceFresh = forceFresh)
                 }
                 if (requestId != loadRequestId) return@launch
                 // Client-side filtering for filters the API can't express.
@@ -113,14 +118,19 @@ class ReposViewModel @Inject constructor(
                 // Roll back the page counter so the next loadMore retries this page.
                 if (append && currentPage == page) currentPage--
             } finally {
-                if (requestId == loadRequestId) _isLoading.update { false }
+                if (requestId == loadRequestId) {
+                    if (forceFresh && !append) _isRefreshing.value = false else _isLoading.update { false }
+                }
             }
         }
     }
 
+    /** Cache-friendly reload of page 1 (used on tab re-entry — no forced network). */
+    fun load() = load(false)
+
     fun refresh() {
         currentPage = 1
         canLoadMore = true
-        load()
+        load(forceFresh = true)
     }
 }

@@ -87,8 +87,17 @@ fun ReposScreen(
     // composition is the signal that the user came back — reload so any mutation
     // (delete / visibility toggle) done on RepoDetail is reflected immediately.
     // The cache was already invalidated by the mutation, so this is a cheap
+    // ReposScreen is disposed when the user leaves the Repos tab and recomposed
+    // on return (HomeScreen uses `when(selectedTab)` to switch content).  A fresh
+    // composition is the signal that the user came back — reload so any mutation
+    // (delete / visibility toggle) done on RepoDetail is reflected immediately.
+    // The cache was already invalidated by the mutation, so this is a cheap
     // cache-miss → single network fetch; no mutation means a fast cache hit.
-    LaunchedEffect(Unit) { vm.refresh() }
+    // Plain load() instead of refresh(): refresh() would force a second network
+    // round-trip on every tab return AND flash both spinners alongside init{}'s
+    // own first load — the double-spinner bug. Cache-first load() already
+    // reflects mutations because mutations invalidate their cache keys.
+    LaunchedEffect(Unit) { vm.load() }
 
     // Infinite scroll
     val shouldLoadMore by remember {
@@ -103,7 +112,7 @@ fun ReposScreen(
     }
 
     com.pockethub.ui.components.RefreshContainer(
-        isRefreshing = isLoading,
+        isRefreshing = isRefreshing,
         onRefresh = { vm.refresh() },
         modifier = modifier,
     ) {

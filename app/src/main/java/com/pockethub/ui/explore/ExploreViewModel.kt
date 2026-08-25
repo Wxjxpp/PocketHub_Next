@@ -129,7 +129,10 @@ class ExploreViewModel @Inject constructor(
     /** Standard cache-friendly load. */
     fun load() = launchLoad(forceFresh = false)
 
-    /** Forces a fresh fetch for the active section, including pull-to-refresh. */
+    /** Forces a fresh fetch for the active section, including pull-to-refresh.
+     *  forceFresh must reach the data layer — the following feed goes through
+     *  CachedRepository's 5-min TTL cache and would otherwise return stale
+     *  content while the pull indicator spins ("fake refresh"). */
     fun refresh() = launchLoad(forceFresh = true)
 
     private suspend fun loadFollowingFeed(forceFresh: Boolean) {
@@ -140,7 +143,7 @@ class ExploreViewModel @Inject constructor(
             return
         }
         _feedAvailable.value = true
-        _feed.value = sources.loadFollowing(login, perPage = if (forceFresh) 50 else 30)
+        _feed.value = sources.loadFollowing(login, perPage = if (forceFresh) 50 else 30, forceFresh = forceFresh)
     }
 
     fun clearError() { _error.update { null } }

@@ -126,6 +126,7 @@ fun PullRequestDetailScreen(
     val isSendingLineComment by vm.isSendingLineComment.collectAsState()
     val checkRuns by vm.checkRuns.collectAsState()
     val checkSummary by vm.checkSummary.collectAsState()
+    val isRefreshingCheckRuns by vm.isLoadingCheckRuns.collectAsState()
     // Thread resolve state (Map<rootCommentId, ThreadInfo>) surfaced for R3.
     val threadState by vm.threadState.collectAsState()
     val busyReviewComments by vm.busyReviewComments.collectAsState()
@@ -530,6 +531,7 @@ fun PullRequestDetailScreen(
                 ChecksCard(
                     summary = checkSummary,
                     runs = checkRuns,
+                    isRefreshing = isRefreshingCheckRuns,
                     onRefresh = { vm.refreshCheckRuns(owner, repo) },
                 )
 
@@ -1202,6 +1204,7 @@ private fun formatDate(s: String): String = try {
 private fun ChecksCard(
     summary: CheckSummary,
     runs: List<GitHubApi.CheckRun>,
+    isRefreshing: Boolean = false,
     onRefresh: () -> Unit,
 ) {
     if (runs.isEmpty() && summary is CheckSummary.NONE) return
@@ -1239,9 +1242,15 @@ private fun ChecksCard(
             Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp), tint = tint)
             Spacer(Modifier.width(8.dp))
             Text(label, style = MaterialTheme.typography.labelMedium, color = tint, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-            // Refresh manually refreshes regardless of expansion state.
-            IconButton(onClick = onRefresh, modifier = Modifier.size(24.dp)) {
-                Icon(Icons.Outlined.Refresh, contentDescription = stringResource(R.string.action_refresh_checks), tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+            // Refresh manually refreshes regardless of expansion state. A tiny inline
+            // spinner replaces the icon while the re-fetch is in flight, so the tap
+            // has visible feedback (previously the button looked dead).
+            IconButton(onClick = onRefresh, modifier = Modifier.size(24.dp), enabled = !isRefreshing) {
+                if (isRefreshing) {
+                    CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 1.5.dp)
+                } else {
+                    Icon(Icons.Outlined.Refresh, contentDescription = stringResource(R.string.action_refresh_checks), tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+                }
             }
         }
 
