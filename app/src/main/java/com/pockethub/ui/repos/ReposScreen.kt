@@ -77,16 +77,12 @@ fun ReposScreen(
 ) {
     val repos by vm.repos.collectAsState()
     val isLoading by vm.isLoading.collectAsState()
+    val isRefreshing by vm.isRefreshing.collectAsState()
     val error by vm.error.collectAsState()
     val tab by vm.currentTab.collectAsState()
     val filter by vm.currentFilter.collectAsState()
     val listState = rememberLazyListState()
 
-    // ReposScreen is disposed when the user leaves the Repos tab and recomposed
-    // on return (HomeScreen uses `when(selectedTab)` to switch content).  A fresh
-    // composition is the signal that the user came back — reload so any mutation
-    // (delete / visibility toggle) done on RepoDetail is reflected immediately.
-    // The cache was already invalidated by the mutation, so this is a cheap
     // ReposScreen is disposed when the user leaves the Repos tab and recomposed
     // on return (HomeScreen uses `when(selectedTab)` to switch content).  A fresh
     // composition is the signal that the user came back — reload so any mutation
