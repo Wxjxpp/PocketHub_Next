@@ -471,20 +471,48 @@ fun RepoDetailScreen(
     }
 
     if (showForkDialog) {
+        // Pre-fill with the source repo name — GitHub forks default to the same
+        // name, and the user can edit it to rename the fork at creation time.
+        var forkName by remember { mutableStateOf(repo) }
         AlertDialog(
-            onDismissRequest = { showForkDialog = false },
+            onDismissRequest = { if (!isForking) showForkDialog = false },
             title = { Text(stringResource(R.string.fork_dialog_title)) },
-            text = { Text(stringResource(R.string.fork_dialog_message, "$owner/$repo")) },
+            text = {
+                Column {
+                    Text(stringResource(R.string.fork_dialog_message, "$owner/$repo"))
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = forkName,
+                        onValueChange = { forkName = it },
+                        singleLine = true,
+                        enabled = !isForking,
+                        label = { Text(stringResource(R.string.fork_dialog_name_label)) },
+                        isError = forkName.trim().isEmpty(),
+                        supportingText = {
+                            if (forkName.trim().isEmpty()) {
+                                Text(stringResource(R.string.fork_dialog_name_required))
+                            }
+                        },
+                    )
+                }
+            },
             confirmButton = {
                 TextButton(
                     onClick = {
                         showForkDialog = false
-                        vm.fork(owner, repo)
+                        vm.fork(owner, repo, newName = forkName)
                     },
-                ) { Text(stringResource(R.string.action_fork)) }
+                    enabled = !isForking && forkName.trim().isNotEmpty(),
+                ) {
+                    if (isForking) {
+                        CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 1.5.dp)
+                    } else {
+                        Text(stringResource(R.string.action_fork))
+                    }
+                }
             },
             dismissButton = {
-                TextButton(onClick = { showForkDialog = false }) {
+                TextButton(onClick = { showForkDialog = false }, enabled = !isForking) {
                     Text(stringResource(R.string.action_cancel))
                 }
             },

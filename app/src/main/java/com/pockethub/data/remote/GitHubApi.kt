@@ -184,12 +184,21 @@ interface GitHubApi {
         val ignored: Boolean = false,
     )
 
-    /** Fork a repository — 202 Accepted, repo object returned when complete. */
+    /** Fork a repository — 202 Accepted, repo object returned when complete.
+     *  [name] lets the user rename the fork; omit for same-name-as-source. */
     @POST("repos/{owner}/{repo}/forks")
     suspend fun forkRepository(
         @Path("owner") owner: String,
         @Path("repo") repo: String,
+        @Body body: ForkRequest = ForkRequest(),
     ): Response<Repository>
+
+    /** GitHub accepts `name` (and optional `default_branch_only`) on fork creation. */
+    @kotlinx.serialization.Serializable
+    data class ForkRequest(
+        val name: String? = null,
+        @kotlinx.serialization.SerialName("default_branch_only") val defaultBranchOnly: Boolean = false,
+    )
 
     /**
      * Delete a repository. Requires the authenticated user to be the owner (or an

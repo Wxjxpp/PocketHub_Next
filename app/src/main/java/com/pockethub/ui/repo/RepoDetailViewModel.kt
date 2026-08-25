@@ -526,14 +526,21 @@ class RepoDetailViewModel @Inject constructor(
         _dispatchMessage.update { null }
     }
 
-    fun fork(owner: String, repo: String) {
+    fun fork(owner: String, repo: String, newName: String? = null) {
         viewModelScope.launch {
             if (_isForking.value) return@launch
             _isForking.update { true }
             try {
-                val resp = api.forkRepository(owner, repo)
+                val trimmed = newName?.trim().orEmpty()
+                // Empty input means "keep the source name" — send no name field.
+                val body = if (trimmed.isEmpty() || trimmed == repo) ForkRequest()
+                else ForkRequest(name = trimmed)
+                val resp = api.forkRepository(owner, repo, body)
                 if (resp.isSuccessful) {
-                    _forkMessage.update { "Forked to current account" }
+                    _forkMessage.update {
+                        if (trimmed.isEmpty() || trimmed == repo) "Forked to current account"
+                        else "Forked to $trimmed"
+                    }
                 } else {
                     _forkMessage.update { "Fork failed: ${resp.code()}" }
                 }

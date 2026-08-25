@@ -68,6 +68,8 @@
     <string name="no_assignees">No assignees</string>
     <string name="fork_dialog_title">Fork this repository?</string>
     <string name="fork_dialog_message">Fork %1$s to your account.</string>
+    <string name="fork_dialog_name_label">Fork name</string>
+    <string name="fork_dialog_name_required">Fork name is required</string>
     <string name="browse_history">Browse history</string>
     <string name="history_empty">No repositories visited yet</string>
 

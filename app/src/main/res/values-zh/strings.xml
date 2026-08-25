@@ -52,6 +52,8 @@
     <string name="no_assignees">暂无指派人</string>
     <string name="fork_dialog_title">Fork 这个仓库？</string>
     <string name="fork_dialog_message">将 %1$s Fork 到你的账号。</string>
+    <string name="fork_dialog_name_label">Fork 仓库名</string>
+    <string name="fork_dialog_name_required">仓库名不能为空</string>
     <string name="browse_history">浏览历史</string>
     <string name="history_empty">还没有浏览过仓库</string>
 
