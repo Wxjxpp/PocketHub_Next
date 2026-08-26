@@ -1,7 +1,12 @@
 package com.pockethub.ui.components
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -288,13 +293,13 @@ fun ShimmerBox(
     modifier: Modifier = Modifier,
     cornerRadius: Dp = 12.dp,
 ) {
-    val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "shimmer")
+    val infiniteTransition = rememberInfiniteTransition(label = "shimmer")
     val offset by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 1000f,
-        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
-            animation = tween(1200, easing = androidx.compose.animation.core.LinearEasing),
-            repeatMode = androidx.compose.animation.core.RepeatMode.Restart
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
         ),
         label = "shimmer_offset"
     )
