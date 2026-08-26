@@ -1085,6 +1085,13 @@ interface GitHubApi {
         @kotlinx.serialization.SerialName("updated_at") val updatedAt: String? = null,
         @kotlinx.serialization.SerialName("run_started_at") val runStartedAt: String? = null,
         val actor: User? = null,
+        @kotlinx.serialization.SerialName("head_commit")
+        val headCommit: HeadCommit? = null,
+    )
+
+    @kotlinx.serialization.Serializable
+    data class HeadCommit(
+        val message: String? = null,
     )
 
     @kotlinx.serialization.Serializable

@@ -26,6 +26,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
@@ -65,6 +66,7 @@ import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
+import androidx.compose.material3.Surface
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -1330,45 +1332,56 @@ private fun WorkflowRunRow(
         }
         Spacer(Modifier.width(6.dp))
         Column(Modifier.weight(1f)) {
-            // Line 1: workflow name — usually identical across runs, so disambiguate below
-            Text(
-                run.name.ifBlank { run.path?.substringAfterLast('/') ?: (run.event ?: "") },
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(Modifier.height(2.dp))
-            // Line 2: what distinguishes this run — commit subject/sha, branch, event
-            val sha = run.headSha?.take(7).orEmpty()
-            val branch = run.headBranch?.takeIf { it.isNotBlank() }
-            val detail = listOfNotNull(branch, run.event?.let { eventLabel(it) })
-                .joinToString(" · ")
+            // Line 1 (title): commit summary — the most distinguishing info, like github.com
+            val commitMsg = run.headCommit?.message
+                ?.substringBefore('\n')
+                ?.trim()
+                .orEmpty()
+            if (commitMsg.isNotEmpty()) {
+                Text(
+                    commitMsg,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(2.dp))
+            }
+            // Line 2: workflow name + event — secondary since it repeats across runs
+            val wfName = run.name.ifBlank { run.path?.substringAfterLast('/') ?: (run.event ?: "") }
+            val detail = listOfNotNull(
+                run.headSha?.take(7),
+                run.event?.let { eventLabel(it) },
+            ).joinToString(" · ")
             Row(verticalAlignment = Alignment.CenterVertically) {
-                if (sha.isNotBlank()) {
-                    Text(
-                        sha,
-                        style = MaterialTheme.typography.labelMedium,
-                        fontFamily = FontFamily.Monospace,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                    if (detail.isNotEmpty()) {
-                        Spacer(Modifier.width(6.dp))
-                    }
-                }
-                if (detail.isNotEmpty()) {
-                    Text(
-                        detail,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+                Text(
+                    if (detail.isNotEmpty()) "$wfName · $detail" else wfName,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
             Spacer(Modifier.height(3.dp))
-            // Line 3: actor · date+time · duration
+            // Line 3: branch chip · actor · date+time · duration
             Row(verticalAlignment = Alignment.CenterVertically) {
+                val branch = run.headBranch?.takeIf { it.isNotBlank() }
+                if (branch != null) {
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                    ) {
+                        Text(
+                            branch,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
+                        )
+                    }
+                    Spacer(Modifier.width(6.dp))
+                }
                 val actor = run.actor
                 if (actor != null) {
                     AsyncImage(
