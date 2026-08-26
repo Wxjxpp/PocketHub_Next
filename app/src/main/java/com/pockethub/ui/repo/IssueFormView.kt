@@ -29,7 +29,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -54,9 +53,9 @@ fun IssueFormView(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        if (form.description.isNotBlank()) {
+        if (!form.description.isNullOrBlank()) {
             Text(
-                form.description,
+                form.description!!,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -123,37 +122,39 @@ private fun CodeLine(line: String) {
 }
 
 /** Parses `**bold**`, `` `code` `` and links `[text](url)` → text into an [AnnotatedString]. */
-internal fun inlineMarkdown(text: String): AnnotatedString = buildAnnotatedString {
+internal fun inlineMarkdown(text: String): AnnotatedString {
+    val b = AnnotatedString.Builder()
     var i = 0
     while (i < text.length) {
         when {
             text.startsWith("**", i) -> {
                 val end = text.indexOf("**", i + 2)
                 if (end > 0) {
-                    push(SpanStyle(fontWeight = FontWeight.Bold))
-                    append(text.substring(i + 2, end))
-                    pop()
+                    b.push(SpanStyle(fontWeight = FontWeight.Bold))
+                    b.append(text.substring(i + 2, end))
+                    b.pop()
                     i = end + 2
                 } else {
-                    append(text[i]); i++
+                    b.append(text[i]); i++
                 }
             }
             text[i] == '`' -> {
                 val end = text.indexOf('`', i + 1)
                 if (end > 0) {
-                    push(SpanStyle(fontFamily = FontFamily.Monospace, fontSize = 13.sp))
-                    append(text.substring(i + 1, end))
-                    pop()
+                    b.push(SpanStyle(fontFamily = FontFamily.Monospace, fontSize = 13.sp))
+                    b.append(text.substring(i + 1, end))
+                    b.pop()
                     i = end + 1
                 } else {
-                    append(text[i]); i++
+                    b.append(text[i]); i++
                 }
             }
             else -> {
-                append(text[i]); i++
+                b.append(text[i]); i++
             }
         }
     }
+    return b.toAnnotatedString()
 }
 
 // ── text input ──────────────────────────────────────────────────────────

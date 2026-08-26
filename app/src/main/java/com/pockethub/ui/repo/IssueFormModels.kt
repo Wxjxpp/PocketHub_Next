@@ -20,6 +20,8 @@ sealed class IssueFormField {
     /** Static informational markdown block (`type: markdown`) — not editable. */
     data class Markdown(
         override val index: Int,
+        override val label: String? = null,
+        override val description: String? = null,
         val value: String,
     ) : IssueFormField()
 
@@ -81,18 +83,11 @@ data class IssueForm(
                 is IssueFormField.Dropdown ->
                     if (f.required && if (f.multiple) a.checked.isEmpty() else a.selected < 0) return f.label
                 is IssueFormField.CheckboxGroup ->
-                    if (f.options.anyIndexed { i, o -> o.required && i !in a.checked }) return f.label
+                    if (f.options.withIndex().any { (i, o) -> o.required && i !in a.checked }) return f.label
                 is IssueFormField.Markdown -> Unit
             }
         }
         return null
-    }
-
-    private inline fun List<IssueFormField.CheckOption>.anyIndexed(
-        predicate: (Int, IssueFormField.CheckOption) -> Boolean,
-    ): Boolean {
-        forEachIndexed { i, o -> if (predicate(i, o)) return true }
-        return false
     }
 
     companion object {

@@ -76,14 +76,17 @@ object IssueFormParser {
             )
             "checkboxes" -> {
                 val options = (attrs?.get("options") as? List<Any?>)
-                    ?.mapIndexed { oi, o ->
+                    ?.mapNotNull { o ->
                         val om = o as? Map<String, Any?>
-                IssueFormField.CheckOption(
-                    label = om?.scalar("label") ?: "",
-                    required = om?.get("required") == true,
-                )
+                        if (om == null) null
+                        else IssueFormField.CheckOption(
+                            label = om.scalar("label") ?: "",
+                            required = om["required"] == true,
+                        )
                     }
-                    .takeIf { it.isNotEmpty() } ?: return fallbackToMarkdown(index, label, description, attrs, type)
+                    ?.filter { it.label.isNotEmpty() }
+                    ?.takeIf { it.isNotEmpty() }
+                    ?: return fallbackToMarkdown(index, label, description, attrs, type)
                 IssueFormField.CheckboxGroup(
                     index = index,
                     label = label,
@@ -93,9 +96,10 @@ object IssueFormParser {
             }
             "dropdown" -> {
                 val options = (attrs?.get("options") as? List<Any?>)
-                    ?.map { scalarOf(it) }
+                    ?.mapNotNull { scalarOf(it) }
                     ?.filter { it.isNotEmpty() }
-                    .takeIf { !it.isNullOrEmpty() } ?: return fallbackToMarkdown(index, label, description, attrs, type)
+                    ?.takeIf { it.isNotEmpty() }
+                    ?: return fallbackToMarkdown(index, label, description, attrs, type)
                 IssueFormField.Dropdown(
                     index = index,
                     label = label,
@@ -134,21 +138,27 @@ object IssueFormParser {
         },
     )
 
-    fun parseConfigYaml(raw: String): Pair<Boolean, List<IssueContactLink>> = runCatching {
-        val root = Yaml().load<Map<String, Any?>>(raw) ?: return runCatching { false to emptyList() }.getOrDefault(false to emptyList())
-        val links = (root["contact_links"] as? List<Any?>)
-            ?.mapNotNull { entry ->
-                val m = entry as? Map<String, Any?>
-                val name = m?.scalar("name") ?: return@mapNotNull null
-                IssueContactLink(
-                    name = name,
-                    url = m.scalar("url") ?: return@mapNotNull null,
-                    about = m.scalar("about").orEmpty(),
-                )
-            }.orEmpty()
-        val blankEnabled = root.getOrDefault("blank_issues_enabled", true) != false
-        blankEnabled to links
-    }.getOrDefault(true to emptyList())
+    fun parseConfigYaml(raw: String): Pair<Boolean, List<IssueContactLink>> {
+        return try {
+            val root: Map<String, Any?> = Yaml().load<Map<String, Any?>>(raw) ?: return true to emptyList()
+            val links = (root["contact_links"] as? List<Any?>)
+                ?.mapNotNull { entry ->
+                    val m = entry as? Map<String, Any?>
+                    val name = m?.scalar("name")
+                    val url = m?.scalar("url")
+                    if (name == null || url == null) null
+                    else IssueContactLink(
+                        name = name,
+                        url = url,
+                        about = m.scalar("about").orEmpty(),
+                    )
+                }.orEmpty()
+            val blankEnabled = root["blank_issues_enabled"] != false
+            blankEnabled to links
+        } catch (_: Exception) {
+            true to emptyList()
+        }
+    }
 
     /**
      * Parse a legacy `.md` template (front-matter + body) into an [IssueTemplate].
@@ -224,12 +234,6 @@ object IssueFormParser {
             is String -> v.split(",").map { it.trim().trim('"', '\'') }.filter { it.isNotEmpty() }
             else -> emptyList()
         }
-    }
-
-    private fun <T> Map<String, Any?>.getOrDefault(key: String, def: T): T {
-        val v = this[key] ?: return def
-        @Suppress("UNCHECKED_CAST")
-        return v as? T ?: def
     }
 
     /** Decode base64 content from the GitHub contents API. */
