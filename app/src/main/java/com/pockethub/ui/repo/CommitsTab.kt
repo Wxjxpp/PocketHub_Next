@@ -52,6 +52,7 @@ fun CommitsTab(
     owner: String,
     repo: String,
     refreshTick: Int = 0,
+    ref: String? = null,
     onNavigateToUser: (String) -> Unit = {},
     onCommitClick: (String) -> Unit = {},
     vm: CommitsViewModel = hiltViewModel(),
@@ -61,11 +62,11 @@ fun CommitsTab(
     val error by vm.error.collectAsState()
     val listState = rememberLazyListState()
 
-    LaunchedEffect(owner, repo) { vm.loadCommits(owner, repo) }
+    LaunchedEffect(owner, repo, ref) { vm.loadCommits(owner, repo, ref) }
     // Pull-to-refresh on the repo detail screen bumps [refreshTick]; re-fetch so
     // the commit list actually updates (previously the spinner spun but this
     // list never reloaded — fake refresh).
-    LaunchedEffect(refreshTick) { if (refreshTick > 0 && owner.isNotBlank()) vm.refresh(owner, repo) }
+    LaunchedEffect(refreshTick) { if (refreshTick > 0 && owner.isNotBlank()) vm.refresh(owner, repo, ref) }
 
     // Infinite scroll
     val shouldLoadMore by remember {

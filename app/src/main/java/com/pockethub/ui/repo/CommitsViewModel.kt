@@ -30,37 +30,39 @@ class CommitsViewModel @Inject constructor(
     private var canLoadMore = true
     private var loadedOwner: String? = null
     private var loadedRepo: String? = null
+    /** Branch/SHA the current commit list was fetched for (null = default branch). */
+    private var loadedRef: String? = null
     private var loadJob: Job? = null
     private var loadRequestId = 0
 
-    fun loadCommits(owner: String, repo: String) {
-        if (loadedOwner == owner && loadedRepo == repo && _commits.value.isNotEmpty()) return
-        loadedOwner = owner; loadedRepo = repo
+    fun loadCommits(owner: String, repo: String, ref: String? = null) {
+        if (loadedOwner == owner && loadedRepo == repo && loadedRef == ref && _commits.value.isNotEmpty()) return
+        loadedOwner = owner; loadedRepo = repo; loadedRef = ref
         currentPage = 1
         canLoadMore = true
-        fetchCommits(owner, repo, append = false)
+        fetchCommits(owner, repo, append = false, ref = ref)
     }
 
     fun loadMore(owner: String, repo: String) {
         if (!canLoadMore || _isLoading.value) return
         currentPage++
-        fetchCommits(owner, repo, append = true)
+        fetchCommits(owner, repo, append = true, ref = loadedRef)
     }
 
-    fun refresh(owner: String, repo: String) {
+    fun refresh(owner: String, repo: String, ref: String? = null) {
         currentPage = 1
         canLoadMore = true
-        fetchCommits(owner, repo, append = false)
+        fetchCommits(owner, repo, append = false, ref = ref)
     }
 
-    private fun fetchCommits(owner: String, repo: String, append: Boolean) {
+    private fun fetchCommits(owner: String, repo: String, append: Boolean, ref: String? = null) {
         if (!append) loadJob?.cancel()
         val requestId = ++loadRequestId
         loadJob = viewModelScope.launch {
             _isLoading.update { true }
             _error.update { null }
             try {
-                val result = api.getCommits(owner, repo, page = currentPage, perPage = 30)
+                val result = api.getCommits(owner, repo, page = currentPage, perPage = 30, sha = ref)
                 if (requestId != loadRequestId) return@launch
                 _commits.update { if (append) it + result else result }
                 canLoadMore = result.size >= 30

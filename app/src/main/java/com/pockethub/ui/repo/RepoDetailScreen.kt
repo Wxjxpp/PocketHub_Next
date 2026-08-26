@@ -111,6 +111,9 @@ fun RepoDetailScreen(
     onBack: () -> Unit,
     vm: RepoDetailViewModel = hiltViewModel(),
     downloadVm: com.pockethub.ui.download.DownloadViewModel = hiltViewModel(),
+    // Shared with CodeTab below: hoisted here so the branch selected in the
+    // Code tab is observable even while another tab is on screen.
+    codeBrowserVm: CodeBrowserViewModel = hiltViewModel(),
 ) {
     val repoData by vm.repo.collectAsState()
     val issues by vm.issues.collectAsState()
@@ -139,6 +142,10 @@ fun RepoDetailScreen(
     val isLoadingWorkflows by vm.isLoadingWorkflows.collectAsState()
     val isLoadingWorkflowRuns by vm.isLoadingWorkflowRuns.collectAsState()
     val commitsRefreshTick by vm.commitsRefreshTick.collectAsState()
+    // Branch picked in the Code tab. Falls back to the repo default branch so
+    // the Commits tab follows the Code tab's selection; null until loaded.
+    val codeBrowserState by codeBrowserVm.state.collectAsState()
+    val codeBrowserRef = codeBrowserState.ref ?: repoData?.defaultBranch
     val isDispatching by vm.isDispatching.collectAsState()
     val dispatchMessage by vm.dispatchMessage.collectAsState()
     val translatedReadme by vm.translatedReadme.collectAsState()
@@ -401,6 +408,7 @@ fun RepoDetailScreen(
                     owner = owner,
                     repo = repo,
                     defaultBranch = repoData?.defaultBranch,
+                    vm = codeBrowserVm,
                     onOpenInBrowser = {
                         val url = "https://github.com/$owner/$repo/tree/${repoData?.defaultBranch ?: "main"}"
                         runCatching { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))) }
@@ -456,6 +464,8 @@ fun RepoDetailScreen(
                     owner = owner,
                     repo = repo,
                     refreshTick = commitsRefreshTick,
+                    // Follow the branch selected in the Code tab; null = default.
+                    ref = codeBrowserRef,
                     onNavigateToUser = onNavigateToUser,
                     onCommitClick = onNavigateToCommit,
                 )
