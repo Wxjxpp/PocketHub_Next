@@ -30,6 +30,7 @@ sealed interface CheckSummary {
 
 @HiltViewModel
 class PullRequestDetailViewModel @Inject constructor(
+    private val issueReporter: com.pockethub.data.reporting.IssueReporter,
     private val api: GitHubApi,
     private val accounts: AccountRepository,
 ) : ViewModel() {
@@ -153,6 +154,7 @@ class PullRequestDetailViewModel @Inject constructor(
             try {
                 _pr.update { api.getPullRequest(owner, repo, number) }
             } catch (e: Exception) {
+                issueReporter.reportError("PullRequestDetail", "loadPullRequest", e)
                 _error.update { e.localizedMessage ?: "Failed to load PR" }
             } finally {
                 _isLoading.update { false }
@@ -163,6 +165,7 @@ class PullRequestDetailViewModel @Inject constructor(
                 try {
                     _files.update { api.getPullRequestFiles(owner, repo, number) }
                 } catch (e: Exception) {
+                    issueReporter.reportError("PullRequestDetail", "loadFiles", e)
                     if (e is kotlinx.coroutines.CancellationException) throw e
                     _filesError.update { e.localizedMessage ?: "Failed to load files" }
                 }
@@ -172,6 +175,7 @@ class PullRequestDetailViewModel @Inject constructor(
                 try {
                     _reviews.update { api.getPullRequestReviews(owner, repo, number) }
                 } catch (e: Exception) {
+                    issueReporter.reportError("PullRequestDetail", "loadReviews", e)
                     if (e is kotlinx.coroutines.CancellationException) throw e
                     _reviewsError.update { e.localizedMessage ?: "Failed to load reviews" }
                 }
@@ -181,6 +185,7 @@ class PullRequestDetailViewModel @Inject constructor(
                 try {
                     _reviewComments.update { api.listPullRequestReviewComments(owner, repo, number) }
                 } catch (e: Exception) {
+                    issueReporter.reportError("PullRequestDetail", "loadReviewComments", e)
                     if (e is kotlinx.coroutines.CancellationException) throw e
                     _reviewCommentsError.update { e.localizedMessage ?: "Failed to load review comments" }
                 }
@@ -195,6 +200,7 @@ class PullRequestDetailViewModel @Inject constructor(
                     _comments.update { resp.body().orEmpty() }
                     hydrateReactions(owner, repo)
                 } catch (e: Exception) {
+                    issueReporter.reportError("PullRequestDetail", "loadComments", e)
                     if (e is kotlinx.coroutines.CancellationException) throw e
                     _commentsError.update { e.localizedMessage ?: "Failed to load comments" }
                 }
@@ -205,6 +211,7 @@ class PullRequestDetailViewModel @Inject constructor(
                     val resp = api.getIssueEvents(owner, repo, number)
                     _events.update { resp.body().orEmpty() }
                 } catch (e: Exception) {
+                    issueReporter.reportError("PullRequestDetail", "loadEvents", e)
                     if (e is kotlinx.coroutines.CancellationException) throw e
                     _eventsError.update { e.localizedMessage ?: "Failed to load events" }
                 }
@@ -270,6 +277,7 @@ class PullRequestDetailViewModel @Inject constructor(
                         _comments.update { resp.body().orEmpty() }
                         hydrateReactions(owner, repo)
                     } catch (e: Exception) {
+                        issueReporter.reportError("PullRequestDetail", "reloadSection", e)
                         if (e is kotlinx.coroutines.CancellationException) throw e
                         _commentsError.update { e.localizedMessage ?: "Failed to load comments" }
                     }
@@ -355,6 +363,7 @@ class PullRequestDetailViewModel @Inject constructor(
                 _reviewComments.update { it + created }
                 _pr.update { pr -> pr?.copy(reviewComments = pr.reviewComments + 1) }
             } catch (e: Exception) {
+                issueReporter.reportError("PullRequestDetail", "postLineComment", e)
                 _commentError.update { e.localizedMessage ?: "Failed to post inline comment" }
             } finally {
                 _isSendingLineComment.update { false }
@@ -385,6 +394,7 @@ class PullRequestDetailViewModel @Inject constructor(
                 )
                 _reviewComments.update { it + created }
             } catch (e: Exception) {
+                issueReporter.reportError("PullRequestDetail", "replyInlineComment", e)
                 _inlineCommentError.update { e.localizedMessage ?: "Failed to reply" }
             } finally {
                 _busyReviewComments.update { it - rootCommentId }
@@ -410,6 +420,7 @@ class PullRequestDetailViewModel @Inject constructor(
                 val updated = api.editPullRequestReviewComment(owner, repo, commentId, GitHubApi.EditReviewCommentRequest(newBody))
                 _reviewComments.update { list -> list.map { if (it.id == commentId) updated else it } }
             } catch (e: Exception) {
+                issueReporter.reportError("PullRequestDetail", "editInlineComment", e)
                 _reviewComments.update { snapshot }
                 _inlineCommentError.update { e.localizedMessage ?: "Failed to update comment" }
             } finally {
@@ -446,6 +457,7 @@ class PullRequestDetailViewModel @Inject constructor(
                     _inlineCommentError.update { "Delete failed (${resp.code()})" }
                 }
             } catch (e: Exception) {
+                issueReporter.reportError("PullRequestDetail", "deleteInlineComment", e)
                 _reviewComments.update { snapshot }
                 _inlineCommentError.update { e.localizedMessage ?: "Failed to delete comment" }
             } finally {
@@ -479,6 +491,7 @@ class PullRequestDetailViewModel @Inject constructor(
                 runThreadMutation(RESOLVE_MUTATION, threadId)
                 _threadState.update { map -> map[rootCommentId]?.let { info -> map + (rootCommentId to info.copy(isResolved = true)) } ?: map }
             } catch (e: Exception) {
+                issueReporter.reportError("PullRequestDetail", "resolveRoot", e)
                 _inlineCommentError.update { e.localizedMessage ?: "Failed to mark as resolved" }
             } finally {
                 _busyReviewComments.update { it - rootCommentId }
@@ -508,6 +521,7 @@ class PullRequestDetailViewModel @Inject constructor(
                 runThreadMutation(UNRESOLVE_MUTATION, threadId)
                 _threadState.update { map -> map[rootCommentId]?.let { info -> map + (rootCommentId to info.copy(isResolved = false)) } ?: map }
             } catch (e: Exception) {
+                issueReporter.reportError("PullRequestDetail", "unresolveRoot", e)
                 _inlineCommentError.update { e.localizedMessage ?: "Failed to unmark resolved" }
             } finally {
                 _busyReviewComments.update { it - rootCommentId }
@@ -605,6 +619,7 @@ class PullRequestDetailViewModel @Inject constructor(
                     _mergeResult.update { result?.message ?: "Merge failed (${response.code()})" }
                 }
             } catch (e: Exception) {
+                issueReporter.reportError("PullRequestDetail", "merge", e)
                 _mergeResult.update { e.localizedMessage ?: "Merge failed" }
             } finally {
                 _isMerging.update { false }
@@ -634,6 +649,7 @@ class PullRequestDetailViewModel @Inject constructor(
                     if (newState == "closed") "Pull request closed" else "Pull request reopened"
                 }
             } catch (e: Exception) {
+                issueReporter.reportError("PullRequestDetail", "togglePrState", e)
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 _actionMessage.update { e.localizedMessage ?: "Failed to update PR state" }
             } finally {
@@ -666,6 +682,7 @@ class PullRequestDetailViewModel @Inject constructor(
                 loadedNumber = null
                 loadPullRequest(owner, repo, number)
             } catch (e: Exception) {
+                issueReporter.reportError("PullRequestDetail", "submitReview", e)
                 _reviewResult.update { e.localizedMessage ?: "Review 提交失败" }
             } finally {
                 _isSendingReview.update { false }
@@ -683,6 +700,7 @@ class PullRequestDetailViewModel @Inject constructor(
                 _pr.update { updated }
                 _actionMessage.update { "Requested ${reviewers.size} reviewer(s)" }
             } catch (e: Exception) {
+                issueReporter.reportError("PullRequestDetail", "requestReviewers", e)
                 _reviewerError.update { e.localizedMessage ?: "Failed to request reviewer" }
             } finally {
                 _reviewerWorking.update { false }
@@ -702,6 +720,7 @@ class PullRequestDetailViewModel @Inject constructor(
                 }
                 _actionMessage.update { "Removed reviewer @${reviewer}" }
             } catch (e: Exception) {
+                issueReporter.reportError("PullRequestDetail", "removeReviewer", e)
                 _reviewerError.update { e.localizedMessage ?: "Failed to remove reviewer" }
             } finally {
                 _reviewerWorking.update { false }
@@ -723,6 +742,7 @@ class PullRequestDetailViewModel @Inject constructor(
                 _pr.update { pr -> pr?.copy(comments = pr.comments + 1) }
                 onSuccess()
             } catch (e: Exception) {
+                issueReporter.reportError("PullRequestDetail", "postComment", e)
                 _commentError.update { e.localizedMessage ?: "Failed to post comment" }
             } finally {
                 _isSendingComment.update { false }
@@ -741,6 +761,7 @@ class PullRequestDetailViewModel @Inject constructor(
                 val updated = api.editIssueComment(owner, repo, commentId, GitHubApi.CommentRequest(newBody))
                 _comments.update { list -> list.map { if (it.id == commentId) updated else it } }
             } catch (e: Exception) {
+                issueReporter.reportError("PullRequestDetail", "editComment", e)
                 _commentError.update { e.localizedMessage ?: "Failed to update comment" }
             } finally {
                 _busyComments.update { it - commentId }
@@ -761,6 +782,7 @@ class PullRequestDetailViewModel @Inject constructor(
                 _pr.update { pr -> pr?.copy(comments = (pr.comments - 1).coerceAtLeast(0)) }
                 _viewerReactions.update { it - commentId }
             } catch (e: Exception) {
+                issueReporter.reportError("PullRequestDetail", "deleteComment", e)
                 _commentError.update { e.localizedMessage ?: "Failed to delete comment" }
             } finally {
                 _busyComments.update { it - commentId }
@@ -786,6 +808,7 @@ class PullRequestDetailViewModel @Inject constructor(
                     _comments.update { list -> list.map { if (it.id == commentId) increment(it, content) else it } }
                 }
             } catch (e: Exception) {
+                issueReporter.reportError("PullRequestDetail", "toggleReaction", e)
                 _commentError.update { e.localizedMessage ?: "Failed to toggle reaction" }
             } finally {
                 _busyComments.update { it - commentId }

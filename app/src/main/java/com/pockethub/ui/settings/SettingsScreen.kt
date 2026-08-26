@@ -276,7 +276,7 @@ fun SettingsScreen(
             ListItem(
                 leadingContent = { Icon(Icons.Outlined.Info, contentDescription = null) },
                 headlineContent = { Text(stringResource(R.string.about_pockethub)) },
-                supportingContent = { Text(stringResource(R.string.version_template, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE)) },
+                supportingContent = { Text(stringResource(R.string.version_template, BuildConfig.VERSION_NAME)) },
                 modifier = Modifier.clickable { showAbout = true },
             )
             Spacer(Modifier.height(48.dp))
@@ -573,7 +573,7 @@ private fun TranslateOption(label: String, selected: Boolean, onClick: () -> Uni
 private fun AboutContent() {
     Column(Modifier.fillMaxWidth().padding(16.dp).padding(bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        Text(stringResource(R.string.version_template, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(stringResource(R.string.version_template, BuildConfig.VERSION_NAME), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(stringResource(R.string.about_description), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(8.dp))
         // Privacy & security notes moved here from the removed settings section.

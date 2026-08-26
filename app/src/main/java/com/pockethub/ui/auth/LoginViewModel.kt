@@ -29,6 +29,7 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class LoginViewModel @Inject constructor(
+    private val issueReporter: com.pockethub.data.reporting.IssueReporter,
     private val api: GitHubApi,
     private val accounts: AccountRepository,
     private val settings: SettingsRepository,
@@ -68,6 +69,7 @@ class LoginViewModel @Inject constructor(
                 )
                 _ui.update { it.copy(isLoading = false, success = true) }
             } catch (e: Exception) {
+                issueReporter.reportError("Login", "signInWithToken", e)
                 authInterceptor.token = ""
                 _ui.update {
                     it.copy(
@@ -163,6 +165,7 @@ class LoginViewModel @Inject constructor(
                 )
                 _ui.update { it.copy(isLoading = false, success = true) }
             } catch (e: Exception) {
+                issueReporter.reportError("Login", "exchangeOAuthCode", e)
                 _ui.update {
                     it.copy(isLoading = false, error = e.localizedMessage ?: "OAuth exchange failed.")
                 }

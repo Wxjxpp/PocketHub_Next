@@ -14,6 +14,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class CommitsViewModel @Inject constructor(
+    private val issueReporter: com.pockethub.data.reporting.IssueReporter,
     private val api: GitHubApi,
 ) : ViewModel() {
 
@@ -67,6 +68,7 @@ class CommitsViewModel @Inject constructor(
                 _commits.update { if (append) it + result else result }
                 canLoadMore = result.size >= 30
             } catch (e: Exception) {
+                issueReporter.reportError("Commits", "fetchCommits", e)
                 if (requestId != loadRequestId) return@launch
                 _error.update { e.localizedMessage ?: "Failed to load commits" }
                 if (!append) _commits.update { emptyList() }

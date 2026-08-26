@@ -16,6 +16,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class IssueDetailViewModel @Inject constructor(
+    private val issueReporter: com.pockethub.data.reporting.IssueReporter,
     private val api: GitHubApi,
     private val accounts: AccountRepository,
 ) : ViewModel() {
@@ -106,6 +107,7 @@ class IssueDetailViewModel @Inject constructor(
                 val resp = api.getIssueEvents(owner, repo, number)
                 _events.value = resp.body().orEmpty()
             } catch (e: Exception) {
+                issueReporter.reportError("IssueDetail", "loadTimelineEvents", e)
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 _eventsError.value = e.localizedMessage ?: "Failed to load events"
             }
@@ -143,6 +145,7 @@ class IssueDetailViewModel @Inject constructor(
                 }
                 _hasMoreComments.value = resp.headers()["link"]?.let { hasNext(it) } ?: false
             } catch (e: Exception) {
+                issueReporter.reportError("IssueDetail", "loadComments", e)
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 _commentsError.value = e.localizedMessage ?: "Failed to load comments"
             } finally {
@@ -250,6 +253,7 @@ class IssueDetailViewModel @Inject constructor(
                 _comments.update { list -> list.map { if (it.id == commentId) increment(it, content) else it } }
             }
         } catch (e: Exception) {
+            issueReporter.reportError("IssueDetail", "toggleReactionInternal", e)
             _actionMessage.value = e.localizedMessage ?: "Failed to toggle reaction"
         } finally {
             _busyComments.update { it - commentId }
@@ -337,6 +341,7 @@ class IssueDetailViewModel @Inject constructor(
                     _actionMessage.value = if (willLock) "Conversation locked" else "Conversation unlocked"
                 }
             } catch (e: Exception) {
+                issueReporter.reportError("IssueDetail", "toggleLock", e)
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 _issue.value = before
                 _actionMessage.value = e.localizedMessage ?: "Failed to toggle lock"

@@ -42,6 +42,9 @@ object GoogleTranslate {
     /** Delay before retrying a rate-limited provider once, per chunk attempt. */
     private const val RATE_LIMIT_RETRY_DELAY_MS = 800L
 
+    /** MyMemory: hard cap on URL-encoded q param (bytes after percent-encoding). */
+    private const val MAX_ENCODED_QUERY = 1800
+
     /**
      * Translate [text] into [targetLang] (e.g. "zh-CN", "en").
      *
@@ -214,11 +217,14 @@ object GoogleTranslate {
      * it receives is within budget.
      */
     private object MyMemoryProvider : TranslationProvider {
-        /** Free anonymous tier rejects requests over ~500 bytes. */
+        // Free anonymous tier rejects long queries. The real constraint is the
+        // URL-encoded query length — CJK chars expand ~9x under UTF-8
+        // percent-encoding, so we budget in encoded bytes, not raw chars.
         override val maxChars: Int get() = 450
 
         override fun translate(text: String, sourceLang: String, targetLang: String): String {
             val q = URLEncoder.encode(text, "UTF-8")
+            check(q.length <= MAX_ENCODED_QUERY) { "encoded query too large: ${q.length}" }
             val pair = "${baseCode(sourceLang)}|${baseCode(targetLang)}"
             val url = URL("https://api.mymemory.translated.net/get?q=$q&langpair=$pair")
             val body = httpGet(url) { code ->

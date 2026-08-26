@@ -32,6 +32,7 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class UpdateViewModel @Inject constructor(
+    private val issueReporter: com.pockethub.data.reporting.IssueReporter,
     @ApplicationContext private val appContext: Context,
     private val updater: UpdateChecker,
     private val settings: SettingsRepository,
@@ -218,6 +219,7 @@ class UpdateViewModel @Inject constructor(
                 _download.value = DownloadState.Idle
                 throw e
             } catch (e: Throwable) {
+                issueReporter.reportError("Update", "startDownload", e)
                 tmp.delete()
                 _download.value = DownloadState.Failed(e.localizedMessage ?: e.javaClass.simpleName)
             }

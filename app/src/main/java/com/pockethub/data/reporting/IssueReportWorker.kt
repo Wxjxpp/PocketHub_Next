@@ -150,6 +150,9 @@ class IssueReportWorker @AssistedInject constructor(
     }
 
     // ── Body rendering ───────────────────────────────────────────────────
+    // Compact digest: one header line (device / OS / version), then one line
+    // per event ("screen · location · problem"). Stack traces trimmed to the
+    // first app-relevant frames only, so the email stays short and readable.
     private fun buildBody(events: List<IssueEvent>, githubMarkdown: Boolean): String {
         val first = events.first()
         val last = events.last()
@@ -157,42 +160,27 @@ class IssueReportWorker @AssistedInject constructor(
         val anr = events.count { it.kind == IssueKind.ANR }
         val err = events.count { it.kind == IssueKind.ERROR }
 
-        val sb = StringBuilder()
-        sb.append(if (githubMarkdown) "**PocketHub 严重问题汇总报告**\n\n" else "PocketHub 严重问题汇总报告\n")
-        sb.append(if (githubMarkdown) "```\n" else "================================\n")
-        sb.append("时间窗: ${first.isoTs} → ${last.isoTs}\n")
-        sb.append("事件总数: ${events.size}  (崩溃=$crash, ANR=$anr, 其他=$err)\n")
-        sb.append("版本: v${first.appVersionName} (build ${first.appVersionCode}, ${first.appVariant})\n")
-        sb.append("设备: ${first.deviceModel}, Android API ${first.sdkInt}\n")
-        sb.append(if (githubMarkdown) "```\n\n" else "================================\n")
+        fun line(s: String) = if (githubMarkdown) "$s\n" else s + "\n"
 
-        if (githubMarkdown) {
-            sb.append("## 事件列表\n\n")
-        }
+        val sb = StringBuilder()
+        sb.append(line("PocketHub 问题报告（${events.size} 条：崩溃$crash / 卡死$anr / 其他错误$err）"))
+        sb.append(line("设备: ${first.deviceModel} · Android ${first.sdkInt} · v${first.appVersionName}(${first.appVariant})"))
+        sb.append(line("时间: ${first.isoTs} ~ ${last.isoTs}"))
+        sb.append(line(""))
+
         events.forEachIndexed { idx, e ->
-            sb.append(if (githubMarkdown) "### #${idx + 1} " else "\n【#${idx + 1}】")
-            sb.append(if (githubMarkdown) "**类型=${e.kind.id.uppercase()}**  时间=${e.isoTs}  线程=${e.threadName}\n\n" else "类型=${e.kind.id.uppercase()}  时间=${e.isoTs}  线程=${e.threadName}\n")
-            sb.append(if (githubMarkdown) "**说明:** ${e.subject}\n\n" else "说明: ${e.subject}\n")
-            if (e.extra.isNotEmpty()) {
-                sb.append(if (githubMarkdown) "**上下文:**\n\n" else "上下文:\n")
-                e.extra.forEach { (k, v) ->
-                    sb.append(if (githubMarkdown) "- $k = $v\n" else "  - $k = $v\n")
-                }
-                if (githubMarkdown) sb.append("\n")
-            }
-            if (e.stackTrace.isNotBlank()) {
-                sb.append(if (githubMarkdown) "**堆栈:**\n\n```\n" else "堆栈:\n")
-                // For markdown wrap stack frames in code fence; for plain email indent them.
-                val frames = e.stackTrace.lineSequence().take(40).toList()
-                frames.forEach { ln ->
-                    sb.append(if (githubMarkdown) "$ln\n" else "  $ln\n")
-                }
-                val total = e.stackTrace.lines().size
-                if (total > 40) sb.append(if (githubMarkdown) "... (+${total - 40} lines)\n```\n\n" else "  ... (+${total - 40} lines\n")
-                else sb.append(if (githubMarkdown) "```\n\n" else "")
+            val where = e.extra["screen"]?.let { s ->
+                e.extra["where"]?.let { w -> "$s.$w" } ?: s
+            } ?: e.threadName
+            sb.append(line("#${idx + 1} [${e.kind.id.uppercase()}] $where — ${e.subject.take(120)} (${e.isoTs})"))
+            // Only keep frames that point into our own code, capped at 3 lines.
+            val appFrames = e.stackTrace.lineSequence()
+                .filter { it.contains("com.pockethub") && !it.contains("IssueReporter") }
+                .take(3).toList()
+            if (appFrames.isNotEmpty()) {
+                sb.append(line("    at " + appFrames.joinToString(" | ") { f -> f.substringBefore("(").trim() }))
             }
         }
-        sb.append(if (githubMarkdown) "---\n_由 PocketHub 自动埋点系统生成_\n" else "================================\n-- 由 PocketHub 自动埋点系统生成\n")
         return sb.toString()
     }
 }

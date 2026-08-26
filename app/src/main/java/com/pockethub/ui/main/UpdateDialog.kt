@@ -88,7 +88,17 @@ fun UpdateDialog(
                 }
 
                 info.releaseNotes?.takeIf { it.isNotBlank() }?.let { notes ->
-                    val items = parseChangelogItems(notes).take(8)
+                    val items = parseChangelogItems(
+                        notes,
+                        tags = ChangelogTags(
+                            new = stringResource(R.string.tag_new),
+                            fix = stringResource(R.string.tag_fix),
+                            improved = stringResource(R.string.tag_improved),
+                            faster = stringResource(R.string.tag_faster),
+                            reverted = stringResource(R.string.tag_reverted),
+                            update = stringResource(R.string.tag_update),
+                        ),
+                    ).take(8)
                     if (items.isNotEmpty()) {
                         Column(
                             modifier = Modifier
@@ -221,6 +231,16 @@ private data class ChangeItem(
     val tagColor: Color,
 )
 
+/** Localized changelog category tags (resolved from string resources). */
+private data class ChangelogTags(
+    val new: String,
+    val fix: String,
+    val improved: String,
+    val faster: String,
+    val reverted: String,
+    val update: String,
+)
+
 /**
  * Parse raw release notes into a flat list of short skimmable items.
  *
@@ -232,7 +252,7 @@ private data class ChangeItem(
  * headers (lines starting with `#`) are dropped, since we want a tall vertical
  * list rather than a markdown essay.
  */
-private fun parseChangelogItems(notes: String): List<ChangeItem> {
+private fun parseChangelogItems(notes: String, tags: ChangelogTags): List<ChangeItem> {
     val featColor = Color(0xFF3FB950)
     val fixColor = Color(0xFF58A6FF)
     val refactorColor = Color(0xFFD29922)
@@ -255,12 +275,12 @@ private fun parseChangelogItems(notes: String): List<ChangeItem> {
             // Friendly, plain-language tags instead of dev jargon — users should
             // see what kind of change it is at a glance.
             val tagText = when (type) {
-                "feat" -> "新增"
-                "fix" -> "修复"
-                "refactor", "refact" -> "优化"
-                "perf" -> "提速"
-                "revert" -> "回退"
-                else -> "改进"
+                "feat" -> tags.new
+                "fix" -> tags.fix
+                "refactor", "refact" -> tags.improved
+                "perf" -> tags.faster
+                "revert" -> tags.reverted
+                else -> tags.improved
             }
             val color = when (type) {
                 "feat" -> featColor
@@ -272,7 +292,7 @@ private fun parseChangelogItems(notes: String): List<ChangeItem> {
             }
             return@mapNotNull ChangeItem(tagText, msg, color)
         }
-        // Plain line — show with a neutral "更新" tag.
-        ChangeItem("更新", line, otherColor)
+        // Plain line — show with a neutral tag.
+        ChangeItem(tags.update, line, otherColor)
     }
 }

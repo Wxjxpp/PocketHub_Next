@@ -21,6 +21,7 @@ private const val PER_PAGE = 30
 
 @HiltViewModel
 class ReposViewModel @Inject constructor(
+    private val issueReporter: com.pockethub.data.reporting.IssueReporter,
     private val cache: CachedRepository,
     private val accounts: AccountRepository,
 ) : ViewModel() {
@@ -113,6 +114,7 @@ class ReposViewModel @Inject constructor(
                 else
                     filtered.size >= PER_PAGE
             } catch (e: Exception) {
+                issueReporter.reportError("Repos", "load", e)
                 if (requestId != loadRequestId) return@launch
                 _error.update { e.localizedMessage ?: "Failed to load" }
                 // Roll back the page counter so the next loadMore retries this page.

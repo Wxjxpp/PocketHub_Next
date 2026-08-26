@@ -22,6 +22,7 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class WorkflowRunDetailViewModel @Inject constructor(
+    private val issueReporter: com.pockethub.data.reporting.IssueReporter,
     private val api: GitHubApi,
 ) : ViewModel() {
 
@@ -67,6 +68,7 @@ class WorkflowRunDetailViewModel @Inject constructor(
                     }
                 }
             } catch (e: Exception) {
+                issueReporter.reportError("WorkflowRunDetail", "loadRun", e)
                 _error.update { e.localizedMessage ?: "Failed to load workflow run" }
             } finally {
                 _isLoading.update { false }

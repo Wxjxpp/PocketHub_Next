@@ -53,6 +53,7 @@ class RepoDetailViewModel @Inject constructor(
     private val history: com.pockethub.data.remote.HistoryRepository,
     private val settings: SettingsRepository,
     private val accountRepository: AccountRepository,
+    private val issueReporter: com.pockethub.data.reporting.IssueReporter,
     private val okHttp: OkHttpClient,
 ) : ViewModel() {
 
@@ -235,6 +236,7 @@ class RepoDetailViewModel @Inject constructor(
                 checkStar(owner, repo)
                 checkWatch(owner, repo)
             } catch (e: Exception) {
+                issueReporter.reportError("RepoDetail", "loadRepo", e)
                 _error.update { e.localizedMessage ?: "Failed to load repo" }
             } finally {
                 _isLoading.update { false }
@@ -360,6 +362,7 @@ class RepoDetailViewModel @Inject constructor(
                     _watchState.update { WatchState.WATCHING }
                 }
             } catch (e: Exception) {
+                issueReporter.reportError("RepoDetail", "toggleWatch", e)
                 _error.update { e.localizedMessage ?: "Failed to toggle subscription" }
             } finally {
                 _isWatchToggling = false
@@ -376,6 +379,7 @@ class RepoDetailViewModel @Inject constructor(
                 api.watch(owner, repo, GitHubApi.WatchSubscriptionRequest(subscribed = false, ignored = true))
                 _watchState.update { WatchState.MUTED }
             } catch (e: Exception) {
+                issueReporter.reportError("RepoDetail", "muteRepo", e)
                 _error.update { e.localizedMessage ?: "Failed to mute" }
             } finally {
                 _isWatchToggling = false
@@ -397,6 +401,7 @@ class RepoDetailViewModel @Inject constructor(
                 }
                 cache.invalidateRepo(owner, repo)
             } catch (e: Exception) {
+                issueReporter.reportError("RepoDetail", "toggleStar", e)
                 _error.update { e.localizedMessage ?: "Operation failed" }
             }
         }
@@ -453,6 +458,7 @@ class RepoDetailViewModel @Inject constructor(
                 }
                 issuesCanLoadMore = all.size >= 30
             } catch (e: Exception) {
+                issueReporter.reportError("RepoDetail", "fetchIssuesPage", e)
                 if (!append) {
                     _issues.update { emptyList() }
                     _pulls.update { emptyList() }
@@ -470,6 +476,7 @@ class RepoDetailViewModel @Inject constructor(
             try {
                 _releases.update { cache.getReleases(owner, repo) }
             } catch (e: Exception) {
+                issueReporter.reportError("RepoDetail", "loadReleases", e)
                 _releases.update { emptyList() }
                 _error.update { e.localizedMessage ?: "Failed to load releases" }
             } finally {
@@ -485,6 +492,7 @@ class RepoDetailViewModel @Inject constructor(
                 val resp = api.getWorkflowRuns(owner, repo, branch = branch)
                 _workflowRuns.update { resp.runs }
             } catch (e: Exception) {
+                issueReporter.reportError("RepoDetail", "loadWorkflowRuns", e)
                 _workflowRuns.update { emptyList() }
                 _error.update { e.localizedMessage ?: "Failed to load workflows" }
             } finally {
@@ -502,6 +510,7 @@ class RepoDetailViewModel @Inject constructor(
                 val resp = api.getWorkflows(owner, repo)
                 _workflows.update { resp.workflows.filter { it.state == "active" && it.deletedAt == null } }
             } catch (e: Exception) {
+                issueReporter.reportError("RepoDetail", "loadWorkflows", e)
                 _workflows.update { emptyList() }
                 _dispatchMessage.update { e.localizedMessage ?: "Failed to load workflow" }
             } finally {
@@ -531,6 +540,7 @@ class RepoDetailViewModel @Inject constructor(
                     _dispatchMessage.update { reason }
                 }
             } catch (e: Exception) {
+                issueReporter.reportError("RepoDetail", "dispatchWorkflow", e)
                 _dispatchMessage.update { e.localizedMessage ?: "Failed to trigger workflow" }
             } finally {
                 _isDispatching.update { false }
@@ -561,6 +571,7 @@ class RepoDetailViewModel @Inject constructor(
                     _forkMessage.update { "Fork failed: ${resp.code()}" }
                 }
             } catch (e: Exception) {
+                issueReporter.reportError("RepoDetail", "fork", e)
                 _forkMessage.update { e.localizedMessage ?: "Fork 失败" }
             } finally {
                 _isForking.update { false }
@@ -600,6 +611,7 @@ class RepoDetailViewModel @Inject constructor(
                     _deleteMessage.update { reason }
                 }
             } catch (e: Exception) {
+                issueReporter.reportError("RepoDetail", "deleteRepository", e)
                 _deleteMessage.update { e.localizedMessage ?: "Delete failed" }
             } finally {
                 _isDeleting.update { false }
@@ -689,6 +701,7 @@ class RepoDetailViewModel @Inject constructor(
                     }
                 }
             } catch (e: Exception) {
+                issueReporter.reportError("RepoDetail", "toggleVisibility", e)
                 _visibilityMessage.update { e.localizedMessage ?: "Failed to update visibility" }
             } finally {
                 _isTogglingVisibility.update { false }
@@ -728,6 +741,7 @@ class RepoDetailViewModel @Inject constructor(
                     _releaseDeleteMessage.update { reason }
                 }
             } catch (e: Exception) {
+                issueReporter.reportError("RepoDetail", "deleteRelease", e)
                 _releaseDeleteMessage.update { e.localizedMessage ?: "Delete failed" }
             } finally {
                 _isDeletingRelease.update { false }
@@ -772,6 +786,7 @@ class RepoDetailViewModel @Inject constructor(
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e // don't swallow real coroutine cancellation
             } catch (e: Exception) {
+                issueReporter.reportError("RepoDetail", "translateReadme", e, mapOf("target" to target))
                 _translateMessage.update { e.message ?: "Translation failed — check your network or try again later" }
             } finally {
                 _isTranslating.update { false }

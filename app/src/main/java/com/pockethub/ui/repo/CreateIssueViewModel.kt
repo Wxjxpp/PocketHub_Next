@@ -27,6 +27,7 @@ data class IssueTemplate(
 
 @HiltViewModel
 class CreateIssueViewModel @Inject constructor(
+    private val issueReporter: com.pockethub.data.reporting.IssueReporter,
     private val api: GitHubApi,
 ) : ViewModel() {
 
@@ -205,6 +206,7 @@ class CreateIssueViewModel @Inject constructor(
                 )
                 _result.value = Result.success(issue)
             } catch (e: Exception) {
+                issueReporter.reportError("CreateIssue", "createIssue", e)
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 _actionError.value = e.localizedMessage ?: "Failed to create"
             } finally {

@@ -17,6 +17,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class UserDetailViewModel @Inject constructor(
+    private val issueReporter: com.pockethub.data.reporting.IssueReporter,
     private val api: GitHubApi,
     private val cache: CachedRepository,
 ) : ViewModel() {
@@ -110,6 +111,7 @@ class UserDetailViewModel @Inject constructor(
                     }
                 }
             } catch (e: Exception) {
+                issueReporter.reportError("UserDetail", "loadUser", e)
                 _error.update { e.localizedMessage ?: "Failed to load user" }
             } finally {
                 _isLoading.update { false }

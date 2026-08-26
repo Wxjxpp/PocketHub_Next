@@ -41,6 +41,7 @@ enum class ReasonFilter(val labelKey: String, val apiValue: String?) {
 
 @HiltViewModel
 class NotificationsViewModel @Inject constructor(
+    private val issueReporter: com.pockethub.data.reporting.IssueReporter,
     private val api: GitHubApi,
     private val cache: CachedRepository,
 ) : ViewModel() {
@@ -87,6 +88,7 @@ class NotificationsViewModel @Inject constructor(
                     if (tab == NotifTab.UNREAD) result.filter { it.isEffectivelyUnread() } else result
                 }
             } catch (e: Exception) {
+                issueReporter.reportError("Notifications", "load", e)
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 if (requestId != loadRequestId) return@launch
                 _error.update { e.localizedMessage ?: "Failed to load notifications" }
@@ -122,6 +124,7 @@ class NotificationsViewModel @Inject constructor(
             try {
                 api.markNotificationRead(threadId)
             } catch (e: Exception) {
+                issueReporter.reportError("Notifications", "markRead", e)
                 _notifications.value = before
                 _error.update { e.localizedMessage ?: "Failed to mark read" }
             }
@@ -138,6 +141,7 @@ class NotificationsViewModel @Inject constructor(
                 api.unsubscribeThread(threadId)
                 _actionMessage.update { "Unsubscribed from this thread" }
             } catch (e: Exception) {
+                issueReporter.reportError("Notifications", "unsubscribe", e)
                 // Unsubscribe failed — restore the thread so the user can retry.
                 _notifications.value = before
                 _actionMessage.update { e.localizedMessage ?: "Failed to unsubscribe" }
@@ -152,6 +156,7 @@ class NotificationsViewModel @Inject constructor(
                 // Reload from cache so the local state reflects the server truth.
                 load(all = currentTab.value == NotifTab.ALL)
             } catch (e: Exception) {
+                issueReporter.reportError("Notifications", "markAllRead", e)
                 // Server still says some are unread; reload rather than pretend it worked.
                 load(all = currentTab.value == NotifTab.ALL)
                 _error.update { e.localizedMessage ?: "Failed to mark all as read" }

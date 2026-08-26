@@ -26,6 +26,7 @@ enum class ExploreSection { TRENDING, FEATURED, FOLLOWING }
 
 @HiltViewModel
 class ExploreViewModel @Inject constructor(
+    private val issueReporter: com.pockethub.data.reporting.IssueReporter,
     private val sources: FeedSourceService,
     private val sourceRepo: FeedSourceRepository,
     private val accounts: AccountRepository,
@@ -118,6 +119,7 @@ class ExploreViewModel @Inject constructor(
                     ExploreSection.FOLLOWING -> loadFollowingFeed(forceFresh)
                 }
             } catch (e: Exception) {
+                issueReporter.reportError("Explore", "launchLoad", e)
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 _error.value = e.localizedMessage ?: "Failed to load feed."
             } finally {

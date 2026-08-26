@@ -42,7 +42,7 @@ private const val MAX_LAST_COMMIT_FETCH = 60
 class CodeBrowserViewModel @Inject constructor(
     private val api: GitHubApi,
     private val json: Json,
-) : ViewModel() {
+    private val issueReporter: com.pockethub.data.reporting.IssueReporter,) : ViewModel() {
 
     /** Per-path last commit info (message + date), cached across navigations. */
     data class LastCommit(
@@ -120,6 +120,7 @@ class CodeBrowserViewModel @Inject constructor(
                 // Fire-and-forget: concurrently fetch the last commit for each visible entry.
                 fetchLastCommits(sorted, s.owner, s.repo, s.ref)
             } catch (e: HttpException) {
+                if (e.code() != 409) issueReporter.reportError("Code", "loadDir", e)
                 // GitHub returns 409 ("Git Repository is empty") for the Contents
                 // API root of a newly-created repository. It is a valid empty
                 // directory, not an error placeholder.
@@ -138,6 +139,7 @@ class CodeBrowserViewModel @Inject constructor(
                     _state.update { it.copy(isLoading = false, error = e.localizedMessage ?: "Failed to list contents") }
                 }
             } catch (e: Exception) {
+                issueReporter.reportError("Code", "loadDir", e)
                 _state.update { it.copy(isLoading = false, error = e.localizedMessage ?: "Failed to list contents") }
             }
         }
@@ -178,6 +180,7 @@ class CodeBrowserViewModel @Inject constructor(
                     _state.update { it.copy(isLoading = false) }
                 }
             } catch (e: Exception) {
+                issueReporter.reportError("Code", "loadFile", e)
                 _state.update { it.copy(isLoading = false, error = e.localizedMessage ?: "Failed to load file") }
             }
         }

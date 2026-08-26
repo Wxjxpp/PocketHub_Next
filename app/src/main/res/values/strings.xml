@@ -49,6 +49,13 @@
     <string name="action_remind_later">Remind me later</string>
     <string name="action_install">Install</string>
     <string name="update_checking">Checking for updates…</string>
+    <!-- Changelog tags in the update dialog -->
+    <string name="tag_new">New</string>
+    <string name="tag_fix">Fixed</string>
+    <string name="tag_improved">Improved</string>
+    <string name="tag_faster">Faster</string>
+    <string name="tag_reverted">Reverted</string>
+    <string name="tag_update">Update</string>
     <string name="update_downloaded_ready">Download complete — tapping Install will run the system updater.</string>
     <string name="update_download_failed">Download failed: %1$s</string>
 
@@ -488,7 +495,7 @@
     <string name="client_id">Client ID</string>
     <string name="client_secret">Client Secret</string>
     <string name="cache_cleared">Cache cleared</string>
-    <string name="version_template">Version %1$s (%2$d)</string>
+    <string name="version_template">Version %1$s</string>
     <string name="by_author_license">by %1$s · %2$s</string>
     <string name="pockethub_license">PocketHub itself is licensed under the Apache License 2.0.</string>
 

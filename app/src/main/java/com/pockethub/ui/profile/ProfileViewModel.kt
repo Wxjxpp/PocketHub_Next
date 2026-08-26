@@ -20,6 +20,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class ProfileViewModel @Inject constructor(
+    private val issueReporter: com.pockethub.data.reporting.IssueReporter,
     private val api: GitHubApi,
     private val cache: CachedRepository,
     private val accounts: AccountRepository,
@@ -124,6 +125,7 @@ class ProfileViewModel @Inject constructor(
                 // Auto-load the default work tab once we know the active login.
                 loadWorkList(_workTab.value, force = false)
             } catch (e: Exception) {
+                issueReporter.reportError("Profile", "loadProfile", e)
                 _error.update { e.localizedMessage ?: "Failed to load profile" }
             } finally {
                 forceRefreshInFlight = false
@@ -193,6 +195,7 @@ class ProfileViewModel @Inject constructor(
                 val result = api.searchIssues(q, sort = "updated", order = "desc", perPage = 30)
                 _workItems.value = result.items
             } catch (e: Exception) {
+                issueReporter.reportError("Profile", "loadWorkList", e)
                 _workError.value = e.localizedMessage ?: "Failed to load work list"
                 _workItems.value = emptyList()
             } finally {

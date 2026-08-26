@@ -66,6 +66,27 @@ class IssueReporter @Inject constructor(
     }
 
     /**
+     * Fire-and-forget severe-error report from anywhere in app code.
+     *
+     * Use this in catch blocks: it never blocks, never throws, and tags the
+     * event with the screen and code location so the email digest pinpoints
+     * where things broke. Only call for genuinely severe failures — routine
+     * empty states / expected misses should stay silent.
+     */
+    fun reportError(screen: String, where: String, error: Throwable?, extra: Map<String, String> = emptyMap()) {
+        reporterScope.launch {
+            runCatching {
+                report(
+                    kind = IssueKind.ERROR,
+                    subject = "[$screen] $where: ${error?.javaClass?.simpleName ?: "Error"}${error?.message?.let { ": $it" } ?: ""}",
+                    stackTrace = error?.stackTraceToString() ?: "",
+                    extra = extra,
+                )
+            }
+        }
+    }
+
+    /**
      * Emit a custom severe event (e.g. ANR detected by the watch-dog, or
      * a critical state from app code that callers want persisted).
      */
