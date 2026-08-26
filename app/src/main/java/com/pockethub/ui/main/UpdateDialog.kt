@@ -104,7 +104,7 @@ fun UpdateDialog(
                                         style = MaterialTheme.typography.labelSmall,
                                         color = item.tagColor,
                                         fontWeight = FontWeight.SemiBold,
-                                        modifier = Modifier.width(56.dp),
+                                        modifier = Modifier.width(64.dp),
                                     )
                                     Spacer(Modifier.size(6.dp))
                                     Text(
@@ -225,8 +225,8 @@ private data class ChangeItem(
  * Parse raw release notes into a flat list of short skimmable items.
  *
  * Recognises the conventional-commit prefix (`feat(scope):` / `fix:` / `chore:` …)
- * and converts each line into a 3-4 char uppercase category tag plus the rest
- * of the message. Lines without a recognisable prefix get a "+ tag.
+ * and converts each line into a friendly Chinese category tag plus the rest of
+ * the message. Lines without a recognisable prefix get a "更新" tag.
  *
  * Only bullet / `- ` lines or pure-message lines are kept; HTML or section
  * headers (lines starting with `#`) are dropped, since we want a tall vertical
@@ -252,33 +252,27 @@ private fun parseChangelogItems(notes: String): List<ChangeItem> {
         if (match != null) {
             val type = match.groupValues[1].lowercase()
             val msg = match.groupValues[3].trim()
+            // Friendly, plain-language tags instead of dev jargon — users should
+            // see what kind of change it is at a glance.
             val tagText = when (type) {
-                "feat" -> "feat"
-                "fix" -> "fix"
-                "refactor", "refact" -> "ref"
-                "chore" -> "chore"
-                "docs" -> "docs"
-                "perf" -> "perf"
-                "test" -> "test"
-                "ci" -> "ci"
-                "build" -> "build"
-                "style" -> "style"
-                "revert" -> "rev"
-                else -> "feat"
+                "feat" -> "新增"
+                "fix" -> "修复"
+                "refactor", "refact" -> "优化"
+                "perf" -> "提速"
+                "revert" -> "回退"
+                else -> "改进"
             }
             val color = when (type) {
                 "feat" -> featColor
                 "fix" -> fixColor
-                "refactor" -> refactorColor
-                "chore" -> choreColor
-                "docs", "style", "test" -> choreColor
-                "perf", "build", "ci" -> choreColor
+                "refactor", "perf" -> refactorColor
+                "chore", "docs", "style", "test", "ci", "build" -> choreColor
                 "revert" -> fixColor
                 else -> otherColor
             }
             return@mapNotNull ChangeItem(tagText, msg, color)
         }
-        // Plain line — show with a "+" tag.
-        ChangeItem("+", line, otherColor)
+        // Plain line — show with a neutral "更新" tag.
+        ChangeItem("更新", line, otherColor)
     }
 }

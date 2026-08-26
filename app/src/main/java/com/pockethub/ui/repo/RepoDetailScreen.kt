@@ -1292,7 +1292,13 @@ private fun WorkflowsTab(
         }
         return
     }
-    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
+    // A refresh replaces the whole list — jump back to the newest run at the
+    // top instead of staying scrolled wherever the old list was.
+    val listState = rememberLazyListState()
+    LaunchedEffect(runs.firstOrNull()?.id, runs.size) {
+        listState.scrollToItem(0)
+    }
+    LazyColumn(state = listState, modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
         items(runs, key = { it.id }) { run ->
             Row(
                 Modifier.fillMaxWidth()
