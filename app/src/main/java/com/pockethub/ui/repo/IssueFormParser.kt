@@ -7,9 +7,9 @@ import org.yaml.snakeyaml.Yaml
  * Parser for GitHub issue templates.
  *
  * Handles every layout found in the wild:
- *  - `.github/ISSUE_TEMPLATE/*.yml|yaml` — issue **forms** (structured controls)
- *  - `.github/ISSUE_TEMPLATE/config.yml` — [contactLinks] + blank-issues toggle
- *  - `.github/ISSUE_TEMPLATE/*.md` and top-level `ISSUE_TEMPLATE*.md` — legacy free-text templates
+ *  - YAML issue forms under the ISSUE_TEMPLATE directory (structured controls)
+ *  - config.yml in that directory — [contactLinks] + blank-issues toggle
+ *  - legacy free-text markdown templates there or at the repo root
  *
  * Unknown/invalid content never throws: malformed fields degrade to raw text so the
  * user can still see and edit them.
