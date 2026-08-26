@@ -66,14 +66,13 @@ class CreateIssueViewModel @Inject constructor(
     private val _blankSelected = MutableStateFlow(false)
     val blankSelected: StateFlow<Boolean> = _blankSelected.asStateFlow()
 
-    /** Leave the blank-issue editor and return to the template chooser. */
-    fun clearBlankSelection() {
-        _blankSelected.update { false }
-    }
-
     /** contact_links from config.yml (external links shown in the chooser). */
     private val _contactLinks = MutableStateFlow<List<IssueContactLink>>(emptyList())
     val contactLinks: StateFlow<List<IssueContactLink>> = _contactLinks.asStateFlow()
+
+    /** Set once loading succeeded but no templates exist anywhere — skip chooser, go straight to editor. */
+    private val _noTemplatesFound = MutableStateFlow(false)
+    val noTemplatesFound: StateFlow<Boolean> = _noTemplatesFound.asStateFlow()
 
     /** Editor state — labels selected for the new issue. Prefilled from template front-matter. */
     private val _labels = MutableStateFlow<List<String>>(emptyList())
@@ -83,17 +82,28 @@ class CreateIssueViewModel @Inject constructor(
     private val _assignees = MutableStateFlow<List<String>>(emptyList())
     val assignees: StateFlow<List<String>> = _assignees.asStateFlow()
 
+    private val _templatesFailed = MutableStateFlow(false)
+
+    /** True when template loading failed (network/API error) — chooser shows a retry. */
+    val templatesFailed: StateFlow<Boolean> = _templatesFailed.asStateFlow()
+
     fun loadTemplates(owner: String, repo: String) {
         if (_templates.value.isNotEmpty() || _forms.value.isNotEmpty() || _isLoadingTemplates.value) return
         viewModelScope.launch {
             _isLoadingTemplates.update { true }
+            _templatesFailed.update { false }
             try {
                 val result = parseTemplateDir(owner, repo)
                 _forms.update { result.forms }
                 _templates.update { result.legacyTemplates }
                 _contactLinks.update { result.contactLinks }
-            } catch (_: Exception) {
-                // Non-fatal — fall back to blank form
+                // Nothing found at all — remember so the editor opens directly (not an error)
+                if (result.forms.isEmpty() && result.legacyTemplates.isEmpty()) {
+                    _noTemplatesFound.update { true }
+                }
+            } catch (e: Exception) {
+                issueReporter.reportError("CreateIssue", "loadTemplates", e)
+                _templatesFailed.update { true }
             } finally {
                 _isLoadingTemplates.update { false }
             }
@@ -108,15 +118,7 @@ class CreateIssueViewModel @Inject constructor(
      *  - `.md` → legacy free-text templates
      */
     private suspend fun parseTemplateDir(owner: String, repo: String): IssueFormParser.Result {
-        val arr = runCatching {
-            api.getContents(owner, repo, ".github/ISSUE_TEMPLATE")
-        }.getOrNull()
-        val entries = decodeDirectory(arr)
-            .ifEmpty {
-                // Legacy repos may only have a top-level ISSUE_TEMPLATE.md
-                decodeDirectory(runCatching { api.getRootContents(owner, repo) }.getOrNull())
-                    .filter { it.type == "file" && it.name.startsWith("ISSUE_TEMPLATE", ignoreCase = true) && it.name.endsWith(".md", ignoreCase = true) }
-            }
+        val entries = listTemplateEntries(owner, repo)
 
         var legacy = emptyList<IssueTemplate>()
         var forms = emptyList<IssueForm>()
@@ -136,6 +138,38 @@ class CreateIssueViewModel @Inject constructor(
         return IssueFormParser.Result(forms, legacy, contactLinks)
     }
 
+    /**
+     * Enumerate candidate template files across all three layouts GitHub supports:
+     *  1. `.github/ISSUE_TEMPLATE/` directory (forms + legacy md + config.yml)
+     *  2. `.github/ISSUE_TEMPLATE.md` single file
+     *  3. top-level `ISSUE_TEMPLATE*.md` (oldest repos)
+     */
+    private suspend fun listTemplateEntries(owner: String, repo: String): List<GitHubApi.ContentEntry> {
+        val dir = decodeDirectory(runCatching {
+            api.getContents(owner, repo, ".github/ISSUE_TEMPLATE")
+        }.getOrNull())
+        if (dir.isNotEmpty()) {
+            return dir.filter { it.type == "file" }
+        }
+        // Layout 2: single .github/ISSUE_TEMPLATE.md — probe it directly
+        runCatching { api.getContents(owner, repo, ".github/ISSUE_TEMPLATE.md") }.getOrNull()?.let { el ->
+            decodeFile(el)?.let { return listOf(it) }
+        }
+        // Layout 3: top-level ISSUE_TEMPLATE*.md
+        val root = decodeDirectory(runCatching { api.getRootContents(owner, repo) }.getOrNull())
+        return root.filter {
+            it.type == "file" &&
+                it.name.startsWith("ISSUE_TEMPLATE", ignoreCase = true) &&
+                it.name.endsWith(".md", ignoreCase = true)
+        }
+    }
+
+    /** Decode a single-file contents response; null when the element is a directory listing. */
+    private fun decodeFile(el: kotlinx.serialization.json.JsonElement): GitHubApi.ContentEntry? =
+        runCatching {
+            kotlinx.serialization.json.Json.decodeFromJsonElement(GitHubApi.ContentEntry.serializer(), el)
+        }.getOrNull()
+
     private fun decodeDirectory(el: kotlinx.serialization.json.JsonElement?): List<GitHubApi.ContentEntry> {
         if (el == null) return emptyList()
         return runCatching {
@@ -148,19 +182,41 @@ class CreateIssueViewModel @Inject constructor(
 
     private suspend fun fetchRaw(owner: String, repo: String, path: String): String {
         val one = runCatching { api.getContents(owner, repo, path) }.getOrNull() ?: return ""
-        val fileEntry = runCatching {
-            kotlinx.serialization.json.Json.decodeFromJsonElement(GitHubApi.ContentEntry.serializer(), one)
-        }.getOrNull() ?: return ""
+        val fileEntry = decodeFile(one) ?: return ""
         return IssueFormParser.decodeContent(fileEntry.content, fileEntry.encoding)
     }
 
     fun selectTemplate(t: IssueTemplate?) {
+        // t == null only clears the selection (back to chooser); use [chooseBlank] for blank issues
         _selectedTemplate.update { t }
         _selectedForm.update { null }
-        _blankSelected.update { t == null }
+        if (t == null) _blankSelected.update { false }
         _labels.update { t?.labels.orEmpty() }
         _assignees.update { t?.assigns.orEmpty() }
         _formAnswers.update { emptyMap() }
+    }
+
+    /** User explicitly chose "Blank issue" — show the plain editor. */
+    fun chooseBlank() {
+        _selectedForm.update { null }
+        _selectedTemplate.update { null }
+        _blankSelected.update { true }
+        _labels.update { emptyList() }
+        _assignees.update { emptyList() }
+        _formAnswers.update { emptyMap() }
+    }
+
+    /** Return from any editor state to the template chooser. */
+    fun backToChooser() {
+        _selectedForm.update { null }
+        _selectedTemplate.update { null }
+        _blankSelected.update { false }
+    }
+
+    /** Retry after a failed load (clears the failure flag first so the guard passes). */
+    fun retryTemplates(owner: String, repo: String) {
+        _templatesFailed.update { false }
+        loadTemplates(owner, repo)
     }
 
     /** Select a parsed YAML issue form — the UI switches to the native form renderer. */

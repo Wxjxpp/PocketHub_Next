@@ -39,6 +39,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -75,6 +76,7 @@ fun CreateIssueScreen(
     val contactLinks by vm.contactLinks.collectAsState()
     val blankSelected by vm.blankSelected.collectAsState()
     val validationError by vm.validationError.collectAsState()
+    val templatesFailed by vm.templatesFailed.collectAsState()
     val uriHandler = LocalUriHandler.current
 
     Scaffold(
@@ -93,9 +95,7 @@ fun CreateIssueScreen(
                 navigationIcon = {
                     IconButton(onClick = {
                         when {
-                            selectedForm != null -> vm.selectForm(null)
-                            selectedTemplate != null -> vm.selectTemplate(null)
-                            blankSelected -> vm.clearBlankSelection()
+                            selectedForm != null || selectedTemplate != null || blankSelected -> vm.backToChooser()
                             else -> onBack()
                         }
                     }) {
@@ -134,11 +134,23 @@ fun CreateIssueScreen(
                     contactLinks = contactLinks,
                     onFormSelected = { vm.selectForm(it) },
                     onTemplateSelected = { vm.selectTemplate(it) },
-                    onBlankSelected = { vm.selectTemplate(null) },
+                    onBlankSelected = { vm.chooseBlank() },
                     onContactLink = { url -> uriHandler.openUri(url) },
                 )
             }
-            // Editor — a legacy template was selected, or no templates exist
+            // Load failed — offer retry instead of silently dropping to the plain editor
+            templatesFailed && selectedTemplate == null && !blankSelected -> {
+                Box(Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(stringResource(R.string.issue_templates_load_failed), color = MaterialTheme.colorScheme.error)
+                        Spacer(Modifier.height(8.dp))
+                        TextButton(onClick = { vm.retryTemplates(owner, repo) }) {
+                            Text(stringResource(R.string.action_retry))
+                        }
+                    }
+                }
+            }
+            // Editor — a legacy template was selected, blank was chosen, or no templates exist
             else -> {
                 IssueEditor(
                     modifier = Modifier.padding(padding),

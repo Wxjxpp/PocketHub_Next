@@ -45,6 +45,7 @@
     <string name="issue_template_blank_desc">不使用模板。</string>
     <string name="issue_contact_links_title">其他联系方式</string>
     <string name="issue_form_required">"为必填项"</string>
+    <string name="issue_templates_load_failed">无法加载 Issue 模板</string>
     <string name="labels_section_title">标签</string>
     <string name="assignees_section_title">指派人</string>
     <string name="label_input_hint">添加标签</string>
