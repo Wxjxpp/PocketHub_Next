@@ -283,6 +283,7 @@
     <string name="cd_revert">Roll back this commit</string>
     <string name="cd_revert_title">Roll back commit?</string>
     <string name="cd_revert_message">Move the default branch back to this commit\'s parent. This discards this commit (and any later commits on that branch) on the repository. Only works on repos where you have push permission.</string>
+    <string name="cd_revert_target">Roll back %1$s → %2$s</string>
     <string name="cd_revert_confirm">Roll back</string>
     <string name="cd_revert_success">Rolled back to parent commit</string>
     <string name="cd_download_zip">Download repository ZIP</string>

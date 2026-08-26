@@ -131,13 +131,25 @@ fun CommitDetailScreen(
     }
 
     if (showRevertDialog) {
+        // Show exactly where the branch will land: the parent commit's short SHA.
+        val parentSha = commit?.parents?.firstOrNull()?.sha.orEmpty()
         AlertDialog(
             onDismissRequest = { if (!isReverting) showRevertDialog = false },
             title = { Text(stringResource(R.string.cd_revert_title)) },
-            text = { Text(stringResource(R.string.cd_revert_message)) },
+            text = {
+                Column {
+                    Text(stringResource(R.string.cd_revert_message))
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        stringResource(R.string.cd_revert_target, sha.take(7), parentSha.take(7).ifEmpty { "?" }),
+                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            },
             confirmButton = {
                 TextButton(
-                    enabled = !isReverting,
+                    enabled = !isReverting && parentSha.isNotEmpty(),
                     onClick = {
                         // Fire the revert from a coroutine scoped to this composable;
                         // dialog stays open showing the disabled confirm button

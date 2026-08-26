@@ -268,6 +268,7 @@
     <string name="cd_revert">回滚此提交</string>
     <string name="cd_revert_title">回滚此提交？</string>
     <string name="cd_revert_message">将默认分支回退到该提交的父提交，这会丢弃此提交（及该分支上其后的提交）。仅在你拥有推送权限的仓库有效。</string>
+    <string name="cd_revert_target">将 %1$s 回滚到 %2$s</string>
     <string name="cd_revert_confirm">回滚</string>
     <string name="cd_download_zip">下载仓库 ZIP</string>
     <string name="cd_download_file">下载文件</string>

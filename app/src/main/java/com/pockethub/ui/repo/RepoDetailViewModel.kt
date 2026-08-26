@@ -740,7 +740,17 @@ class RepoDetailViewModel @Inject constructor(
             _isTranslating.update { true }
             try {
                 val lang = if (target == "zh") "zh-CN" else "en"
-                val translated = GoogleTranslate.translate(original, lang)
+                // One automatic retry: 429s from the free endpoints are usually
+                // transient, and the multi-provider fallback inside
+                // GoogleTranslate already spreads load across services.
+                val translated = try {
+                    GoogleTranslate.translate(original, lang)
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (first: Exception) {
+                    kotlinx.coroutines.delay(1500)
+                    GoogleTranslate.translate(original, lang)
+                }
                 _translatedReadme.update { translated }
                 _showTranslated.update { true }
             } catch (e: kotlinx.coroutines.CancellationException) {

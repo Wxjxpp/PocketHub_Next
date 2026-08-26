@@ -5,42 +5,50 @@ import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.json.JSONArray
+import org.json.JSONObject
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
 
 /**
- * Free Google Translate API client (no API key required).
+ * Multi-provider free translation client (no API keys required).
  *
- * Uses the same `translate.googleapis.com/translate_a/single` endpoint that the
- * Google Translate web interface calls.  There is no hard rate-limit published,
- * but excessive usage may get temporarily throttled — keep requests infrequent.
+ * Providers, tried in order until one succeeds:
+ *  1. Google `translate_a/single` (the endpoint behind translate.google.com)
+ *  2. Lingva — open-source Google Translate proxy mirror
+ *  3. MyMemory — community translation memory API
+ *
+ * A 429 (rate limit) or any error on one provider automatically falls through
+ * to the next, so a single throttled endpoint no longer fails the whole
+ * README translation.
  */
 object GoogleTranslate {
 
-    private const val BASE_URL = "https://translate.googleapis.com/translate_a/single"
     private const val CHUNK_SIZE = 4500 // safe limit per request
 
     private const val CONNECT_TIMEOUT_MS = 8_000
     private const val READ_TIMEOUT_MS = 12_000
     /** Hard ceiling for the whole translation so the UI can never spin forever. */
-    private const val OVERALL_TIMEOUT_MS = 30_000L
-    /** Max concurrent chunk requests (keeps us friendly to the free endpoint). */
-    private const val MAX_CONCURRENT = 6
+    private const val OVERALL_TIMEOUT_MS = 45_000L
+    /** Max concurrent chunk requests (keeps us friendly to the free endpoints). */
+    private const val MAX_CONCURRENT = 4
+    /** Delay before retrying a rate-limited provider once, per chunk attempt. */
+    private const val RATE_LIMIT_RETRY_DELAY_MS = 800L
 
     /**
      * Translate [text] into [targetLang] (e.g. "zh-CN", "en").
      *
      * Chunks are translated **concurrently** (capped at [MAX_CONCURRENT]) and the
      * whole operation is bounded by [OVERALL_TIMEOUT_MS]. Throws [IOException] on
-     * any failure (network, timeout, bad response) so the caller can surface it
-     * instead of silently showing the original text.
+     * total failure of every provider so the caller can surface it instead of
+     * silently showing the original text.
      */
     suspend fun translate(text: String, targetLang: String): String {
         if (text.isBlank()) return text
@@ -93,11 +101,109 @@ object GoogleTranslate {
             return text
         }
 
-        val encoded = URLEncoder.encode(text, "UTF-8")
-        val url = URL("$BASE_URL?client=gtx&sl=$sl&tl=$targetLang&dt=t&q=$encoded")
+        var lastError: Exception? = null
+        for (provider in providers) {
+            try {
+                return provider.translate(text, sl, targetLang)
+            } catch (e: RateLimitException) {
+                // Throttled: brief backoff then fall through to the next provider.
+                lastError = e
+                runCatching { Thread.sleep(RATE_LIMIT_RETRY_DELAY_MS) }
+            } catch (e: Exception) {
+                lastError = e
+            }
+        }
+        throw lastError ?: IOException("All translation providers failed")
+    }
+
+    /** Ordered fallback chain — first success wins. */
+    private val providers: List<TranslationProvider> = listOf(
+        GoogleProvider,
+        LingvaProvider("https://lingva.ml"),
+        LingvaProvider("https://lingva.garudalinux.org"),
+        MyMemoryProvider,
+    )
+
+    private class RateLimitException(message: String) : IOException(message)
+
+    private interface TranslationProvider {
+        fun translate(text: String, sourceLang: String, targetLang: String): String
+    }
+
+    /** Normalize "zh-CN"/"zh-TW" style codes for providers expecting bare "zh". */
+    private fun baseCode(lang: String): String = lang.substringBefore('-')
+
+    /** Google's official-ish web endpoint: GET /translate_a/single?client=gtx&… */
+    private object GoogleProvider : TranslationProvider {
+        override fun translate(text: String, sourceLang: String, targetLang: String): String {
+            val encoded = URLEncoder.encode(text, "UTF-8")
+            val url = URL("https://translate.googleapis.com/translate_a/single?client=gtx&sl=$sourceLang&tl=$targetLang&dt=t&q=$encoded")
+            val body = httpGet(url) { code ->
+                if (code == 429 || code == 503) throw RateLimitException("Google translate HTTP $code")
+                IOException("Google translate HTTP $code")
+            }
+            // Response: [[["translated","original",…],…], …]
+            val arr = JSONArray(body)
+            val segments = arr.getJSONArray(0)
+            val sb = StringBuilder()
+            for (i in 0 until segments.length()) {
+                sb.append(segments.getJSONArray(i).getString(0))
+            }
+            return sb.toString()
+        }
+    }
+
+    /**
+     * Lingva — open-source Google Translate front-end with a clean JSON API:
+     * GET {host}/api/v1/{source}/{target}/{query}
+     * Multiple public mirrors exist; each instance is tried independently.
+     */
+    private class LingvaProvider(private val host: String) : TranslationProvider {
+        override fun translate(text: String, sourceLang: String, targetLang: String): String {
+            val path = URLEncoder.encode(text, "UTF-8")
+                .replace("+", "%20")
+            val url = URL("$host/api/v1/$sourceLang/${baseCode(targetLang)}/$path")
+            val body = httpGet(url) { code ->
+                if (code == 429 || code == 503) RateLimitException("Lingva HTTP $code")
+                else IOException("Lingva ($host) HTTP $code")
+            }
+            // Response: {"translation": "…", …}
+            return JSONObject(body).getString("translation")
+        }
+    }
+
+    /**
+     * MyMemory translation memory: GET /get?q=…&langpair=src|tgt
+     * Free anonymous tier (~5k chars/day per IP); fine as an occasional fallback.
+     * Note: it rejects chunks over ~500 bytes, so only used when Google+Lingva fail
+     * and the chunk is small enough; large chunks surface the earlier errors.
+     */
+    private object MyMemoryProvider : TranslationProvider {
+        override fun translate(text: String, sourceLang: String, targetLang: String): String {
+            if (text.length > 450) {
+                // Provider limit — don't send garbage requests; fail fast so any
+                // earlier provider's error is what the caller sees.
+                throw IOException("MyMemory: chunk too large")
+            }
+            val q = URLEncoder.encode(text, "UTF-8")
+            val pair = "${baseCode(sourceLang)}|${baseCode(targetLang)}"
+            val url = URL("https://api.mymemory.translated.net/get?q=$q&langpair=$pair")
+            val body = httpGet(url) { code ->
+                if (code == 429) RateLimitException("MyMemory HTTP $code")
+                else IOException("MyMemory HTTP $code")
+            }
+            val obj = JSONObject(body)
+            val status = obj.optInt("responseStatus", 500)
+            if (status != 200) throw IOException("MyMemory status $status")
+            return obj.getJSONObject("responseData").getString("translatedText")
+        }
+    }
+
+    /** Minimal GET helper shared by all providers. Throws via [errorFor] on non-200. */
+    private inline fun httpGet(url: URL, errorFor: (Int) -> Exception): String {
         val conn = (url.openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
-            setRequestProperty("User-Agent", "Mozilla/5.0")
+            setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36")
             connectTimeout = CONNECT_TIMEOUT_MS
             readTimeout = READ_TIMEOUT_MS
             instanceFollowRedirects = true
@@ -105,25 +211,13 @@ object GoogleTranslate {
         return try {
             val code = conn.responseCode
             if (code == 200) {
-                val body = conn.inputStream.bufferedReader().use { it.readText() }
-                parseTranslationResponse(body)
+                conn.inputStream.bufferedReader().use { it.readText() }
             } else {
-                throw IOException("Translate service returned HTTP $code")
+                throw errorFor(code)
             }
         } finally {
             conn.disconnect()
         }
-    }
-
-    private fun parseTranslationResponse(json: String): String {
-        val arr = JSONArray(json)
-        val segments = arr.getJSONArray(0)
-        val sb = StringBuilder()
-        for (i in 0 until segments.length()) {
-            val segment = segments.getJSONArray(i)
-            sb.append(segment.getString(0))
-        }
-        return sb.toString()
     }
 
     /**
