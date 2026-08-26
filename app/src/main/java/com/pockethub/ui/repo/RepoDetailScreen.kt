@@ -80,6 +80,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -1300,70 +1301,176 @@ private fun WorkflowsTab(
     }
     LazyColumn(state = listState, modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
         items(runs, key = { it.id }) { run ->
-            Row(
-                Modifier.fillMaxWidth()
-                    .clickable { onNavigateToWorkflowRun(run.id) }
-                    .padding(vertical = 10.dp),
-                verticalAlignment = Alignment.Top,
-            ) {
-                // Status dot
-                val statusColor = when (run.conclusion) {
-                    "success" -> androidx.compose.ui.graphics.Color(0xFF2EA043)
-                    "failure", "cancelled" -> MaterialTheme.colorScheme.error
-                    else -> MaterialTheme.colorScheme.primary
-                }
-                Box(
-                    Modifier.size(8.dp).clip(CircleShape)
-                        .background(statusColor),
-                )
-                Spacer(Modifier.width(10.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        run.name.ifBlank { run.event ?: "" },
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Spacer(Modifier.height(2.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            stringResource(R.string.workflow_run_status, run.runNumber, run.headBranch ?: "—", run.status ?: "—"),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Spacer(Modifier.height(2.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        val actor = run.actor
-                        if (actor != null) {
-                            AsyncImage(
-                                model = actor.avatarUrl,
-                                contentDescription = null,
-                                modifier = Modifier.size(14.dp).clip(CircleShape)
-                                    .clickable { onNavigateToUser(actor.login) },
-                            )
-                            Spacer(Modifier.width(4.dp))
-                            Text(
-                                actor.login,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.clickable { onNavigateToUser(actor.login) },
-                            )
-                            Spacer(Modifier.width(6.dp))
-                        }
-                        run.createdAt?.let {
-                            Text(
-                                formatDate(it),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
-            }
+            WorkflowRunRow(
+                run = run,
+                onNavigateToUser = onNavigateToUser,
+                onNavigateToWorkflowRun = onNavigateToWorkflowRun,
+            )
             HorizontalDivider()
         }
+    }
+}
+
+@Composable
+private fun WorkflowRunRow(
+    run: GitHubApi.WorkflowRun,
+    onNavigateToUser: (String) -> Unit,
+    onNavigateToWorkflowRun: (Long) -> Unit,
+) {
+    Row(
+        Modifier.fillMaxWidth()
+            .clickable { onNavigateToWorkflowRun(run.id) }
+            .padding(vertical = 10.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        // Conclusion badge (success/failure/running/…) instead of a bare dot
+        Box(Modifier.width(30.dp), contentAlignment = Alignment.TopStart) {
+            Text(conclusionBadge(run), color = conclusionColor(run.conclusion),
+                style = MaterialTheme.typography.titleSmall)
+        }
+        Spacer(Modifier.width(6.dp))
+        Column(Modifier.weight(1f)) {
+            // Line 1: workflow name — usually identical across runs, so disambiguate below
+            Text(
+                run.name.ifBlank { run.path?.substringAfterLast('/') ?: (run.event ?: "") },
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(2.dp))
+            // Line 2: what distinguishes this run — commit subject/sha, branch, event
+            val sha = run.headSha?.take(7).orEmpty()
+            val branch = run.headBranch?.takeIf { it.isNotBlank() }
+            val detail = listOfNotNull(branch, run.event?.let { eventLabel(it) })
+                .joinToString(" · ")
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (sha.isNotBlank()) {
+                    Text(
+                        sha,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    if (detail.isNotEmpty()) {
+                        Spacer(Modifier.width(6.dp))
+                    }
+                }
+                if (detail.isNotEmpty()) {
+                    Text(
+                        detail,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            Spacer(Modifier.height(3.dp))
+            // Line 3: actor · date+time · duration
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                val actor = run.actor
+                if (actor != null) {
+                    AsyncImage(
+                        model = actor.avatarUrl,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp).clip(CircleShape)
+                            .clickable { onNavigateToUser(actor.login) },
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        actor.login,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.clickable { onNavigateToUser(actor.login) },
+                    )
+                    Spacer(Modifier.width(6.dp))
+                }
+                run.createdAt?.let {
+                    Text(
+                        formatDateTime(it),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                formatDuration(run.runStartedAt, run.updatedAt)?.let { d ->
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        d,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** Single-glyph conclusion badge; running/pending gets an animated feel via color. */
+private fun conclusionBadge(run: GitHubApi.WorkflowRun): String = when (run.conclusion) {
+    "success" -> "✓"
+    "failure" -> "✕"
+    "cancelled" -> "⊘"
+    "timed_out" -> "⏱"
+    "skipped" -> "↷"
+    else -> if (run.status == "in_progress" || run.status == "queued") "…" else "•"
+}
+
+@Composable
+private fun conclusionColor(conclusion: String?): androidx.compose.ui.graphics.Color =
+    when {
+        conclusion == "success" -> androidx.compose.ui.graphics.Color(0xFF2EA043)
+        conclusion == "failure" || conclusion == "cancelled" || conclusion == "timed_out" ->
+            MaterialTheme.colorScheme.error
+        else -> MaterialTheme.colorScheme.primary
+    }
+
+/** Human-readable event names; push stays terse. */
+private fun eventLabel(event: String): String = when (event) {
+    "push" -> "push"
+    "pull_request" -> "PR"
+    "workflow_dispatch" -> "manual"
+    "schedule" -> "cron"
+    else -> event
+}
+
+/** ISO timestamp → localized "MMM d, HH:mm" (in the device timezone). */
+@Composable
+private fun formatDateTime(s: String): String {
+    val pattern = stringResource(R.string.workflow_run_datetime)
+    return try {
+        val dt = java.time.OffsetDateTime.parse(s)
+            .atZoneSameInstant(java.time.ZoneId.systemDefault())
+        val date = java.time.format.DateTimeFormatter.ofPattern("MMM d", Locale.getDefault()).format(dt)
+        val time = java.time.format.DateTimeFormatter.ofPattern("HH:mm").format(dt)
+        String.format(Locale.getDefault(), pattern, date, time)
+    } catch (_: Exception) {
+        s.take(16)
+    }
+}
+
+/**
+ * Duration between run start and last update, e.g. "2m 34s" / "1h 03m".
+ * Returns null when the timestamps are missing or the run is still going.
+ */
+private fun formatDuration(startedAt: String?, updatedAt: String?): String? {
+    val start = startedAt ?: return null
+    val end = updatedAt ?: return null
+    return try {
+        val secs = java.time.Duration.between(
+            java.time.OffsetDateTime.parse(start),
+            java.time.OffsetDateTime.parse(end),
+        ).seconds
+        if (secs < 0) null
+        else when {
+            secs < 60 -> "${secs}s"
+            secs < 3600 -> "%dm %02ds".format(secs / 60, secs % 60)
+            else -> "%dh %02dm".format(secs / 3600, (secs % 3600) / 60)
+        }
+    } catch (_: Exception) {
+        null
     }
 }
 
