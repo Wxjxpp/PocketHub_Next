@@ -29,6 +29,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -187,8 +191,18 @@ fun MarkdownText(
         }
     }
 
-    val parseResult = androidx.compose.runtime.remember(markdown) {
-        runCatching { parseMarkdown(cleanMarkdown(markdown)) }
+    // Parse OFF the main thread: large documents (600KB+ awesome-lists) take
+    // seconds-to-minutes synchronously and would ANR the Overview tab. Also
+    // cap the input so pathological docs stay renderable.
+    val parseResult by produceState<Result<List<MdBlock>>>(
+        initialValue = Result.success(emptyList()),
+        key1 = markdown,
+    ) {
+        value = runCatching {
+            withContext(Dispatchers.Default) {
+                parseMarkdown(cleanMarkdown(truncateOversized(markdown)))
+            }
+        }
     }
     Column(modifier = modifier) {
         parseResult.onFailure { MarkdownErrorBox(it) }
@@ -824,6 +838,23 @@ private fun splitTableRow(line: String): List<String> {
     if (hasLeading && cells.isNotEmpty()) cells = cells.drop(1)
     if (hasTrailing && cells.isNotEmpty()) cells = cells.dropLast(1)
     return cells
+}
+
+/** Max raw characters fed into the renderer; larger docs are truncated. */
+private const val MAX_MARKDOWN_CHARS = 200_000
+
+/**
+ * Hard cap for pathological documents (e.g. 600KB+ awesome lists). The cap is
+ * generous enough for any normal README/issue body; oversized docs keep their
+ * beginning (title + intro + usually the first content sections) and get a
+ * visible truncation marker instead of stalling the UI.
+ */
+private fun truncateOversized(markdown: String): String {
+    if (markdown.length <= MAX_MARKDOWN_CHARS) return markdown
+    // Cut at a line boundary so we don't split a construct mid-way.
+    val cut = markdown.lastIndexOf('\n', MAX_MARKDOWN_CHARS).takeIf { it > 0 }
+        ?: MAX_MARKDOWN_CHARS
+    return markdown.substring(0, cut) + "\n\n<!-- truncated -->\n\n*[Content too large — showing the first part]*"
 }
 
 private fun parseMarkdown(src: String): List<MdBlock> {
