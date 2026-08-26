@@ -10,6 +10,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import javax.inject.Inject
 
 /** A parsed GitHub issue template (an `.md` or `.yml` file under `.github/ISSUE_TEMPLATE`). */
@@ -117,6 +120,9 @@ class CreateIssueViewModel @Inject constructor(
      *  - `.yml`/`.yaml` → structured issue forms
      *  - `.md` → legacy free-text templates
      */
+    /** Lenient JSON decoder — GitHub contents responses carry many extra fields. */
+    private val json = Json { ignoreUnknownKeys = true }
+
     private suspend fun parseTemplateDir(owner: String, repo: String): IssueFormParser.Result {
         val entries = listTemplateEntries(owner, repo)
 
@@ -165,16 +171,16 @@ class CreateIssueViewModel @Inject constructor(
     }
 
     /** Decode a single-file contents response; null when the element is a directory listing. */
-    private fun decodeFile(el: kotlinx.serialization.json.JsonElement): GitHubApi.ContentEntry? =
+    private fun decodeFile(el: JsonElement): GitHubApi.ContentEntry? =
         runCatching {
-            kotlinx.serialization.json.Json.decodeFromJsonElement(GitHubApi.ContentEntry.serializer(), el)
+            json.decodeFromJsonElement(GitHubApi.ContentEntry.serializer(), el)
         }.getOrNull()
 
-    private fun decodeDirectory(el: kotlinx.serialization.json.JsonElement?): List<GitHubApi.ContentEntry> {
+    private fun decodeDirectory(el: JsonElement?): List<GitHubApi.ContentEntry> {
         if (el == null) return emptyList()
         return runCatching {
-            kotlinx.serialization.json.Json.decodeFromJsonElement(
-                kotlinx.serialization.builtins.ListSerializer(GitHubApi.ContentEntry.serializer()),
+            json.decodeFromJsonElement(
+                ListSerializer(GitHubApi.ContentEntry.serializer()),
                 el,
             )
         }.getOrDefault(emptyList())
