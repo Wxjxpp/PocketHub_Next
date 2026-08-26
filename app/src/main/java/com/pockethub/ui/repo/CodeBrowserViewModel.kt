@@ -33,6 +33,11 @@ import java.util.TimeZone
  *
  * Maintains a path stack so users can navigate into directories and back out.
  */
+/** Max per-directory last-commit fetches in one pass (rate-limit guard).
+ *  Results are cached, so re-visits don't refetch — the cap only throttles
+ *  how quickly an unseen directory fills in its timestamps. */
+private const val MAX_LAST_COMMIT_FETCH = 60
+
 @HiltViewModel
 class CodeBrowserViewModel @Inject constructor(
     private val api: GitHubApi,
@@ -258,7 +263,10 @@ class CodeBrowserViewModel @Inject constructor(
             _state.update { it.copy(lastCommits = it.lastCommits + cached) }
         }
         val toFetch = entries.filter { cacheKey(it.path) !in commitCache }
-            .take(15) // Cap at 15 to avoid burning the API rate limit on large directories.
+            // Cap protects the API rate limit on huge directories. Cached entries
+            // are excluded first, so re-visiting a directory costs nothing and the
+            // timestamps eventually cover the whole list across visits.
+            .take(MAX_LAST_COMMIT_FETCH)
         if (toFetch.isEmpty()) return
 
         viewModelScope.launch {
