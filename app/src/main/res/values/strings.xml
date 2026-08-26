@@ -67,8 +67,11 @@
     <string name="issue_template_blank">Blank issue</string>
     <string name="issue_template_blank_desc">Open a plain issue without a template.</string>
     <string name="issue_contact_links_title">Other contact options</string>
-    <string name="issue_form_required">" is required"</string>
     <string name="issue_templates_load_failed">Couldn\'t load issue templates</string>
+    <string name="issue_form_select_one">Select one</string>
+    <string name="issue_form_select_multi">Select one or more</string>
+    <string name="issue_form_fallback_name">Issue form</string>
+    <string name="issue_form_required_prompt">"%1$s" is required</string>
     <string name="labels_section_title">Labels</string>
     <string name="assignees_section_title">Assignees</string>
     <string name="label_input_hint">Add a label</string>

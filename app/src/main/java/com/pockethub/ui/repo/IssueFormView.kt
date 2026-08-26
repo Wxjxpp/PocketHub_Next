@@ -258,7 +258,10 @@ private fun DropdownField(
                 readOnly = true,
                 enabled = enabled,
                 label = null,
-                placeholder = { Text(if (field.multiple) "Select one or more" else "Select one") },
+                placeholder = {
+                    val hint = stringResource(if (field.multiple) R.string.issue_form_select_multi else R.string.issue_form_select_one)
+                    Text(hint)
+                },
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                 modifier = Modifier
                     .menuAnchor()

@@ -52,6 +52,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -192,7 +193,7 @@ private fun TemplateChooser(
         // YAML issue forms first
         items(forms) { f ->
             TemplateCard(
-                name = f.name ?: f.description ?: "Issue",
+                name = f.name ?: f.description ?: stringResource(R.string.issue_form_fallback_name),
                 about = f.description ?: "",
                 icon = Icons.Outlined.Article,
                 onClick = { onFormSelected(f) },
@@ -269,11 +270,12 @@ private fun FormIssueEditor(
     val actionError by vm.actionError.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val genericError = stringResource(R.string.loading_failed)
-    val requiredSuffix = stringResource(R.string.issue_form_required)
+    val ctx = LocalContext.current
 
     LaunchedEffect(validationError) {
         validationError?.let {
-            snackbarHostState.showSnackbar("「${it.take(50)}」$requiredSuffix")
+            val label = if (it.length > 50) it.take(50) + "…" else it
+            snackbarHostState.showSnackbar(ctx.getString(R.string.issue_form_required_prompt, label))
             vm.clearValidationError()
         }
     }
