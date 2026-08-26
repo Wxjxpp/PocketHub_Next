@@ -151,10 +151,10 @@ class CachedRepository @Inject constructor(
 
     // ── README ──────────────────────────────────────────
 
-    suspend fun getReadme(owner: String, repo: String): GitHubApi.ReadmeResponse {
-        val key = "readme:$owner/$repo"
+    suspend fun getReadme(owner: String, repo: String, ref: String? = null): GitHubApi.ReadmeResponse {
+        val key = "readme:$owner/$repo@$ref"
         return cacheFirst(key, THREE_MIN) {
-            api.getReadme(owner, repo)
+            api.getReadme(owner, repo, ref = ref)
         }
     }
 

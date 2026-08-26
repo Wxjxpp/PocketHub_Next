@@ -167,6 +167,12 @@ fun RepoDetailScreen(
     var deleteInput by remember { mutableStateOf("") }
 
     LaunchedEffect(owner, repo) { vm.loadRepo(owner, repo) }
+    // Branch picked in the Code tab → reload README for that branch (and reset
+    // the stale translation). PR/issue lists are repo-wide by GitHub's API and
+    // intentionally do not follow the branch.
+    LaunchedEffect(owner, repo, codeBrowserRef) {
+        if (repoData != null) vm.onBranchChanged(owner, repo, codeBrowserRef)
+    }
     LaunchedEffect(owner, repo, tab) {
         if (tab == RepoTab.ISSUES) vm.loadIssues(owner, repo)
         if (tab == RepoTab.PRS) vm.loadPulls(owner, repo)

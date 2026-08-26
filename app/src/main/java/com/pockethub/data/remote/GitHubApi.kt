@@ -102,11 +102,13 @@ interface GitHubApi {
         @Path("repo") repo: String,
     ): Repository
 
-    /** README — returns base64 content + download_url. Parsed into [ReadmeResponse]. */
+        /** README — returns base64 content + download_url. Parsed into [ReadmeResponse].
+     *  [ref] selects the branch (defaults to the repo's default branch). */
     @GET("repos/{owner}/{repo}/readme")
     suspend fun getReadme(
         @Path("owner") owner: String,
         @Path("repo") repo: String,
+        @Query("ref") ref: String? = null,
     ): ReadmeResponse
 
     @kotlinx.serialization.Serializable

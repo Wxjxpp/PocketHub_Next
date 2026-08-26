@@ -279,18 +279,34 @@ class RepoDetailViewModel @Inject constructor(
     private val _commitsRefreshTick = MutableStateFlow(0)
     val commitsRefreshTick: StateFlow<Int> = _commitsRefreshTick.asStateFlow()
 
-    private fun loadReadme(owner: String, repo: String): Job = viewModelScope.launch {
+    /** Branch the current README was loaded for — used to skip redundant reloads. */
+    private var readmeRef: String? = null
+
+    private fun loadReadme(owner: String, repo: String, ref: String? = null): Job = viewModelScope.launch {
         try {
-            val resp = cache.getReadme(owner, repo)
+            val resp = cache.getReadme(owner, repo, ref = ref)
             val markdown = if (resp.encoding == "base64" && resp.content.isNotBlank()) {
                 decodeBase64(resp.content)
             } else {
                 resp.content
             }
             _readme.update { markdown }
+            readmeRef = ref
         } catch (_: Exception) {
             _readme.update { null }
         }
+    }
+
+    /**
+     * Called by the screen when the Code tab's branch selection changes:
+     * reloads the README for [ref] and resets the translation view (the cached
+     * translated text belongs to the previous branch's README).
+     */
+    fun onBranchChanged(owner: String, repo: String, ref: String?) {
+        if (readmeRef == ref && _readme.value != null) return
+        _translatedReadme.update { null }
+        _showTranslated.update { false }
+        loadReadme(owner, repo, ref)
     }
 
     private fun checkStar(owner: String, repo: String) = viewModelScope.launch {
