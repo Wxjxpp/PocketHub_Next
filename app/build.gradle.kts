@@ -143,4 +143,7 @@ dependencies {
 
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
+
+    // GitHub issue form templates (.github/ISSUE_TEMPLATE/*.yml)
+    implementation("org.yaml:snakeyaml:2.2")
 }

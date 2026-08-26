@@ -24,10 +24,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Article
-import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -39,7 +39,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -51,6 +50,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -69,23 +69,34 @@ fun CreateIssueScreen(
     val templates by vm.templates.collectAsState()
     val isLoadingTemplates by vm.isLoadingTemplates.collectAsState()
     val selectedTemplate by vm.selectedTemplate.collectAsState()
+    val forms by vm.forms.collectAsState()
+    val selectedForm by vm.selectedForm.collectAsState()
+    val formAnswers by vm.formAnswers.collectAsState()
+    val contactLinks by vm.contactLinks.collectAsState()
+    val blankSelected by vm.blankSelected.collectAsState()
+    val validationError by vm.validationError.collectAsState()
+    val uriHandler = LocalUriHandler.current
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     Text(
-                        text = if (selectedTemplate != null) selectedTemplate!!.name
-                        else stringResource(R.string.create_issue_title),
+                        text = when {
+                            selectedForm != null -> selectedForm!!.name ?: stringResource(R.string.create_issue_title)
+                            selectedTemplate != null -> selectedTemplate!!.name
+                            else -> stringResource(R.string.create_issue_title)
+                        },
                         fontWeight = FontWeight.SemiBold,
                     )
                 },
                 navigationIcon = {
                     IconButton(onClick = {
-                        if (selectedTemplate != null) {
-                            vm.selectTemplate(null)
-                        } else {
-                            onBack()
+                        when {
+                            selectedForm != null -> vm.selectForm(null)
+                            selectedTemplate != null -> vm.selectTemplate(null)
+                            blankSelected -> vm.clearBlankSelection()
+                            else -> onBack()
                         }
                     }) {
                         Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = stringResource(R.string.action_back))
@@ -96,21 +107,38 @@ fun CreateIssueScreen(
     ) { padding ->
         when {
             // Loading templates — show progress
-            isLoadingTemplates && templates.isEmpty() && selectedTemplate == null -> {
+            isLoadingTemplates && templates.isEmpty() && forms.isEmpty() && selectedTemplate == null && selectedForm == null -> {
                 Box(Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
             }
+            // Native form renderer for YAML issue-form templates
+            selectedForm != null -> {
+                FormIssueEditor(
+                    modifier = Modifier.padding(padding),
+                    owner = owner,
+                    repo = repo,
+                    vm = vm,
+                    form = selectedForm!!,
+                    answers = formAnswers,
+                    validationError = validationError,
+                    onIssueCreated = onIssueCreated,
+                )
+            }
             // Template chooser — when templates exist and none selected yet
-            templates.isNotEmpty() && selectedTemplate == null -> {
+            (templates.isNotEmpty() || forms.isNotEmpty()) && selectedTemplate == null && !blankSelected -> {
                 TemplateChooser(
                     modifier = Modifier.padding(padding),
                     templates = templates,
+                    forms = forms,
+                    contactLinks = contactLinks,
+                    onFormSelected = { vm.selectForm(it) },
                     onTemplateSelected = { vm.selectTemplate(it) },
                     onBlankSelected = { vm.selectTemplate(null) },
+                    onContactLink = { url -> uriHandler.openUri(url) },
                 )
             }
-            // Editor — either a template was selected, or no templates exist
+            // Editor — a legacy template was selected, or no templates exist
             else -> {
                 IssueEditor(
                     modifier = Modifier.padding(padding),
@@ -130,8 +158,12 @@ fun CreateIssueScreen(
 private fun TemplateChooser(
     modifier: Modifier,
     templates: List<IssueTemplate>,
+    forms: List<IssueForm>,
+    contactLinks: List<IssueContactLink>,
+    onFormSelected: (IssueForm) -> Unit,
     onTemplateSelected: (IssueTemplate) -> Unit,
     onBlankSelected: () -> Unit,
+    onContactLink: (String) -> Unit,
 ) {
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -143,6 +175,15 @@ private fun TemplateChooser(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            )
+        }
+        // YAML issue forms first
+        items(forms) { f ->
+            TemplateCard(
+                name = f.name ?: f.description ?: "Issue",
+                about = f.description ?: "",
+                icon = Icons.Outlined.Article,
+                onClick = { onFormSelected(f) },
             )
         }
         // Blank issue option
@@ -162,7 +203,153 @@ private fun TemplateChooser(
                 onClick = { onTemplateSelected(t) },
             )
         }
+        // External contact links from config.yml
+        if (contactLinks.isNotEmpty()) {
+            item {
+                Text(
+                    stringResource(R.string.issue_contact_links_title),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                )
+            }
+            items(contactLinks, key = { it.url }) { link ->
+                TemplateCard(
+                    name = link.name,
+                    about = link.about,
+                    icon = Icons.AutoMirrored.Outlined.OpenInNew,
+                    onClick = { onContactLink(link.url) },
+                )
+            }
+        }
         item { Spacer(Modifier.height(12.dp)) }
+    }
+}
+
+/** Template title, falling back to the first filled single-line answer (GitHub-like behavior). */
+private fun effectiveFormTitle(form: IssueForm, answers: Map<Int, IssueFormAnswer>): String =
+    form.title.ifBlank {
+        answers.entries.sortedBy { it.key }.firstOrNull { (i, a) ->
+            (form.fields.firstOrNull { it.index == i } as? IssueFormField.TextInput)?.multiline == false &&
+                a.text.isNotBlank()
+        }?.value?.text.orEmpty().take(80)
+    }
+
+/**
+ * Editor for YAML issue-form templates — native controls driven entirely by the parsed form.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FormIssueEditor(
+    modifier: Modifier,
+    owner: String,
+    repo: String,
+    vm: CreateIssueViewModel,
+    form: IssueForm,
+    answers: Map<Int, IssueFormAnswer>,
+    validationError: String?,
+    onIssueCreated: (Int) -> Unit,
+) {
+    val isSending by vm.isSending.collectAsState()
+    val labels by vm.labels.collectAsState()
+    val assignees by vm.assignees.collectAsState()
+    val result by vm.result.collectAsState()
+    val actionError by vm.actionError.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val genericError = stringResource(R.string.loading_failed)
+    val requiredSuffix = stringResource(R.string.issue_form_required)
+
+    LaunchedEffect(validationError) {
+        validationError?.let {
+            snackbarHostState.showSnackbar("「${it.take(50)}」$requiredSuffix")
+            vm.clearValidationError()
+        }
+    }
+
+    LaunchedEffect(actionError) {
+        actionError?.let {
+            snackbarHostState.showSnackbar(it)
+            vm.clearActionError()
+        }
+    }
+
+    LaunchedEffect(result) {
+        result?.onSuccess { issue ->
+            vm.clearResult()
+            onIssueCreated(issue.number)
+        }?.onFailure { e ->
+            snackbarHostState.showSnackbar(e.localizedMessage ?: genericError)
+            vm.clearResult()
+        }
+    }
+
+    Box(modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .imePadding()
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            var title by remember(form) { mutableStateOf(effectiveFormTitle(form, answers)) }
+            // Keep the fallback title in sync as the user fills single-line inputs (never clobber edits)
+            LaunchedEffect(answers) {
+                if (form.title.isBlank() && title.isBlank()) title = effectiveFormTitle(form, answers)
+            }
+            OutlinedTextField(
+                value = title,
+                onValueChange = { title = it },
+                label = { Text(stringResource(R.string.hint_issue_title)) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                enabled = !isSending,
+            )
+
+            IssueFormView(
+                form = form,
+                answers = answers,
+                enabled = !isSending,
+                onAnswerChange = vm::updateAnswer,
+            )
+
+            ChipListEditor(
+                title = stringResource(R.string.labels_section_title),
+                items = labels,
+                inputHint = stringResource(R.string.label_input_hint),
+                emptyText = stringResource(R.string.no_labels),
+                enabled = !isSending,
+                onAdd = vm::addLabel,
+                onRemove = vm::removeLabel,
+            )
+
+            ChipListEditor(
+                title = stringResource(R.string.assignees_section_title),
+                items = assignees,
+                inputHint = stringResource(R.string.assignee_input_hint),
+                emptyText = stringResource(R.string.no_assignees),
+                enabled = !isSending,
+                onAdd = vm::addAssignee,
+                onRemove = vm::removeAssignee,
+            )
+
+            Button(
+                onClick = { vm.submitForm(owner, repo, title) },
+                enabled = !isSending,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                if (isSending) {
+                    CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                } else {
+                    Icon(Icons.AutoMirrored.Outlined.Send, contentDescription = null, modifier = Modifier.size(16.dp))
+                }
+                Text(stringResource(R.string.action_create_issue))
+            }
+        }
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
     }
 }
 

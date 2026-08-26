@@ -66,6 +66,8 @@
     <string name="issue_template_picker_hint">Pick a template to get started, or open a blank issue.</string>
     <string name="issue_template_blank">Blank issue</string>
     <string name="issue_template_blank_desc">Open a plain issue without a template.</string>
+    <string name="issue_contact_links_title">Other contact options</string>
+    <string name="issue_form_required">" is required"</string>
     <string name="labels_section_title">Labels</string>
     <string name="assignees_section_title">Assignees</string>
     <string name="label_input_hint">Add a label</string>
