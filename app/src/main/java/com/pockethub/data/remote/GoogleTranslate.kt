@@ -119,7 +119,7 @@ object GoogleTranslate {
         }
     }
 
-    private fun translateChunk(text: String, targetLang: String): String {
+    private suspend fun translateChunk(text: String, targetLang: String): String {
         val sl = detectLanguage(text)
         // If already in target language, skip
         if ((targetLang.startsWith("zh") && sl == "zh") ||
