@@ -130,7 +130,7 @@ internal fun inlineMarkdown(text: String): AnnotatedString {
             text.startsWith("**", i) -> {
                 val end = text.indexOf("**", i + 2)
                 if (end > 0) {
-                    b.push(SpanStyle(fontWeight = FontWeight.Bold))
+                    b.pushStyle(SpanStyle(fontWeight = FontWeight.Bold))
                     b.append(text.substring(i + 2, end))
                     b.pop()
                     i = end + 2
@@ -141,7 +141,7 @@ internal fun inlineMarkdown(text: String): AnnotatedString {
             text[i] == '`' -> {
                 val end = text.indexOf('`', i + 1)
                 if (end > 0) {
-                    b.push(SpanStyle(fontFamily = FontFamily.Monospace, fontSize = 13.sp))
+                    b.pushStyle(SpanStyle(fontFamily = FontFamily.Monospace, fontSize = 13.sp))
                     b.append(text.substring(i + 1, end))
                     b.pop()
                     i = end + 1
