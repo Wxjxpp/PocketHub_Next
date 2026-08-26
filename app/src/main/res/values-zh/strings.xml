@@ -395,6 +395,10 @@
     <string name="settings">设置</string>
     <string name="section_appearance">外观</string>
     <string name="section_language">语言</string>
+    <string name="app_language">App 语言</string>
+    <string name="severe_issues_send_now">一键发送问题报告</string>
+    <string name="severe_issues_one_tap_summary">共 %1$d 条本地收集的严重事件，点击通过邮件发送给开发者</string>
+    <string name="severe_issues_none_local">本地没有收集到严重问题，无需发送</string>
     <string name="language">语言</string>
     <string name="locale_system">跟随系统</string>
     <string name="locale_english">English</string>

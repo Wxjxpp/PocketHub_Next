@@ -134,6 +134,10 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { _issueCount.value = issueReporter.readLog().size }
     }
 
+    /** One-shot read of the local severe-event log for the email report. */
+    suspend fun issueEvents(): List<com.pockethub.data.reporting.IssueEvent> = issueReporter.readLog()
+    }
+
     fun setIssueReportEnabled(enabled: Boolean) {
         viewModelScope.launch {
             settings.setIssueReportEnabled(enabled)

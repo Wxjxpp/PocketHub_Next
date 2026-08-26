@@ -412,6 +412,10 @@
     <string name="settings">Settings</string>
     <string name="section_appearance">Appearance</string>
     <string name="section_language">Language</string>
+    <string name="app_language">App language</string>
+    <string name="severe_issues_send_now">Send issue report</string>
+    <string name="severe_issues_one_tap_summary">%1$d local severe events collected — tap to email them to the developer</string>
+    <string name="severe_issues_none_local">No severe issues collected locally — nothing to send</string>
     <string name="language">Language</string>
     <string name="locale_system">Follow system</string>
     <string name="locale_english">English</string>
