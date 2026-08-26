@@ -92,6 +92,33 @@ object GoogleTranslate {
 
     // ── internals ──────────────────────────────────────────────
 
+    /**
+     * Try one provider on [text]. If the provider's [TranslationProvider.maxChars]
+     * limit is exceeded, re-split just for that provider and translate the
+     * sub-chunks (still concurrently capped). This lets small-limit providers
+     * (e.g. MyMemory) join the fallback chain even for large chunks instead of
+     * failing fast.
+     */
+    private suspend fun translateWithProvider(
+        provider: TranslationProvider,
+        text: String,
+        sourceLang: String,
+        targetLang: String,
+    ): String {
+        if (text.length <= provider.maxChars) return provider.translate(text, sourceLang, targetLang)
+        // Provider limit exceeded — re-split just for it. Sub-chunks are translated
+        // concurrently (capped) and joined in order.
+        val subChunks = splitIntoChunks(text, provider.maxChars)
+        return coroutineScope {
+            val semaphore = Semaphore(MAX_CONCURRENT)
+            subChunks.map { sub ->
+                async {
+                    semaphore.withPermit { provider.translate(sub, sourceLang, targetLang) }
+                }
+            }.awaitAll().joinToString("")
+        }
+    }
+
     private fun translateChunk(text: String, targetLang: String): String {
         val sl = detectLanguage(text)
         // If already in target language, skip
@@ -104,7 +131,7 @@ object GoogleTranslate {
         var lastError: Exception? = null
         for (provider in providers) {
             try {
-                return provider.translate(text, sl, targetLang)
+                return translateWithProvider(provider, text, sl, targetLang)
             } catch (e: RateLimitException) {
                 // Throttled: brief backoff then fall through to the next provider.
                 lastError = e
@@ -128,6 +155,9 @@ object GoogleTranslate {
 
     private interface TranslationProvider {
         fun translate(text: String, sourceLang: String, targetLang: String): String
+
+        /** Max chars this provider accepts in one request (used for adaptive splitting). */
+        val maxChars: Int get() = Int.MAX_VALUE
     }
 
     /** Normalize "zh-CN"/"zh-TW" style codes for providers expecting bare "zh". */
@@ -135,6 +165,8 @@ object GoogleTranslate {
 
     /** Google's official-ish web endpoint: GET /translate_a/single?client=gtx&… */
     private object GoogleProvider : TranslationProvider {
+        override val maxChars: Int get() = 4500
+
         override fun translate(text: String, sourceLang: String, targetLang: String): String {
             val encoded = URLEncoder.encode(text, "UTF-8")
             val url = URL("https://translate.googleapis.com/translate_a/single?client=gtx&sl=$sourceLang&tl=$targetLang&dt=t&q=$encoded")
@@ -159,6 +191,9 @@ object GoogleTranslate {
      * Multiple public mirrors exist; each instance is tried independently.
      */
     private class LingvaProvider(private val host: String) : TranslationProvider {
+        /** URL-path based API — long encoded payloads risk 4xx on mirrors. */
+        override val maxChars: Int get() = 1800
+
         override fun translate(text: String, sourceLang: String, targetLang: String): String {
             val path = URLEncoder.encode(text, "UTF-8")
                 .replace("+", "%20")
@@ -175,16 +210,14 @@ object GoogleTranslate {
     /**
      * MyMemory translation memory: GET /get?q=…&langpair=src|tgt
      * Free anonymous tier (~5k chars/day per IP); fine as an occasional fallback.
-     * Note: it rejects chunks over ~500 bytes, so only used when Google+Lingva fail
-     * and the chunk is small enough; large chunks surface the earlier errors.
+     * Chunks over its [maxChars] limit are re-split upstream, so every request
+     * it receives is within budget.
      */
     private object MyMemoryProvider : TranslationProvider {
+        /** Free anonymous tier rejects requests over ~500 bytes. */
+        override val maxChars: Int get() = 450
+
         override fun translate(text: String, sourceLang: String, targetLang: String): String {
-            if (text.length > 450) {
-                // Provider limit — don't send garbage requests; fail fast so any
-                // earlier provider's error is what the caller sees.
-                throw IOException("MyMemory: chunk too large")
-            }
             val q = URLEncoder.encode(text, "UTF-8")
             val pair = "${baseCode(sourceLang)}|${baseCode(targetLang)}"
             val url = URL("https://api.mymemory.translated.net/get?q=$q&langpair=$pair")
@@ -221,52 +254,58 @@ object GoogleTranslate {
     }
 
     /**
-     * Split [text] into chunks of roughly [CHUNK_SIZE] characters,
-     * breaking at paragraph boundaries (\n\n) when possible.
+     * Split [text] into chunks of at most [limit] characters.
+     *
+     * Text is decomposed into atomic units (paragraphs, then lines, then
+     * hard-split runs for oversized lines) that keep their leading separators,
+     * then greedily packed into chunks. Joining the returned chunks back with
+     * "" therefore reconstructs the original layout — no blank lines lost at
+     * chunk boundaries.
      */
-    private fun splitIntoChunks(text: String): List<String> {
-        if (text.length <= CHUNK_SIZE) return listOf(text)
+    private fun splitIntoChunks(text: String, limit: Int = CHUNK_SIZE): List<String> {
+        if (text.length <= limit) return listOf(text)
 
+        val units = mutableListOf<String>()
         val paragraphs = text.split("\n\n")
+        for ((pi, para) in paragraphs.withIndex()) {
+            val paraPrefix = if (pi == 0) "" else "\n\n"
+            if (paraPrefix.length + para.length <= limit) {
+                units.add(paraPrefix + para)
+                continue
+            }
+            val lines = para.split("\n")
+            for ((li, line) in lines.withIndex()) {
+                val prefix = if (li == 0) paraPrefix else "\n"
+                var rest = prefix + line
+                if (rest.length <= limit) {
+                    units.add(rest)
+                    continue
+                }
+                // Oversized single line: hard-split at word boundaries.
+                while (rest.length > limit) {
+                    val breakAt = rest.lastIndexOf(' ', limit)
+                    if (breakAt > 0) {
+                        // Keep the separating space on the left chunk so joining
+                        // the pieces back reconstructs the original text.
+                        units.add(rest.substring(0, breakAt + 1))
+                        rest = rest.substring(breakAt + 1)
+                    } else {
+                        units.add(rest.substring(0, limit))
+                        rest = rest.substring(limit)
+                    }
+                }
+                if (rest.isNotEmpty()) units.add(rest)
+            }
+        }
+
         val chunks = mutableListOf<String>()
         val current = StringBuilder()
-
-        for (para in paragraphs) {
-            if (current.length + para.length + 2 > CHUNK_SIZE && current.isNotEmpty()) {
+        for (unit in units) {
+            if (current.isNotEmpty() && current.length + unit.length > limit) {
                 chunks.add(current.toString())
-                current.clear()
+                current.setLength(0)
             }
-            if (current.isNotEmpty()) current.append("\n\n")
-            // If a single paragraph exceeds CHUNK_SIZE, split by lines
-            if (para.length > CHUNK_SIZE) {
-                if (current.isNotEmpty()) {
-                    chunks.add(current.toString())
-                    current.clear()
-                }
-                val lines = para.split("\n")
-                for (line in lines) {
-                    if (current.length + line.length + 1 > CHUNK_SIZE && current.isNotEmpty()) {
-                        chunks.add(current.toString())
-                        current.clear()
-                    }
-                    if (current.isNotEmpty()) current.append("\n")
-                    if (line.length > CHUNK_SIZE) {
-                        // Last resort: hard-split at character boundary
-                        var remaining = line
-                        while (remaining.length > CHUNK_SIZE) {
-                            val breakAt = remaining.lastIndexOf(' ', CHUNK_SIZE)
-                                .takeIf { it > 0 } ?: CHUNK_SIZE
-                            chunks.add(remaining.substring(0, breakAt))
-                            remaining = remaining.substring(breakAt).trimStart()
-                        }
-                        current.append(remaining)
-                    } else {
-                        current.append(line)
-                    }
-                }
-            } else {
-                current.append(para)
-            }
+            current.append(unit)
         }
         if (current.isNotEmpty()) chunks.add(current.toString())
         return chunks
