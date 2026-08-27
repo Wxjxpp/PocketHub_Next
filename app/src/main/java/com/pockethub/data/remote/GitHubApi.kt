@@ -1018,11 +1018,18 @@ interface GitHubApi {
         @kotlinx.serialization.SerialName("slug") val slug: String? = null,
     )
 
-    /** List workflows (definitions) for a repo. */
+    /**
+     * List workflows (definitions) for a repo.
+     * [ref] is optional — omit it to use the repo's default branch, or pass a
+     * specific branch name to list workflows as defined on that branch.
+     */
     @GET("repos/{owner}/{repo}/actions/workflows")
     suspend fun getWorkflows(
         @Path("owner") owner: String,
         @Path("repo") repo: String,
+        @Query("per_page") perPage: Int = 100,
+        @Query("page") page: Int = 1,
+        @Query("ref") ref: String? = null,
     ): WorkflowsResponse
 
     /** Trigger a `workflow_dispatch` event for a single workflow. */

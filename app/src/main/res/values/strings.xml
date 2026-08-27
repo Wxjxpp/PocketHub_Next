@@ -276,6 +276,7 @@
     <string name="workflow_dispatch_empty">No active workflows in this repository.</string>
     <string name="workflow_dispatch_ref_label">Branch / tag</string>
     <string name="workflow_dispatch_ref_hint">Runs the workflow on this branch or tag. Requires `on: workflow_dispatch` in the YAML.</string>
+    <string name="workflow_dispatch_sync_hint">Synced with the Code tab branch; tap to switch manually</string>
     <string name="pre_release">pre-release</string>
     <string name="released_at">Released %1$s</string>
     <string name="by_author">@%1$s</string>

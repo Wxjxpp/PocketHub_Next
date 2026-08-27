@@ -84,6 +84,12 @@ class CodeBrowserViewModel @Inject constructor(
         listDir("")
     }
 
+    /** Called when the parent repo changes — resets Code tab branch to avoid
+     *  carrying over the previous repo's selection. */
+    fun resetRef() {
+        _state.update { it.copy(ref = null) }
+    }
+
     private fun refreshCurrent() {
         val s = _state.value
         listDir(s.currentPath)

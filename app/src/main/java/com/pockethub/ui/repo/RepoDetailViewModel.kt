@@ -55,6 +55,7 @@ class RepoDetailViewModel @Inject constructor(
     private val accountRepository: AccountRepository,
     private val issueReporter: com.pockethub.data.reporting.IssueReporter,
     private val okHttp: OkHttpClient,
+    private val codeBrowserVm: com.pockethub.ui.repo.CodeBrowserViewModel,
 ) : ViewModel() {
 
     private val _repo = MutableStateFlow<Repository?>(null)
@@ -134,6 +135,12 @@ class RepoDetailViewModel @Inject constructor(
     // so the tab previously saw a permanently-false flag and never spun.
     private val _isLoadingWorkflowRuns = MutableStateFlow(false)
     val isLoadingWorkflowRuns: StateFlow<Boolean> = _isLoadingWorkflowRuns.asStateFlow()
+
+    // Branch that the workflow list / dispatch dialog are currently pinned to.
+    // Mirrors the Code tab's branch so switching branches in Code also updates
+    // what workflows/runs the user sees. Reset to null when the repo changes.
+    private val _workflowBranch = MutableStateFlow<String?>(null)
+    val workflowBranch: StateFlow<String?> = _workflowBranch.asStateFlow()
 
     private val _isDispatching = MutableStateFlow(false)
     val isDispatching: StateFlow<Boolean> = _isDispatching.asStateFlow()
@@ -227,6 +234,12 @@ class RepoDetailViewModel @Inject constructor(
     fun loadRepo(owner: String, repo: String, force: Boolean = false): Job? {
         if (!force && loadedOwner == owner && loadedRepo == repo && _repo.value != null) return null
         loadedOwner = owner; loadedRepo = repo
+        // Reset workflow branch when switching repos — the previous repo's branch
+        // has no meaning here. Code tab branch also gets reset so it refreshes
+        // with the new repo's default branch on the next LaunchedEffect run.
+        _workflowBranch.update { null }
+        _branches.update { emptyList() }
+        codeBrowserVm.resetRef()
         _currentSlug = "$owner/$repo"
         return viewModelScope.launch {
             _isLoading.update { true }
@@ -276,7 +289,7 @@ class RepoDetailViewModel @Inject constructor(
                         cache.invalidateReleases(owner, repo)
                         loadReleases(owner, repo)?.join()
                     }
-                    RepoTab.WORKFLOWS -> loadWorkflowRuns(owner, repo)?.join()
+                    RepoTab.WORKFLOWS -> loadWorkflowRuns(owner, repo, _workflowBranch.value)?.join()
                 }
             } finally {
                 _isRefreshing.value = false
@@ -316,6 +329,14 @@ class RepoDetailViewModel @Inject constructor(
         _translatedReadme.update { null }
         _showTranslated.update { false }
         loadReadme(owner, repo, ref)
+        // When the Code tab changes branch, mirror it to the workflows tab so the
+        // workflow runs list & dispatch dialog follow the current branch automatically.
+        val branch = ref ?: repoData?.defaultBranch
+        if (branch != null && branch != _workflowBranch.value) {
+            _workflowBranch.update { branch }
+            loadWorkflows(owner, repo, branch)
+            loadBranches(owner, repo)
+        }
     }
 
     private fun checkStar(owner: String, repo: String) = viewModelScope.launch {
@@ -509,13 +530,15 @@ class RepoDetailViewModel @Inject constructor(
     }
 
     /** Load workflow definitions so the user can pick one to dispatch manually. */
-    fun loadWorkflows(owner: String, repo: String) {
+    fun loadWorkflows(owner: String, repo: String, branch: String? = null) {
         viewModelScope.launch {
             if (_isLoadingWorkflows.value) return@launch
             _isLoadingWorkflows.update { true }
             try {
-                val resp = api.getWorkflows(owner, repo)
+                val resp = api.getWorkflows(owner, repo, ref = branch)
                 _workflows.update { resp.workflows.filter { it.state == "active" && it.deletedAt == null } }
+                // Sync the tracked branch once we've resolved it from the API response.
+                branch?.let { _workflowBranch.update { it } }
             } catch (e: Exception) {
                 issueReporter.reportError("RepoDetail", "loadWorkflows", e)
                 _workflows.update { emptyList() }
@@ -524,6 +547,13 @@ class RepoDetailViewModel @Inject constructor(
                 _isLoadingWorkflows.update { false }
             }
         }
+    }
+
+    /** Reset the workflow branch; called when owner/repo changes so the dialog
+     *  doesn't carry over stale branch selections from a different repo. */
+    fun resetWorkflowBranch() {
+        _workflowBranch.update { null }
+        _branches.update { emptyList() }
     }
 
     /** Trigger a `workflow_dispatch` event for the given workflow on the given ref. */
@@ -555,7 +585,15 @@ class RepoDetailViewModel @Inject constructor(
         }
     }
 
-    /** Load branches for the given repo; called when the dispatch dialog opens. */
+    /** Branch to use for the workflow dispatch dialog (mirrors Code tab by default). */
+    fun setWorkflowBranch(owner: String, repo: String, branch: String) {
+        if (_workflowBranch.value == branch) return
+        _workflowBranch.update { branch }
+        loadWorkflows(owner, repo, branch)
+        loadBranches(owner, repo)
+    }
+
+    /** Load branches for the given repo; called when the dispatch dialog opens or branch changes. */
     fun loadBranches(owner: String, repo: String) {
         viewModelScope.launch {
             if (_isLoadingBranches.value) return@launch

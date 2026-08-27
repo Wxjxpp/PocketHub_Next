@@ -46,6 +46,8 @@ import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material.icons.outlined.ArrowDropDown
+import androidx.compose.material.icons.outlined.Public
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.remember
@@ -172,7 +174,10 @@ fun RepoDetailScreen(
     var showActionsMenu by remember { mutableStateOf(false) }
     var deleteInput by remember { mutableStateOf("") }
 
-    LaunchedEffect(owner, repo) { vm.loadRepo(owner, repo) }
+    LaunchedEffect(owner, repo) {
+        vm.loadRepo(owner, repo)
+        vm.resetWorkflowBranch()
+    }
     // Branch picked in the Code tab → reload README for that branch (and reset
     // the stale translation). PR/issue lists are repo-wide by GitHub's API and
     // intentionally do not follow the branch.
@@ -183,7 +188,7 @@ fun RepoDetailScreen(
         if (tab == RepoTab.ISSUES) vm.loadIssues(owner, repo)
         if (tab == RepoTab.PRS) vm.loadPulls(owner, repo)
         if (tab == RepoTab.RELEASES) vm.loadReleases(owner, repo)
-        if (tab == RepoTab.WORKFLOWS) vm.loadWorkflowRuns(owner, repo)
+        if (tab == RepoTab.WORKFLOWS) vm.loadWorkflowRuns(owner, repo, vm.workflowBranch.value)
     }
     LaunchedEffect(forkMessage) {
         forkMessage?.let {
@@ -228,10 +233,12 @@ fun RepoDetailScreen(
         }
     }
 
-    // Load workflow list when the dispatch dialog opens (lazy load).
+    // Load workflow list when the dispatch dialog opens (lazy load). Sync
+    // with the current workflow branch (mirrored from the Code tab by default).
     LaunchedEffect(showDispatchDialog, owner, repo) {
         if (showDispatchDialog) {
-            vm.loadWorkflows(owner, repo)
+            val branch = vm.workflowBranch.value ?: repoData?.defaultBranch ?: "main"
+            vm.loadWorkflows(owner, repo, branch)
             vm.loadBranches(owner, repo)
         }
     }
@@ -1548,7 +1555,7 @@ private fun WorkflowDispatchDialog(
                     )
                     Spacer(Modifier.height(8.dp))
                     val scrollState = rememberScrollState()
-                    Column(Modifier.heightIn(max = 240.dp).verticalScroll(scrollState)) {
+                    Column(Modifier.heightIn(max = 200.dp).verticalScroll(scrollState)) {
                         workflows.forEach { wf ->
                             Row(
                                 Modifier.fillMaxWidth()
@@ -1582,17 +1589,26 @@ private fun WorkflowDispatchDialog(
                         }
                     }
                     Spacer(Modifier.height(12.dp))
-                    BranchDropdown(
+                    // Branch selector — mirrors the repo's Code tab so the dispatch
+                    // ref stays in sync; tapping opens the dropdown to switch manually.
+                    BranchSelectorChip(
+                        currentRef = ref,
                         branchNames = branchNames,
-                        selected = ref,
                         enabled = !isDispatching,
-                        isLoading = isLoadingBranches,
-                        onSelect = { ref = it },
+                        isLoadingBranches = isLoadingBranches,
+                        onToggle = { /* already toggle-able via onSelect in the chip itself */ },
+                        onSelect = { newRef -> ref = newRef },
                     )
                     Text(
                         stringResource(R.string.workflow_dispatch_ref_hint),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        stringResource(R.string.workflow_dispatch_sync_hint),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        modifier = Modifier.padding(top = 2.dp),
                     )
                 }
             }
@@ -1618,47 +1634,69 @@ private fun WorkflowDispatchDialog(
 }
 
 @Composable
-private fun BranchDropdown(
+private fun BranchSelectorChip(
+    currentRef: String,
     branchNames: List<String>,
-    selected: String,
     enabled: Boolean,
-    isLoading: Boolean,
+    isLoadingBranches: Boolean,
+    onToggle: () -> Unit,
     onSelect: (String) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
-    Box {
-        OutlinedTextField(
-            value = selected,
-            onValueChange = {},
-            readOnly = true,
-            enabled = enabled,
-            label = { Text(stringResource(R.string.workflow_dispatch_ref_label)) },
-            singleLine = true,
-            trailingIcon = {
-                if (isLoading) {
-                    CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-                } else {
-                    Icon(Icons.Outlined.ArrowDropDown, contentDescription = null)
-                }
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(enabled = enabled) { expanded = true },
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp)
+            .clickable(enabled = enabled) { onToggle() }
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            Icons.Outlined.Public,
+            contentDescription = null,
+            modifier = Modifier.size(18.dp),
+            tint = MaterialTheme.colorScheme.primary,
         )
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            if (branchNames.isEmpty()) {
-                DropdownMenuItem(text = { Text("—") }, onClick = {})
-            } else {
-                branchNames.forEach { name ->
-                    DropdownMenuItem(
-                        text = { Text(name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                        onClick = {
-                            onSelect(name)
-                            expanded = false
-                        },
-                    )
-                }
-            }
+        Spacer(Modifier.width(8.dp))
+        Text(
+            stringResource(R.string.workflow_dispatch_ref_label),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.weight(1f))
+        if (isLoadingBranches) {
+            CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+        } else {
+            Text(
+                currentRef,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+        Icon(
+            Icons.Outlined.ArrowDropDown,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+    DropdownMenu(expanded = expanded && enabled, onDismissRequest = { expanded = false }) {
+        branchNames.forEach { name ->
+            DropdownMenuItem(
+                text = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (name == currentRef) {
+                            Icon(Icons.Outlined.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(8.dp))
+                        }
+                        Text(name, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                },
+                onClick = {
+                    onSelect(name)
+                    expanded = false
+                },
+            )
         }
     }
 }
