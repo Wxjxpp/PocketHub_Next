@@ -103,7 +103,7 @@ fun ActivityCard(
         } else null,
         cornerRadius = 16.dp,
     ) {
-        Column {
+        Column(Modifier.padding(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             // Icon with colored background circle
             androidx.compose.foundation.layout.Box(

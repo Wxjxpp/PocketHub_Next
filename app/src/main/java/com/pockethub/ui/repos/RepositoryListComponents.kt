@@ -48,7 +48,7 @@ internal fun RepositoryRow(
         onClick = onOpen,
         cornerRadius = 18.dp,
     ) {
-        Column {
+        Column(Modifier.padding(16.dp)) {
         // Header: Avatar + Owner
         Row(
             verticalAlignment = Alignment.CenterVertically,
