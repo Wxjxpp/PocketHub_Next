@@ -45,6 +45,7 @@ import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.StarBorder
+import androidx.compose.material.icons.outlined.ArrowDropDown
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.remember
@@ -151,6 +152,8 @@ fun RepoDetailScreen(
     val codeBrowserRef = codeBrowserState.ref ?: repoData?.defaultBranch
     val isDispatching by vm.isDispatching.collectAsState()
     val dispatchMessage by vm.dispatchMessage.collectAsState()
+    val branches by vm.branches.collectAsState()
+    val isLoadingBranches by vm.isLoadingBranches.collectAsState()
     val translatedReadme by vm.translatedReadme.collectAsState()
     val showTranslated by vm.showTranslated.collectAsState()
     val isTranslating by vm.isTranslating.collectAsState()
@@ -227,7 +230,10 @@ fun RepoDetailScreen(
 
     // Load workflow list when the dispatch dialog opens (lazy load).
     LaunchedEffect(showDispatchDialog, owner, repo) {
-        if (showDispatchDialog) vm.loadWorkflows(owner, repo)
+        if (showDispatchDialog) {
+            vm.loadWorkflows(owner, repo)
+            vm.loadBranches(owner, repo)
+        }
     }
 
     // Surface dispatch results via Snackbar. On success, close the dialog and refresh runs.
@@ -620,8 +626,10 @@ fun RepoDetailScreen(
     if (showDispatchDialog) {
         WorkflowDispatchDialog(
             workflows = workflows,
-            defaultBranch = repoData?.defaultBranch,
+            branches = branches,
             isLoading = isLoadingWorkflows,
+            isLoadingBranches = isLoadingBranches,
+            defaultBranch = repoData?.defaultBranch,
             isDispatching = isDispatching,
             onDismiss = { if (!isDispatching) showDispatchDialog = false },
             onDispatch = { workflowId, ref ->
@@ -1498,8 +1506,10 @@ private fun formatDuration(startedAt: String?, updatedAt: String?): String? {
 @Composable
 private fun WorkflowDispatchDialog(
     workflows: List<GitHubApi.Workflow>,
-    defaultBranch: String?,
+    branches: List<GitHubApi.Branch>,
     isLoading: Boolean,
+    isLoadingBranches: Boolean,
+    defaultBranch: String?,
     isDispatching: Boolean,
     onDismiss: () -> Unit,
     onDispatch: (workflowId: Long, ref: String) -> Unit,
@@ -1507,8 +1517,13 @@ private fun WorkflowDispatchDialog(
     var selectedId by remember(workflows.size) {
         mutableStateOf(workflows.firstOrNull()?.id)
     }
-    var ref by remember(defaultBranch) {
-        mutableStateOf(defaultBranch ?: "main")
+    // Seed the branch picker from the repo's real branches (default first),
+    // falling back to defaultBranch / "main" if the list isn't loaded yet.
+    val branchNames = remember(branches) { branches.map { it.name } }
+    var ref by remember(branchNames, defaultBranch) {
+        mutableStateOf(
+            branchNames.firstOrNull { it == defaultBranch } ?: branchNames.firstOrNull() ?: defaultBranch ?: "main"
+        )
     }
 
     AlertDialog(
@@ -1567,13 +1582,12 @@ private fun WorkflowDispatchDialog(
                         }
                     }
                     Spacer(Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = ref,
-                        onValueChange = { ref = it },
-                        label = { Text(stringResource(R.string.workflow_dispatch_ref_label)) },
-                        singleLine = true,
+                    BranchDropdown(
+                        branchNames = branchNames,
+                        selected = ref,
                         enabled = !isDispatching,
-                        modifier = Modifier.fillMaxWidth(),
+                        isLoading = isLoadingBranches,
+                        onSelect = { ref = it },
                     )
                     Text(
                         stringResource(R.string.workflow_dispatch_ref_hint),
@@ -1601,6 +1615,52 @@ private fun WorkflowDispatchDialog(
             }
         },
     )
+}
+
+@Composable
+private fun BranchDropdown(
+    branchNames: List<String>,
+    selected: String,
+    enabled: Boolean,
+    isLoading: Boolean,
+    onSelect: (String) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        OutlinedTextField(
+            value = selected,
+            onValueChange = {},
+            readOnly = true,
+            enabled = enabled,
+            label = { Text(stringResource(R.string.workflow_dispatch_ref_label)) },
+            singleLine = true,
+            trailingIcon = {
+                if (isLoading) {
+                    CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                } else {
+                    Icon(Icons.Outlined.ArrowDropDown, contentDescription = null)
+                }
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(enabled = enabled) { expanded = true },
+        )
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            if (branchNames.isEmpty()) {
+                DropdownMenuItem(text = { Text("—") }, onClick = {})
+            } else {
+                branchNames.forEach { name ->
+                    DropdownMenuItem(
+                        text = { Text(name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        onClick = {
+                            onSelect(name)
+                            expanded = false
+                        },
+                    )
+                }
+            }
+        }
+    }
 }
 
 @Composable

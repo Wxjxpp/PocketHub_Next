@@ -141,6 +141,13 @@ class RepoDetailViewModel @Inject constructor(
     private val _dispatchMessage = MutableStateFlow<String?>(null)
     val dispatchMessage: StateFlow<String?> = _dispatchMessage.asStateFlow()
 
+    /** Branches for the repo; used by the dispatch dialog's branch picker. */
+    private val _branches = MutableStateFlow<List<GitHubApi.Branch>>(emptyList())
+    val branches: StateFlow<List<GitHubApi.Branch>> = _branches.asStateFlow()
+
+    private val _isLoadingBranches = MutableStateFlow(false)
+    val isLoadingBranches: StateFlow<Boolean> = _isLoadingBranches.asStateFlow()
+
     private val _readme = MutableStateFlow<String?>(null)
     val readme: StateFlow<String?> = _readme
 
@@ -544,6 +551,26 @@ class RepoDetailViewModel @Inject constructor(
                 _dispatchMessage.update { e.localizedMessage ?: "Failed to trigger workflow" }
             } finally {
                 _isDispatching.update { false }
+            }
+        }
+    }
+
+    /** Load branches for the given repo; called when the dispatch dialog opens. */
+    fun loadBranches(owner: String, repo: String) {
+        viewModelScope.launch {
+            if (_isLoadingBranches.value) return@launch
+            _isLoadingBranches.update { true }
+            _branches.update { emptyList() }
+            try {
+                // First page is enough — dispatch targets are usually branch names,
+                // not deep feature-branch lists. Pagination not exposed in dialog UI.
+                val resp = api.getBranches(owner, repo, perPage = 30)
+                _branches.update { resp }
+            } catch (e: Exception) {
+                issueReporter.reportError("RepoDetail", "loadBranches", e)
+                // Silent — dialog will keep falling back to defaultBranch.
+            } finally {
+                _isLoadingBranches.update { false }
             }
         }
     }
