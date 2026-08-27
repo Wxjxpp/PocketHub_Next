@@ -732,6 +732,7 @@ private fun DiscoverItemCard(
                     }
                 }
             }
+        }
 }
 
 @Composable
