@@ -83,8 +83,3 @@ private fun guessMime(fileName: String): String {
 }
 
 /** Compact human-readable byte size (used by download list + artifact cards). */
-fun humanBytes(bytes: Long): String = when {
-    bytes >= 1_048_576L -> String.format(java.util.Locale.US, "%.1f MB", bytes / 1_048_576.0)
-    bytes >= 1024L -> String.format(java.util.Locale.US, "%.1f KB", bytes / 1024.0)
-    else -> "$bytes B"
-}

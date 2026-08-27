@@ -24,11 +24,9 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Article
 import androidx.compose.material.icons.automirrored.outlined.TrendingUp
-import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.DeveloperMode
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.ForkRight
@@ -37,9 +35,6 @@ import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material.icons.outlined.RssFeed
 import androidx.compose.material.icons.outlined.Star
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -48,7 +43,6 @@ import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -66,6 +60,9 @@ import com.pockethub.data.model.FeedEvent
 import com.pockethub.data.remote.feed.CommunitySignal
 import com.pockethub.data.remote.feed.DiscoverItem
 import com.pockethub.data.remote.feed.FeedSourceOption
+import com.pockethub.ui.components.EmptyState
+import com.pockethub.ui.components.ErrorState
+import com.pockethub.ui.components.LoadingFooter
 import com.pockethub.ui.components.languageColorHex
 import com.pockethub.ui.components.parseColorHex
 
@@ -321,7 +318,7 @@ fun ExploreScreen(
                     } else if (error != null && feed.isEmpty()) {
                         item { ErrorState(message = error ?: "", onRetry = { vm.load() }) }
                     } else if (feed.isEmpty()) {
-                        item { EmptyState(stringResource(R.string.feed_empty_title), stringResource(R.string.feed_empty_subtitle)) }
+                        item { EmptyState(stringResource(R.string.feed_empty_title), stringResource(R.string.feed_empty_subtitle), icon = Icons.AutoMirrored.Outlined.Article) }
                     } else {
                         items(feed, key = { it.id }) { ev ->
                             FeedEventCard(
@@ -389,20 +386,6 @@ private fun sourceDisplayName(source: FeedSourceOption): String = when (source) 
     FeedSourceOption.GITHUB_EVENTS        -> stringResource(R.string.source_name_github_events)
 }
 
-@Composable
-private fun ErrorState(message: String, onRetry: () -> Unit) {
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(48.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Icon(Icons.Outlined.CloudOff, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(36.dp))
-        Text(stringResource(R.string.error_couldnt_load), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
-        Text(message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = androidx.compose.ui.text.style.TextAlign.Center, maxLines = 4)
-        TextButton(onClick = onRetry) { Text(stringResource(R.string.action_retry)) }
-    }
-}
-
 /** LazyColumn section listing a [DiscoverItem] collection with loading / error / empty states.
  *  [isRefreshing] is the pull-to-refresh indicator state, tracked separately so a
  *  pull-to-refresh never ALSO shows the list footer spinner (double spinner). */
@@ -423,7 +406,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.repoItems(
             ErrorState(message = error, onRetry = onRetry)
         }
         repos.isEmpty() && !isLoading -> item {
-            EmptyState(stringResource(R.string.no_repositories_found), stringResource(R.string.no_discover_items_subtitle))
+            EmptyState(stringResource(R.string.no_repositories_found), stringResource(R.string.no_discover_items_subtitle), icon = Icons.AutoMirrored.Outlined.Article)
         }
         else -> {
             items(repos, key = { it.id }) { item ->
@@ -572,22 +555,6 @@ private fun formatTimeAgo(resources: android.content.res.Resources, iso: String)
     } catch (_: Exception) { iso.take(10) }
 }
 
-
-@Composable
-private fun EmptyState(title: String, subtitle: String) {
-    com.pockethub.ui.components.EmptyStateV2(
-        icon = Icons.AutoMirrored.Outlined.Article,
-        title = title,
-        subtitle = subtitle,
-    )
-}
-
-@Composable
-private fun LoadingFooter() {
-    Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator(modifier = Modifier.size(24.dp))
-    }
-}
 
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable

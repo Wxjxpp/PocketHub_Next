@@ -2,7 +2,6 @@ package com.pockethub.ui.settings
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -27,7 +26,6 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -55,6 +53,7 @@ import com.pockethub.R
 import com.pockethub.data.remote.feed.FeedSourceConfig
 import com.pockethub.data.remote.feed.FeedSourceOption
 import com.pockethub.data.remote.feed.FeedTab
+import com.pockethub.ui.components.SectionHeader
 
 /**
  * Picks the data source backing each Explore tab and (when supported) the
@@ -136,18 +135,6 @@ fun FeedSourcesScreen(
         }
     }
 }
-
-@Composable
-private fun SectionHeader(text: String) {
-    Text(
-        text,
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.primary,
-        fontWeight = FontWeight.SemiBold,
-        modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp),
-    )
-}
-
 @Composable
 private fun SourceGroup(
     tab: FeedTab,

@@ -63,9 +63,9 @@ import com.pockethub.R
 import com.pockethub.data.remote.GitHubApi
 import java.text.DateFormat
 import java.util.Date
-import java.util.Locale
-import kotlinx.coroutines.launch
 import java.time.Duration
+import com.pockethub.util.parseIso
+import com.pockethub.util.parseIsoSafe
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -390,14 +390,6 @@ private fun stepConclusionColor(c: String?): Color {
         else -> Color(0xFF959DA5)
     }
 }
-
-private fun parseIso(iso: String): Date {
-    return parseIsoSafe(iso) ?: Date()
-}
-
-private fun parseIsoSafe(iso: String): Date? = runCatching {
-    java.util.Date.from(java.time.OffsetDateTime.parse(iso.trim().replace(" ", "T")).toInstant())
-}.getOrNull()
 
 @Composable
 private fun InfoPill(label: String, value: String) {

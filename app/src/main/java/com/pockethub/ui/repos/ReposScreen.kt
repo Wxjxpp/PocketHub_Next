@@ -1,17 +1,12 @@
 package com.pockethub.ui.repos
 
 import com.pockethub.R
-import com.pockethub.ui.components.languageColorHex
-import com.pockethub.ui.components.parseColorHex
 
 import androidx.compose.ui.res.stringResource
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -22,19 +17,15 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Code
-import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -49,13 +40,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import coil.compose.AsyncImage
-import com.pockethub.data.model.Repository
 
 private val FILTERS = listOf(
     RepoFilter.ALL, RepoFilter.OWNER, RepoFilter.MEMBER,
@@ -120,15 +106,15 @@ fun ReposScreen(
     Column(Modifier.fillMaxSize()) {
         // Tab selector
         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-            SegmentedButton(selected = tab == RepoTab.MINE, onClick = { vm.switchTab(RepoTab.MINE) },
+            SegmentedButton(selected = tab == ReposTab.MINE, onClick = { vm.switchTab(ReposTab.MINE) },
                 shape = SegmentedButtonDefaults.itemShape(0, 2), label = { Text(stringResource(R.string.tab_my_repos)) })
-            SegmentedButton(selected = tab == RepoTab.STARRED, onClick = { vm.switchTab(RepoTab.STARRED) },
+            SegmentedButton(selected = tab == ReposTab.STARRED, onClick = { vm.switchTab(ReposTab.STARRED) },
                 shape = SegmentedButtonDefaults.itemShape(1, 2), label = { Text(stringResource(R.string.tab_starred)) })
         }
 
         // Filter chips — only meaningful for "My Repos" (the starred endpoint doesn't
         // support type/visibility filters).
-        if (tab == RepoTab.MINE) {
+        if (tab == ReposTab.MINE) {
             LazyRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(FILTERS.size) { idx ->
                     FilterChip(

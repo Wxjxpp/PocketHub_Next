@@ -35,7 +35,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.pockethub.R
 import com.pockethub.data.remote.UpdateChecker
-import java.util.Locale
+import com.pockethub.util.humanBytes
 
 /**
  * In-place updater flow: prompt → download (with progress) → install, without
@@ -275,13 +275,6 @@ private fun formatPublishedDate(iso: String): String = try {
 }
 
 // Helper: display bytes with a single-decimal unit string (e.g. "8.5 MB").
-private fun humanBytes(bytes: Long): String = when {
-    bytes >= 1_073_741_824L -> String.format(Locale.US, "%.1f GB", bytes / 1_073_741_824.0)
-    bytes >= 1_048_576L -> String.format(Locale.US, "%.1f MB", bytes / 1_048_576.0)
-    bytes >= 1024L -> String.format(Locale.US, "%.1f KB", bytes / 1024.0)
-    else -> "$bytes B"
-}
-
 /** A skimmable changelog line shown in the update dialog. */
 private data class ChangeItem(
     val tag: String,

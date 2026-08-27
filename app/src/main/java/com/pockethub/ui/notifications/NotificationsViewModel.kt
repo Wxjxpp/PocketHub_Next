@@ -3,7 +3,6 @@ package com.pockethub.ui.notifications
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.pockethub.data.model.GitHubNotification
-import com.pockethub.data.model.NotificationReason
 import com.pockethub.data.remote.CachedRepository
 import com.pockethub.data.remote.GitHubApi
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -13,8 +12,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.time.OffsetDateTime
 import javax.inject.Inject
+import com.pockethub.util.parseIsoSafe
 
 /**
  * Mirrors GitHub web's three notification tabs. UNREAD pulls the default list
@@ -177,7 +176,5 @@ class NotificationsViewModel @Inject constructor(
         return updated > lastRead
     }
 
-    private fun parseIso(iso: String?): Long? = try {
-        iso?.let { OffsetDateTime.parse(it.trim().replace("Z", "+00:00")).toInstant().toEpochMilli() }
-    } catch (_: Exception) { null }
+    private fun parseIso(iso: String?): Long? = iso?.let { parseIsoSafe(it)?.time }
 }

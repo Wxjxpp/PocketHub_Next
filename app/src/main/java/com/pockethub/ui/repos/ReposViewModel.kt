@@ -14,7 +14,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-enum class RepoTab { MINE, STARRED }
+enum class ReposTab { MINE, STARRED }
 enum class RepoFilter { ALL, OWNER, MEMBER, PUBLIC, PRIVATE, FORKS }
 
 private const val PER_PAGE = 30
@@ -40,7 +40,7 @@ class ReposViewModel @Inject constructor(
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
 
-    var currentTab = MutableStateFlow(RepoTab.MINE)
+    var currentTab = MutableStateFlow(ReposTab.MINE)
     var currentFilter = MutableStateFlow(RepoFilter.ALL)
     var currentPage = 1
         private set
@@ -52,7 +52,7 @@ class ReposViewModel @Inject constructor(
         load()
     }
 
-    fun switchTab(tab: RepoTab) {
+    fun switchTab(tab: ReposTab) {
         currentTab.value = tab
         currentPage = 1
         canLoadMore = true
@@ -84,7 +84,7 @@ class ReposViewModel @Inject constructor(
             _error.update { null }
             try {
                 val result = when (currentTab.value) {
-                    RepoTab.MINE -> {
+                    ReposTab.MINE -> {
                         val filter = currentFilter.value
                         val type = when (filter) {
                             RepoFilter.OWNER -> "owner"
@@ -98,7 +98,7 @@ class ReposViewModel @Inject constructor(
                         }
                         cache.getMyRepositories(page = page, type = type, visibility = vis, forceFresh = forceFresh)
                     }
-                    RepoTab.STARRED -> cache.getStarredRepositories(page = page, forceFresh = forceFresh)
+                    ReposTab.STARRED -> cache.getStarredRepositories(page = page, forceFresh = forceFresh)
                 }
                 if (requestId != loadRequestId) return@launch
                 // Client-side filtering for filters the API can't express.

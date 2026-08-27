@@ -47,7 +47,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.pockethub.R
-import com.pockethub.data.download.humanBytes
+import com.pockethub.util.humanBytes
+import com.pockethub.util.parseIsoSafe
 import com.pockethub.data.download.openLocalFile
 import com.pockethub.data.remote.GitHubApi
 import com.pockethub.ui.repo.WorkflowRunDetailViewModel.ArtifactUi
@@ -308,11 +309,4 @@ private fun ArtifactCard(
             }
         }
     }
-}
-
-// Reuse the same ISO parsing helpers as the run screen.
-private fun parseIsoSafe(iso: String): Date? = try {
-    java.time.Instant.parse(iso).let { Date.from(it) }
-} catch (_: Exception) {
-    null
 }

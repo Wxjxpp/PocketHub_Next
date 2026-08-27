@@ -93,6 +93,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import java.text.DateFormat
+import com.pockethub.util.parseIso
 
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
@@ -1276,13 +1277,6 @@ private fun ChecksCard(
             }
         }
     }
-}
-
-/** Parse an ISO-8601 timestamp into a Date for SimpleDateFormat. */
-private fun parseIso(iso: String): java.util.Date {
-    return runCatching {
-        java.util.Date.from(java.time.OffsetDateTime.parse(iso.trim().replace(" ", "T")).toInstant())
-    }.getOrDefault(java.util.Date())
 }
 
 /**

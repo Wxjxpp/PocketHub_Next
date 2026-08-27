@@ -6,6 +6,7 @@ import java.nio.charset.Charset
 import java.util.zip.ZipInputStream
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.pockethub.util.humanBytes
 
 /**
  * Extracts a downloaded workflow-artifact zip into a directory, with the
@@ -126,11 +127,6 @@ class ArtifactExtractor @Inject constructor() {
         return n
     }
 
-    private fun humanBytes(bytes: Long): String = when {
-        bytes >= 1_048_576L -> String.format(java.util.Locale.US, "%.1f MB", bytes / 1_048_576.0)
-        bytes >= 1024L -> String.format(java.util.Locale.US, "%.1f KB", bytes / 1024.0)
-        else -> "$bytes B"
-    }
 
     private companion object {
         const val MAX_ENTRIES = 5_000
