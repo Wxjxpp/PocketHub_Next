@@ -261,16 +261,24 @@ fun SkeletonCardRow(modifier: Modifier = Modifier) {
     }
 }
 
-/** Full-screen skeleton list — the default "loading" look of the app. */
+/**
+ * Full-screen skeleton list — the default "loading" look of the app.
+ * [horizontalPadding] and [spacing] should mirror the real list's layout so
+ * the skeleton occupies exactly the same width/gaps as the loaded content.
+ */
 @Composable
 fun SkeletonList(
     modifier: Modifier = Modifier,
     rows: Int = 8,
     topPadding: Dp = 8.dp,
+    horizontalPadding: Dp = 16.dp,
+    spacing: Dp = 8.dp,
 ) {
     Column(
-        modifier.fillMaxWidth().padding(top = topPadding),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        modifier
+            .fillMaxWidth()
+            .padding(top = topPadding, start = horizontalPadding, end = horizontalPadding),
+        verticalArrangement = Arrangement.spacedBy(spacing),
     ) {
         repeat(rows) { SkeletonCardRow() }
     }

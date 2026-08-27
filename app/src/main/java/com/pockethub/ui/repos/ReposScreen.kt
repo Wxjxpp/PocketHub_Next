@@ -148,7 +148,7 @@ fun ReposScreen(
         when {
             // First-load skeleton — shimmering rows read as "fast", not stuck.
             isLoading && repos.isEmpty() ->
-                com.pockethub.ui.components.SkeletonList(Modifier.fillMaxSize(), rows = 9)
+                com.pockethub.ui.components.SkeletonList(Modifier.fillMaxSize(), rows = 9, spacing = 12.dp)
             // Error with nothing cached/stale to show.
             error != null && repos.isEmpty() ->
                 com.pockethub.ui.components.ErrorState(message = error!!, onRetry = { vm.refresh() })
