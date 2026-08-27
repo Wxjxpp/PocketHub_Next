@@ -178,9 +178,10 @@ fun RepoDetailScreen(
         vm.loadRepo(owner, repo)
         vm.resetWorkflowBranch()
     }
-    // Branch picked in the Code tab → reload README for that branch (and reset
-    // the stale translation). PR/issue lists are repo-wide by GitHub's API and
-    // intentionally do not follow the branch.
+    // When the Code tab changes branch, mirror it to the workflows tab so the
+    // workflow run list & dispatch dialog follow the current branch automatically.
+    // CodeBrowserViewModel itself doesn't need resetting here — its ref is scoped
+    // to the repo and gets cleared on navigation via the Compose nav graph.
     LaunchedEffect(owner, repo, codeBrowserRef) {
         if (repoData != null) vm.onBranchChanged(owner, repo, codeBrowserRef)
     }

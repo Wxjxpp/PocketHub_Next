@@ -55,7 +55,6 @@ class RepoDetailViewModel @Inject constructor(
     private val accountRepository: AccountRepository,
     private val issueReporter: com.pockethub.data.reporting.IssueReporter,
     private val okHttp: OkHttpClient,
-    private val codeBrowserVm: com.pockethub.ui.repo.CodeBrowserViewModel,
 ) : ViewModel() {
 
     private val _repo = MutableStateFlow<Repository?>(null)
@@ -235,11 +234,10 @@ class RepoDetailViewModel @Inject constructor(
         if (!force && loadedOwner == owner && loadedRepo == repo && _repo.value != null) return null
         loadedOwner = owner; loadedRepo = repo
         // Reset workflow branch when switching repos — the previous repo's branch
-        // has no meaning here. Code tab branch also gets reset so it refreshes
-        // with the new repo's default branch on the next LaunchedEffect run.
+        // has no meaning here. Branches list also gets cleared so the dialog
+        // doesn't show stale selections from a different repo.
         _workflowBranch.update { null }
         _branches.update { emptyList() }
-        codeBrowserVm.resetRef()
         _currentSlug = "$owner/$repo"
         return viewModelScope.launch {
             _isLoading.update { true }
@@ -331,9 +329,8 @@ class RepoDetailViewModel @Inject constructor(
         _translatedReadme.update { null }
         _showTranslated.update { false }
         loadReadme(owner, repo, ref)
-        // Mirror to workflows tab only after we've loaded the repo metadata so we
-        // can resolve the default branch. Use `repo.value` instead of the stale
-        // private field to stay consistent with the rest of this class.
+        // Mirror to workflows tab so the workflow run list & dispatch dialog follow
+        // the current Code tab branch automatically.
         val branch = ref ?: _repo.value?.defaultBranch
         if (branch != null && branch != _workflowBranch.value) {
             _workflowBranch.update { branch }
