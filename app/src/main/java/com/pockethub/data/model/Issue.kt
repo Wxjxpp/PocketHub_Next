@@ -68,13 +68,3 @@ data class Issue(
 
 /** Wrapper returned by /repos/{owner}/{repo}/issues. */
 @Serializable
-data class IssueListResponse(
-    val number: Int = 0,
-    val title: String = "",
-    val state: String = "",
-    val user: User? = null,
-    val labels: List<Issue.Label> = emptyList(),
-    @SerialName("comments") val comments: Int = 0,
-    @SerialName("created_at") val createdAt: String? = null,
-    @SerialName("updated_at") val updatedAt: String? = null,
-)

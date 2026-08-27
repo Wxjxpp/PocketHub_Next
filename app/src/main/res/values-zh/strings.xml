@@ -3,14 +3,11 @@
     <string name="app_name">PocketHub</string>
 
     <!-- Login -->
-    <string name="login_welcome">欢迎使用 PocketHub</string>
     <string name="login_subtitle">登录你的 GitHub 账号</string>
     <string name="login_with_token">使用 Token 登录</string>
     <string name="login_with_oauth">使用 GitHub 登录</string>
     <string name="login_token_hint">Personal Access Token</string>
-    <string name="login_oauth_hint">Client ID（可选）</string>
     <string name="login_description_scopes">需要拥有 repo、read:user、user:email、read:org、read:notifications 权限的 Token。</string>
-    <string name="login_get_token_prompt">在 GitHub 上创建 Personal Access Token</string>
     <string name="login_get_token_link">https://github.com/settings/tokens/new</string>
     <string name="login_get_token_link_text">创建新 Token →</string>
     <string name="login_oauth_description">通过 OAuth App 授权 PocketHub 登录，无需手动创建 Token。</string>
@@ -20,7 +17,6 @@
     <!-- Common actions -->
     <string name="action_search">搜索</string>
     <string name="action_cancel">取消</string>
-    <string name="action_sign_in">登录</string>
     <string name="action_sign_out">登出</string>
     <string name="action_retry">重试</string>
     <string name="action_dismiss">关闭</string>
@@ -39,7 +35,6 @@
     <string name="create_issue_title">提 issue</string>
     <string name="hint_issue_title">标题</string>
     <string name="hint_issue_body">正文（可选）</string>
-    <string name="issue_template_browser_title">提 issue</string>
     <string name="issue_template_picker_hint">选择模板或新建空白 issue。</string>
     <string name="issue_template_blank">空白 issue</string>
     <string name="issue_template_blank_desc">不使用模板。</string>
@@ -67,7 +62,6 @@
     <string name="download_screen_title">下载</string>
     <string name="download_tab_active">下载中</string>
     <string name="download_tab_done">已完成</string>
-    <string name="download_action_open">打开</string>
     <string name="download_action_delete">删除</string>
     <string name="download_action_retry">重试</string>
     <string name="download_action_cancel">取消</string>
@@ -83,13 +77,11 @@
     <string name="tab_starred">已加星</string>
     <string name="tab_notifications">通知</string>
     <string name="tab_profile">我</string>
-    <string name="profile_avatar_fallback">我</string>
 
     <!-- Explore -->
     <string name="section_trending">趋势</string>
     <string name="section_featured">精选</string>
     <string name="pinned_repos_title">收藏仓库</string>
-    <string name="pinned_repos_empty">收藏你常用的仓库，一键直达。</string>
     <string name="section_following">关注</string>
     <string name="trending_language_all">全部</string>
     <string name="time_range_daily">今日</string>
@@ -101,7 +93,6 @@
     <string name="feed_empty_title">暂无动态</string>
     <string name="feed_empty_subtitle">你关注的人有新活动时会显示在这里。</string>
     <string name="no_repositories_found">未找到仓库</string>
-    <string name="no_repositories_subtitle">试试其他语言或时间范围。</string>
     <string name="no_discover_items_subtitle">换个信息源、语言或时间范围，再双击发现 Tab 刷新试试。</string>
     <string name="feed_someone">某人</string>
     <string name="feed_source_label">来源：%1$s</string>
@@ -165,11 +156,9 @@
 
     <!-- Notifications -->
     <string name="tab_unread">未读</string>
-    <string name="tab_read">已读</string>
     <string name="tab_participating">参与中</string>
     <string name="tab_all">全部</string>
     <string name="no_notifications">没有通知</string>
-    <string name="cd_mark_read">标为已读</string>
 
     <!-- 通知 -->
     <string name="cd_notif_actions">通知操作</string>
@@ -193,9 +182,7 @@
 
     <!-- Profile -->
     <string name="title_profile">我</string>
-    <string name="top_repositories">热门仓库</string>
     <string name="profile_loading">加载中…</string>
-    <string name="profile_activity">最近动态</string>
     <string name="load_more_repos">加载更多</string>
     <string name="profile_no_repos_yet">还没有内容 — 加载完成后会显示在这里。</string>
     <string name="accounts">账号</string>
@@ -216,7 +203,6 @@
     <string name="cd_unstar">取消标星</string>
     <string name="cd_watch">关注</string>
     <string name="cd_unwatch">取消关注</string>
-    <string name="cd_muted">已静音</string>
     <string name="action_fork">Fork</string>
     <string name="tab_overview">概览</string>
     <string name="tab_code">代码</string>
@@ -226,15 +212,11 @@
     <string name="tab_workflows">工作流</string>
     <string name="stats_by">%1$s</string>
     <string name="stat_forks">forks</string>
-    <string name="repo_issues_header">%1$d issues</string>
     <string name="readme_title">README</string>
     <string name="readme_loading">正在加载 README…</string>
-    <string name="readme_unavailable">%1$s 暂无 README。</string>
     <string name="no_open_issues">没有开放的 issues</string>
-    <string name="no_open_pull_requests">没有开放的 pull requests</string>
     <string name="no_releases_yet">还没有 releases</string>
     <string name="no_workflow_runs">没有工作流运行记录</string>
-    <string name="workflow_run_status">#%1$d · %2$s · %3$s</string>
     <string name="workflow_run_datetime">%1$s %2$s</string>
     <string name="action_dispatch_workflow">运行工作流</string>
     <string name="action_cancel_run">取消</string>
@@ -248,8 +230,6 @@
     <string name="workflow_artifact_download_failed">下载失败</string>
     <string name="workflow_artifact_extracting">解压中…</string>
     <string name="workflow_artifact_empty_zip">空压缩包。</string>
-    <string name="workflow_runs_jobs_count">个任务</string>
-    <string name="workflow_run_steps_label">步骤</string>
     <string name="workflow_dispatch_title">手动运行工作流</string>
     <string name="workflow_dispatch_select">选择要触发的工作流</string>
     <string name="workflow_dispatch_empty">此仓库没有可用的工作流。</string>
@@ -265,7 +245,6 @@
     <string name="loading_failed">加载失败</string>
     <string name="issue_state_open">开放</string>
     <string name="issue_state_closed">已关闭</string>
-    <string name="issue_subtitle">#%1$d 由 %2$s 创建于 · %3$d 条评论</string>
     <string name="issue_meta">#%1$d · %2$d 条评论</string>
     <string name="comments_title">评论 (%1$d)</string>
     <string name="no_comments_yet">暂无评论</string>
@@ -287,7 +266,6 @@
     <string name="cd_revert_target">将 %1$s 回滚到 %2$s</string>
     <string name="cd_revert_confirm">回滚</string>
     <string name="cd_download_zip">下载仓库 ZIP</string>
-    <string name="cd_download_file">下载文件</string>
     <string name="action_download">下载</string>
     <string name="cd_send_comment">发送评论</string>
     <string name="action_edit_issue">编辑 Issue</string>
@@ -295,14 +273,11 @@
     <string name="issue_unlock_action">解锁对话</string>
     <string name="issue_edit_title">编辑 Issue</string>
     <string name="issue_labels">标签</string>
-    <string name="issue_assignees_hint">负责人</string>
-    <string name="issue_assignees_help">输入 GitHub 用户名，多个以英文逗号分隔</string>
     <string name="issue_milestone">里程碑</string>
     <string name="issue_no_milestone">不设置里程碑</string>
 
     <!-- Commits -->
     <string name="tab_commits">提交</string>
-    <string name="commit_author_subtitle">%1$s · %2$s</string>
     <string name="commit_files_changed">%1$d 个文件变更</string>
     <string name="commit_additions_deletions">+%1$d / -%2$d</string>
     <string name="commit_comments">评论 (%1$d)</string>
@@ -311,10 +286,6 @@
     <string name="commit_comment_send">评论</string>
     <string name="commit_line_comment_title">在 %1$s:%2$d 留言</string>
     <string name="commit_no_more">没有更多提交了</string>
-    <string name="commit_detail">提交详情</string>
-    <string name="commit_stats">统计</string>
-    <string name="commit_files">变更文件</string>
-    <string name="commit_message_line">%1$s</string>
 
     <!-- User detail -->
     <string name="user_repositories">仓库</string>
@@ -345,10 +316,6 @@
 
     <!-- My repos -->
     <string name="tab_my_repos">我的仓库</string>
-    <string name="repo_private">私有</string>
-    <string name="repo_forks">Forks: %1$d</string>
-    <string name="repo_issues">Issues: %1$d</string>
-    <string name="repo_updated">更新于 %1$s</string>
     <string name="repo_forked_from">fork 自 %1$s</string>
 
     <!-- 可见性切换 -->
@@ -397,7 +364,6 @@
     <string name="search_tab_issues">议题</string>
     <string name="search_results_empty">没有找到“%1$s”相关的结果</string>
     <string name="search_initial_hint">搜索仓库、用户、代码或议题</string>
-    <string name="load_failed">加载失败</string>
 
     <!-- 评论 -->
     <string name="cd_comment_actions">评论操作</string>
@@ -421,9 +387,7 @@
     <string name="theme">主题</string>
     <string name="theme_dark">深色（Linear 风格）</string>
     <string name="theme_light">浅色（Primer 风格）</string>
-    <string name="theme_system">跟随系统</string>
     <string name="app_style">风格</string>
-    <string name="app_style_default">默认（跟随主题）</string>
     <string name="style_linear_dark">Linear 暗夜</string>
     <string name="style_primer_light">Primer 明亮</string>
     <string name="style_paper">纸张阅读</string>
@@ -437,45 +401,17 @@
     <string name="system_notification_settings_summary">打开 Android 设置管理 PocketHub 通知</string>
     <string name="section_account">账号</string>
     <string name="sign_out_summary">退出当前账号并返回登录页</string>
-    <string name="section_authentication">认证</string>
     <string name="custom_oauth_client">自定义 OAuth Client</string>
     <string name="custom_oauth_client_not_configured">未配置（仅使用 PAT）</string>
     <string name="custom_oauth_client_configured">Client ID %1$s…</string>
-    <string name="section_storage">存储</string>
     <string name="clear_cache">清除缓存</string>
     <string name="clear_cache_summary">当前 %1$s</string>
     <string name="accounts_summary">已存储 %1$d 个账号</string>
     <string name="section_privacy_security">隐私与安全</string>
     <string name="section_about">关于</string>
     <string name="section_severe_issues">严重问题上报</string>
-    <string name="severe_issues_intro">本地捕获崩溃与 ANR。每隔 %1$d 天把汇总草稿暂存到你的邮箱里，无远端服务器、无遥测。</string>
-    <string name="severe_issues_collect_now">查看已收集问题</string>
-    <string name="severe_issues_collect_now_summary">本地环形缓冲区中现有 %1$d 条严重事件</string>
-    <string name="severe_issues_test_now">立即植入测试报告</string>
     <string name="severe_issues_send_now">立即发送暂存的报告</string>
-    <string name="severe_issues_send_now_summary">打开系统邮件应用，预填好最新已暂存的报告</string>
-    <string name="severe_issues_enabled">启用严重问题捕获</string>
-    <string name="severe_issues_email">目标邮箱</string>
-    <string name="severe_issues_email_hint">you@example.com</string>
-    <string name="severe_issues_mode">上报方式</string>
-    <string name="severe_issues_mode_email">邮件草稿（手动发送）</string>
-    <string name="severe_issues_mode_email_summary">暂存好邮件草稿到你的邮箱，你点一下发送。</string>
-    <string name="severe_issues_mode_github">GitHub Issue（自动）</string>
-    <string name="severe_issues_mode_github_summary">自动在目标仓库创建带标签的 Issue，无需点按。最适合搭配 AI 自动整环。</string>
-    <string name="severe_issues_target_repo">目标仓库（GitHub）</string>
-    <string name="severe_issues_target_repo_hint">owner/repo</string>
-    <string name="severe_issues_target_repo_summary">github 方式上报提交到哪里。留空时默认上报到 PocketHub 自仓库。</string>
-    <string name="severe_issues_interval">发送周期</string>
-    <string name="severe_issues_interval_1d">每天</string>
-    <string name="severe_issues_interval_3d">每 3 天</string>
-    <string name="severe_issues_interval_7d">每周</string>
-    <string name="severe_issues_test_injected">已植入测试事件 — 点击"立即发送暂存的报告"即可看到邮件草稿。</string>
-    <string name="severe_issues_no_staged_report">尚未暂存报告。请先点"立即植入测试报告"。</string>
-    <string name="severe_issues_staging_now">正在暂存…</string>
-    <string name="severe_issues_status_normal">未检测到严重问题；环形缓冲区为空。</string>
-    <string name="token_storage">Token 存储</string>
     <string name="token_storage_summary">Token 存储在本机应用私有的 Room 数据库中，除直接调用 GitHub 外不会离开本机。</string>
-    <string name="analytics_telemetry">分析与遥测</string>
     <string name="analytics_telemetry_summary">PocketHub 不收集任何使用数据。</string>
     <string name="about_pockethub">关于 PocketHub</string>
     <string name="about_description">一款精心打造的 Android 开源 GitHub 客户端。</string>
@@ -499,7 +435,6 @@
     <string name="notification_cadence_min">每 %1$d 分钟</string>
 
     <!-- Translation -->
-    <string name="section_translation">翻译</string>
     <string name="translate_readme">README 翻译</string>
     <string name="translate_off">关闭</string>
     <string name="translate_to_chinese">翻译为简体中文</string>
@@ -554,14 +489,6 @@
     <string name="pr_review_already">已 Review</string>
     <string name="pr_changes_requested_warning">%1$d 位审阅者请求修改</string>
     <string name="pr_merge_warning_title">审阅者请求了修改</string>
-    <string name="pr_inline_reply_hint">回复…</string>
-    <string name="pr_inline_reply">回复</string>
-    <string name="pr_inline_resolve">标记已解决</string>
-    <string name="pr_inline_unresolve">取消已解决</string>
-    <string name="pr_inline_resolved_tag">已解决</string>
-    <string name="pr_inline_edit">编辑</string>
-    <string name="pr_inline_delete">删除</string>
-    <string name="pr_inline_more">更多</string>
     <string name="pr_inline_edit_title">编辑评论</string>
     <string name="action_merge">合并</string>
     <string name="pr_merge_title">合并 Pull Request</string>
@@ -569,13 +496,8 @@
     <string name="pr_merge_method_merge">创建合并提交</string>
     <string name="pr_merge_method_squash">压缩合并</string>
     <string name="pr_merge_method_rebase">变基合并</string>
-    <string name="pr_review_approve_title">批准更改</string>
-    <string name="pr_review_request_changes_title">请求修改</string>
-    <string name="pr_review_comment_hint">留下 Review 评论…</string>
 
     <!-- Code viewer -->
-    <string name="code_lines">%1$d 行</string>
-    <string name="code_file_size">%1$s · %2$d 行</string>
 
     <!-- Repo delete -->
     <string name="delete_repo_action">删除仓库</string>
@@ -611,7 +533,6 @@
     <!-- 用户关注 -->
     <string name="action_follow">关注</string>
     <string name="action_unfollow">取消关注</string>
-    <string name="user_not_found">用户不存在</string>
     <string name="no_followers">还没有粉丝</string>
     <string name="not_following_anyone">还没有关注任何人</string>
 

@@ -85,7 +85,7 @@ fun IssueEventRow(
 }
 
 /** Map an [GitHubApi.IssueEvent] to (icon, message). */
-fun describeEvent(event: GitHubApi.IssueEvent): Pair<ImageVector, String> {
+private fun describeEvent(event: GitHubApi.IssueEvent): Pair<ImageVector, String> {
     val actor = event.actor?.login ?: "someone"
     return when (event.event) {
         "labeled" -> Icons.Outlined.Label to "$actor added the ${event.label?.name.orEmpty()} label"
@@ -109,7 +109,7 @@ fun describeEvent(event: GitHubApi.IssueEvent): Pair<ImageVector, String> {
 }
 
 /** Short, locale-neutral "2h ago" / "3d ago" style label parsed from an ISO-8601 timestamp. */
-fun formatRelativeShort(iso: String): String {
+private fun formatRelativeShort(iso: String): String {
     return try {
         val instant = java.time.OffsetDateTime.parse(iso).toInstant()
         val mins = java.time.Duration.between(instant, java.time.Instant.now()).toMinutes()

@@ -29,7 +29,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -52,7 +51,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.ImageLoader
 import coil.compose.AsyncImage
 import coil.compose.SubcomposeAsyncImage
 import com.pockethub.ui.LocalAppImageLoader
@@ -111,7 +109,7 @@ enum class LinkKind {
 /**
  * Classify an absolute URL into a [LinkKind]. URL is assumed already absolute (http/https).
  */
-fun classifyLink(url: String): LinkKind {
+private fun classifyLink(url: String): LinkKind {
     val u = url.lowercase()
     if (u.startsWith("https://github.com/") || u.startsWith("http://github.com/")) {
         val path = u.substringAfter("github.com/", "").removePrefix("/").trimEnd('/')

@@ -52,7 +52,7 @@ class HistoryRepository @Inject constructor(
 }
 
 @Serializable
-data class HistoryEntry(
+private data class HistoryEntry(
     val owner: String,
     val repo: String,
     val visitedAt: Long,

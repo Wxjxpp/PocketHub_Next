@@ -1,7 +1,6 @@
 package com.pockethub.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.EaseOutBack
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -13,7 +12,6 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
-import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -25,7 +23,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -39,13 +36,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -60,7 +54,7 @@ import androidx.compose.ui.unit.dp
  * PocketHub motion tokens. One place to keep every animation consistent:
  * springs for interactions (press / selection), tweens for entrances.
  */
-object Motion {
+private object Motion {
     /** Interactive press / toggle springs — snappy with a slight bounce. */
     fun press() = spring<Float>(dampingRatio = 0.55f, stiffness = Spring.StiffnessMediumLow)
     fun settle() = spring<Float>(dampingRatio = 0.9f, stiffness = Spring.StiffnessMedium)
@@ -167,25 +161,6 @@ fun PhCard(
 }
 
 /** Soft circular icon plate used in cards, empty states and headers. */
-@Composable
-fun IconPlate(
-    icon: ImageVector,
-    modifier: Modifier = Modifier,
-    size: Dp = 40.dp,
-    container: Color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
-    tint: Color = MaterialTheme.colorScheme.primary,
-    cornerRadius: Dp = 14.dp,
-) {
-    Box(
-        modifier
-            .size(size)
-            .clip(RoundedCornerShape(cornerRadius))
-            .background(container),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(size * 0.5f))
-    }
-}
 
 /**
  * Staggered entrance: fades + slides an item up as it first composes. Give each
@@ -247,7 +222,7 @@ fun SkeletonBox(
 
 /** One skeleton list row that mirrors the redesigned card layout. */
 @Composable
-fun SkeletonCardRow(modifier: Modifier = Modifier) {
+private fun SkeletonCardRow(modifier: Modifier = Modifier) {
     PhCard(modifier.fillMaxWidth()) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             SkeletonBox(Modifier.size(44.dp), shape = CircleShape)
@@ -287,30 +262,8 @@ fun SkeletonList(
 // ── Small functional atoms ───────────────────────────────────────────────────
 
 /** Rounded count/tag pill (stars, forks, unread…). */
-@Composable
-fun CountPill(
-    text: String,
-    modifier: Modifier = Modifier,
-    icon: ImageVector? = null,
-    container: Color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
-    content: Color = MaterialTheme.colorScheme.onSurfaceVariant,
-) {
-    Row(
-        modifier
-            .clip(RoundedCornerShape(999.dp))
-            .background(container)
-            .padding(horizontal = 8.dp, vertical = 3.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        if (icon != null) Icon(icon, null, tint = content, modifier = Modifier.size(12.dp))
-        Text(text, style = MaterialTheme.typography.labelSmall, color = content)
-    }
-}
 
 /** Colored language dot with its name. */
-@Composable
-fun LanguageDot(name: String, color: Color?, modifier: Modifier = Modifier) {
     if (name.isBlank()) return
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         Box(
@@ -391,8 +344,6 @@ fun EmptyStateV2(
 }
 
 /** Section header with an accent tick — consistent section titles app-wide. */
-@Composable
-fun SectionTitle(text: String, modifier: Modifier = Modifier, trailing: (@Composable () -> Unit)? = null) {
     Row(
         modifier.fillMaxWidth().padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,

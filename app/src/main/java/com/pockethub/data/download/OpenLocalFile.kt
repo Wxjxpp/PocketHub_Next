@@ -62,7 +62,7 @@ fun openLocalFile(context: Context, file: File): Boolean {
     return started
 }
 
-fun guessMime(fileName: String): String {
+private fun guessMime(fileName: String): String {
     val map = mapOf(
         "zip" to "application/zip",
         "tar" to "application/x-tar",

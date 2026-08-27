@@ -26,7 +26,7 @@ import androidx.core.view.WindowCompat
 enum class ThemeMode { System, Dark, Light }
 
 /** Complete visual definition of one style: palette + typography + shapes + tokens. */
-data class AppStyleDef(
+private data class AppStyleDef(
     val style: AppStyle,
     val isDark: Boolean,
     val colors: ColorScheme,
@@ -195,7 +195,7 @@ fun styleDef(style: AppStyle): AppStyleDef = when (style) {
 }
 
 /** Resolve the active style: explicit override wins, else map from legacy [mode]. */
-fun resolveStyle(styleOverride: AppStyle?, mode: ThemeMode, systemDark: Boolean): AppStyle =
+private fun resolveStyle(styleOverride: AppStyle?, mode: ThemeMode, systemDark: Boolean): AppStyle =
     styleOverride ?: when (mode) {
         ThemeMode.Dark -> AppStyle.LinearDark
         ThemeMode.Light -> AppStyle.PrimerLight

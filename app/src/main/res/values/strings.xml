@@ -3,14 +3,11 @@
     <string name="app_name">PocketHub</string>
 
     <!-- Login -->
-    <string name="login_welcome">Welcome to PocketHub</string>
     <string name="login_subtitle">Sign in to your GitHub account</string>
     <string name="login_with_token">Sign in with Token</string>
     <string name="login_with_oauth">Sign in with GitHub</string>
     <string name="login_token_hint">Personal Access Token</string>
-    <string name="login_oauth_hint">Client ID (optional)</string>
     <string name="login_description_scopes">A token with repo, read:user, user:email, read:org, read:notifications scopes is required.</string>
-    <string name="login_get_token_prompt">Create a Personal Access Token on GitHub</string>
     <string name="login_get_token_link">https://github.com/settings/tokens/new</string>
     <string name="login_get_token_link_text">Create a new token →</string>
     <string name="login_oauth_description">Authorize PocketHub as an OAuth App to sign in without creating a token.</string>
@@ -20,7 +17,6 @@
     <!-- Common actions -->
     <string name="action_search">Search</string>
     <string name="action_cancel">Cancel</string>
-    <string name="action_sign_in">Sign in</string>
     <string name="action_sign_out">Sign out</string>
     <string name="action_retry">Retry</string>
     <string name="action_dismiss">Dismiss</string>
@@ -62,7 +58,6 @@
     <string name="create_issue_title">New issue</string>
     <string name="hint_issue_title">Title</string>
     <string name="hint_issue_body">Body (optional)</string>
-    <string name="issue_template_browser_title">New issue</string>
     <string name="issue_template_picker_hint">Pick a template to get started, or open a blank issue.</string>
     <string name="issue_template_blank">Blank issue</string>
     <string name="issue_template_blank_desc">Open a plain issue without a template.</string>
@@ -90,7 +85,6 @@
     <string name="download_screen_title">Downloads</string>
     <string name="download_tab_active">In progress</string>
     <string name="download_tab_done">Completed</string>
-    <string name="download_action_open">Open</string>
     <string name="download_action_delete">Delete</string>
     <string name="download_action_retry">Retry</string>
     <string name="download_action_cancel">Cancel</string>
@@ -105,13 +99,11 @@
     <string name="tab_repos">Repos</string>
     <string name="tab_notifications">Notifications</string>
     <string name="tab_profile">Me</string>
-    <string name="profile_avatar_fallback">ME</string>
 
     <!-- Explore -->
     <string name="section_trending">Trending</string>
     <string name="section_featured">Featured</string>
     <string name="pinned_repos_title">Pinned Repositories</string>
-    <string name="pinned_repos_empty">Pin your favorite repos to keep them one tap away.</string>
     <string name="section_following">Following</string>
     <string name="trending_language_all">All</string>
     <string name="time_range_daily">Daily</string>
@@ -123,7 +115,6 @@
     <string name="feed_empty_title">Your feed is quiet</string>
     <string name="feed_empty_subtitle">Activity from people you follow will appear here.</string>
     <string name="no_repositories_found">No repositories found</string>
-    <string name="no_repositories_subtitle">Try a different language or time window.</string>
     <string name="no_discover_items_subtitle">Pick a different source, language or time window, then double-tap the Explore tab to refresh.</string>
     <string name="feed_someone">someone</string>
     <string name="feed_source_label">Source: %1$s</string>
@@ -187,11 +178,9 @@
 
     <!-- Notifications -->
     <string name="tab_unread">Unread</string>
-    <string name="tab_read">Read</string>
     <string name="tab_participating">Participating</string>
     <string name="tab_all">All</string>
     <string name="no_notifications">No notifications</string>
-    <string name="cd_mark_read">Mark read</string>
 
     <!-- Notifications -->
     <string name="cd_notif_actions">Notification actions</string>
@@ -215,9 +204,7 @@
 
     <!-- Profile -->
     <string name="title_profile">Me</string>
-    <string name="top_repositories">Top repositories</string>
     <string name="profile_loading">Loading…</string>
-    <string name="profile_activity">Recent Activity</string>
     <string name="load_more_repos">Load more</string>
     <string name="profile_no_repos_yet">Nothing yet — repositories will appear here once they\'re loaded.</string>
     <string name="accounts">Accounts</string>
@@ -238,7 +225,6 @@
     <string name="cd_unstar">Unstar</string>
     <string name="cd_watch">Watch</string>
     <string name="cd_unwatch">Unwatch</string>
-    <string name="cd_muted">Muted</string>
     <string name="action_fork">Fork</string>
     <string name="tab_overview">Overview</string>
     <string name="tab_code">Code</string>
@@ -248,15 +234,11 @@
     <string name="tab_workflows">Workflows</string>
     <string name="stats_by">by %1$s</string>
     <string name="stat_forks">forks</string>
-    <string name="repo_issues_header">%1$d issues</string>
     <string name="readme_title">README</string>
     <string name="readme_loading">Loading README…</string>
-    <string name="readme_unavailable">No README available for %1$s.</string>
     <string name="no_open_issues">No open issues</string>
-    <string name="no_open_pull_requests">No open pull requests</string>
     <string name="no_releases_yet">No releases yet</string>
     <string name="no_workflow_runs">No workflow runs</string>
-    <string name="workflow_run_status">#%1$d · %2$s · %3$s</string>
     <string name="workflow_run_datetime">%1$s, %2$s</string>
     <string name="action_dispatch_workflow">Run workflow</string>
     <string name="action_cancel_run">Cancel</string>
@@ -270,8 +252,6 @@
     <string name="workflow_artifact_download_failed">Download failed</string>
     <string name="workflow_artifact_extracting">Extracting…</string>
     <string name="workflow_artifact_empty_zip">Empty archive.</string>
-    <string name="workflow_runs_jobs_count">jobs</string>
-    <string name="workflow_run_steps_label">Steps</string>
     <string name="workflow_dispatch_title">Run a workflow</string>
     <string name="workflow_dispatch_select">Select a workflow to trigger</string>
     <string name="workflow_dispatch_empty">No active workflows in this repository.</string>
@@ -287,7 +267,6 @@
     <string name="loading_failed">Failed to load</string>
     <string name="issue_state_open">Open</string>
     <string name="issue_state_closed">Closed</string>
-    <string name="issue_subtitle">#%1$d opened by %2$s · %3$d comments</string>
     <string name="issue_meta">#%1$d · %2$d comments</string>
     <string name="comments_title">Comments (%1$d)</string>
     <string name="no_comments_yet">No comments yet</string>
@@ -310,7 +289,6 @@
     <string name="cd_revert_confirm">Roll back</string>
     <string name="cd_revert_success">Rolled back to parent commit</string>
     <string name="cd_download_zip">Download repository ZIP</string>
-    <string name="cd_download_file">Download file</string>
     <string name="action_download">Download</string>
     <string name="cd_send_comment">Send comment</string>
     <string name="action_edit_issue">Edit issue</string>
@@ -318,14 +296,11 @@
     <string name="issue_unlock_action">Unlock conversation</string>
     <string name="issue_edit_title">Edit issue</string>
     <string name="issue_labels">Labels</string>
-    <string name="issue_assignees_hint">Assignees</string>
-    <string name="issue_assignees_help">GitHub usernames, separated by commas</string>
     <string name="issue_milestone">Milestone</string>
     <string name="issue_no_milestone">No milestone</string>
 
     <!-- Commits -->
     <string name="tab_commits">Commits</string>
-    <string name="commit_author_subtitle">%1$s · %2$s</string>
     <string name="commit_files_changed">%1$d files changed</string>
     <string name="commit_additions_deletions">+%1$d / -%2$d</string>
     <string name="commit_comments">Comments (%1$d)</string>
@@ -334,10 +309,6 @@
     <string name="commit_comment_send">Comment</string>
     <string name="commit_line_comment_title">Comment on %1$s:%2$d</string>
     <string name="commit_no_more">No more commits</string>
-    <string name="commit_detail">Commit Detail</string>
-    <string name="commit_stats">Stats</string>
-    <string name="commit_files">Files changed</string>
-    <string name="commit_message_line">%1$s</string>
 
     <!-- User detail -->
     <string name="user_repositories">Repositories</string>
@@ -369,10 +340,6 @@
     <!-- My repos -->
     <string name="tab_my_repos">My Repos</string>
     <string name="tab_starred">Starred</string>
-    <string name="repo_private">Private</string>
-    <string name="repo_forks">Forks: %1$d</string>
-    <string name="repo_issues">Issues: %1$d</string>
-    <string name="repo_updated">Updated %1$s</string>
     <string name="repo_forked_from">forked from %1$s</string>
 
     <!-- Visibility toggle -->
@@ -421,7 +388,6 @@
     <string name="search_tab_issues">Issues</string>
     <string name="search_results_empty">No results for "%1$s"</string>
     <string name="search_initial_hint">Search repositories, users, code or issues</string>
-    <string name="load_failed">Load failed</string>
 
     <!-- Comments -->
     <string name="cd_comment_actions">Comment actions</string>
@@ -445,9 +411,7 @@
     <string name="theme">Theme</string>
     <string name="theme_dark">Dark (Linear-inspired)</string>
     <string name="theme_light">Light (Primer-inspired)</string>
-    <string name="theme_system">Follow system</string>
     <string name="app_style">Style</string>
-    <string name="app_style_default">Default (follows theme)</string>
     <string name="style_linear_dark">Linear Dark</string>
     <string name="style_primer_light">Primer Light</string>
     <string name="style_paper">Paper</string>
@@ -461,45 +425,17 @@
     <string name="system_notification_settings_summary">Open Android settings to manage PocketHub notifications</string>
     <string name="section_account">Account</string>
     <string name="sign_out_summary">Sign out of the current account and return to login</string>
-    <string name="section_authentication">Authentication</string>
     <string name="custom_oauth_client">Custom OAuth Client</string>
     <string name="custom_oauth_client_not_configured">Not configured (using PAT-only)</string>
     <string name="custom_oauth_client_configured">Client ID %1$s…</string>
-    <string name="section_storage">Storage</string>
     <string name="clear_cache">Clear cache</string>
     <string name="clear_cache_summary">Currently %1$s</string>
     <string name="accounts_summary">%1$d account(s) stored</string>
     <string name="section_privacy_security">Privacy &amp; Security</string>
     <string name="section_about">About</string>
     <string name="section_severe_issues">Severe-issue reporting</string>
-    <string name="severe_issues_intro">Capture crashes and ANRs locally. When %1$d day(s) elapse, a summary email is staged to your inbox — no remote server, no telemetry.</string>
-    <string name="severe_issues_collect_now">Inspect collected issues</string>
-    <string name="severe_issues_collect_now_summary">%1$d severe issue(s) currently in the local ring buffer</string>
-    <string name="severe_issues_test_now">Stage test report now</string>
     <string name="severe_issues_send_now">Send staged report now</string>
-    <string name="severe_issues_send_now_summary">Open your mail composer with the latest staged report pre-filled</string>
-    <string name="severe_issues_enabled">Enable severe-issue capture</string>
-    <string name="severe_issues_email">Destination email</string>
-    <string name="severe_issues_email_hint">you@example.com</string>
-    <string name="severe_issues_mode">Delivery mode</string>
-    <string name="severe_issues_mode_email">Email draft (manual send)</string>
-    <string name="severe_issues_mode_email_summary">Stages a mail composer draft to your inbox; you hit send.</string>
-    <string name="severe_issues_mode_github">GitHub issue (auto)</string>
-    <string name="severe_issues_mode_github_summary">Creates a labelled issue on the target repo automatically — no tap needed. Best for the AI-audit loop.</string>
-    <string name="severe_issues_target_repo">Target repo (GitHub)</string>
-    <string name="severe_issues_target_repo_hint">owner/repo</string>
-    <string name="severe_issues_target_repo_summary">Where github-mode reports are filed. Auto-defaults to the PocketHub self repo if blank.</string>
-    <string name="severe_issues_interval">Cadence</string>
-    <string name="severe_issues_interval_1d">Every day</string>
-    <string name="severe_issues_interval_3d">Every 3 days</string>
-    <string name="severe_issues_interval_7d">Every week</string>
-    <string name="severe_issues_test_injected">A test event was recorded — tap "Send staged report" to email it.</string>
-    <string name="severe_issues_no_staged_report">No staged report yet. Tap "Stage test report" first.</string>
-    <string name="severe_issues_staging_now">Staging…</string>
-    <string name="severe_issues_status_normal">No severe issues detected; ring buffer empty.</string>
-    <string name="token_storage">Token storage</string>
     <string name="token_storage_summary">Tokens are stored in this device\'s app-private Room database. They never leave this device except when calling GitHub directly.</string>
-    <string name="analytics_telemetry">Analytics &amp; telemetry</string>
     <string name="analytics_telemetry_summary">PocketHub does not collect any usage analytics.</string>
     <string name="about_pockethub">About PocketHub</string>
     <string name="about_description">A well-crafted open-source GitHub client for Android.</string>
@@ -523,7 +459,6 @@
     <string name="notification_cadence_min">Every %1$d minutes</string>
 
     <!-- Translation -->
-    <string name="section_translation">Translation</string>
     <string name="translate_readme">README translation</string>
     <string name="translate_off">Off</string>
     <string name="translate_to_chinese">Translate to 简体中文</string>
@@ -578,14 +513,6 @@
     <string name="pr_review_already">Reviewed</string>
     <string name="pr_changes_requested_warning">%1$d reviewer(s) requested changes</string>
     <string name="pr_merge_warning_title">Reviewers requested changes</string>
-    <string name="pr_inline_reply_hint">Reply…</string>
-    <string name="pr_inline_reply">Reply</string>
-    <string name="pr_inline_resolve">Resolve</string>
-    <string name="pr_inline_unresolve">Unresolve</string>
-    <string name="pr_inline_resolved_tag">Resolved</string>
-    <string name="pr_inline_edit">Edit</string>
-    <string name="pr_inline_delete">Delete</string>
-    <string name="pr_inline_more">More</string>
     <string name="pr_inline_edit_title">Edit comment</string>
     <string name="action_merge">Merge</string>
     <string name="pr_merge_title">Merge Pull Request</string>
@@ -593,13 +520,8 @@
     <string name="pr_merge_method_merge">Merge commit</string>
     <string name="pr_merge_method_squash">Squash and merge</string>
     <string name="pr_merge_method_rebase">Rebase and merge</string>
-    <string name="pr_review_approve_title">Approve changes</string>
-    <string name="pr_review_request_changes_title">Request changes</string>
-    <string name="pr_review_comment_hint">Leave a review comment…</string>
 
     <!-- Code viewer -->
-    <string name="code_lines">%1$d lines</string>
-    <string name="code_file_size">%1$s · %2$d lines</string>
 
     <!-- Repo delete -->
     <string name="delete_repo_action">Delete repository</string>
@@ -635,7 +557,6 @@
     <!-- User follow -->
     <string name="action_follow">Follow</string>
     <string name="action_unfollow">Unfollow</string>
-    <string name="user_not_found">User not found</string>
     <string name="no_followers">No followers yet</string>
     <string name="not_following_anyone">Not following anyone yet</string>
 
