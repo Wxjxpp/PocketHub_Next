@@ -30,10 +30,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.pockethub.R
 
-/** Full-screen loading = skeleton list with shimmering rows (perceived speed). */
-    SkeletonList(modifier.fillMaxSize(), rows = 9)
-}
-
 /** Compact footer spinner shown while appending a page. */
 @Composable
 fun LoadingFooter(modifier: Modifier = Modifier) {
