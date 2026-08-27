@@ -31,6 +31,29 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
+ * Adaptive column count for a content grid, based on the available width.
+ * Phones (~<600dp) stay single-column; tablets / landscape get 2 columns and
+ * large screens 3. Works with LazyVerticalGrid via GridCells.Fixed(columns).
+ */
+fun adaptiveColumnCount(maxWidth: Dp): Int = when {
+    maxWidth >= 840.dp -> 3
+    maxWidth >= 600.dp -> 2
+    else -> 1
+}
+
+/** Adaptive grid cells: single column on phones, multi-column on larger widths. */
+@Composable
+fun adaptiveGridCells(contentWidth: Dp = 0.dp): androidx.compose.foundation.lazy.grid.GridCells {
+    // If caller doesn't pass a measured width, fall back to a floor-based
+    // Adaptive cell size so cards never get absurdly wide.
+    return if (contentWidth > 0.dp) {
+        androidx.compose.foundation.lazy.grid.GridCells.Fixed(adaptiveColumnCount(contentWidth))
+    } else {
+        androidx.compose.foundation.lazy.grid.GridCells.Adaptive(minSize = 320.dp)
+    }
+}
+
+/**
  * Enhanced card with elevation, subtle gradient, and press animation.
  * Provides a more premium visual feel compared to plain Surface.
  */

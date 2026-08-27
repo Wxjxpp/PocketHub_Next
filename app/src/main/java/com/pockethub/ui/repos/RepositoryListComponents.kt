@@ -30,7 +30,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import com.pockethub.R
 import com.pockethub.data.model.Repository
 import com.pockethub.ui.components.EnhancedCard
 import com.pockethub.ui.components.languageColorHex
@@ -41,11 +40,11 @@ internal fun RepositoryRow(
     repo: Repository,
     onOpen: () -> Unit,
     onOpenOwner: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     EnhancedCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp),
+        modifier = modifier
+            .fillMaxWidth(),
         onClick = onOpen,
         elevation = 2.dp,
         cornerRadius = 16.dp,
@@ -207,7 +206,3 @@ private fun formatCount(count: Int): String = when {
     count >= 1000 -> "%.1fk".format(count / 1000.0)
     else -> count.toString()
 }
-
-@Composable
-private fun stringResourceCompat(id: Int, vararg formatArgs: Any): String =
-    androidx.compose.ui.res.stringResource(id, *formatArgs)

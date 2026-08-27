@@ -19,10 +19,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.LazyGridState
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Star
@@ -81,7 +85,7 @@ fun ReposScreen(
     val error by vm.error.collectAsState()
     val tab by vm.currentTab.collectAsState()
     val filter by vm.currentFilter.collectAsState()
-    val listState = rememberLazyListState()
+    val listState = rememberLazyGridState()
 
     // ReposScreen is disposed when the user leaves the Repos tab and recomposed
     // on return (HomeScreen uses `when(selectedTab)` to switch content).  A fresh
@@ -150,29 +154,42 @@ fun ReposScreen(
             repos.isEmpty() ->
                 com.pockethub.ui.components.EmptyState(title = stringResource(R.string.no_repositories_found))
             else -> {
-                    LazyColumn(state = listState, modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(repos, key = { it.id }) { repo ->
-                    RepositoryRow(
-                        repo = repo,
-                        onOpen = { onNavigateToRepo(repo.owner.login, repo.name) },
-                        onOpenOwner = { onNavigateToUser(repo.owner.login) },
-                    )
-                }
-                // Inline error banner when a page/refresh failed but stale data is visible.
-                if (error != null) {
-                    item(key = "error-banner") {
-                        Text(
-                            text = error!!,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                        )
+                    // Responsive grid: single column on phones, multi-column on tablets.
+                    // BoxWithConstraints measures available width to pick column count.
+                    BoxWithConstraints(Modifier.fillMaxSize()) {
+                        val columns = com.pockethub.ui.components.adaptiveColumnCount(maxWidth)
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(columns),
+                            state = listState,
+                            modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            items(repos.size, key = { repos[it].id }) { index ->
+                                val repo = repos[index]
+                                RepositoryRow(
+                                    repo = repo,
+                                    onOpen = { onNavigateToRepo(repo.owner.login, repo.name) },
+                                    onOpenOwner = { onNavigateToUser(repo.owner.login) },
+                                    modifier = Modifier.animateItem(),
+                                )
+                            }
+                            // Inline error banner when a page/refresh failed but stale data is visible.
+                            if (error != null) {
+                                item(key = "error-banner", span = { GridItemSpan(maxLineSpan) }) {
+                                    Text(
+                                        text = error!!,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                                    )
+                                }
+                            }
+                            if (isLoading) {
+                                item(key = "loading-footer", span = { GridItemSpan(maxLineSpan) }) { Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
+                            }
+                        }
                     }
-                }
-                if (isLoading) {
-                    item(key = "loading-footer") { Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
-                }
-                    } // LazyColumn close
             }
         }
     }

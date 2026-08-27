@@ -325,7 +325,14 @@ fun ExploreScreen(
                     } else if (feed.isEmpty()) {
                         item { EmptyState(stringResource(R.string.feed_empty_title), stringResource(R.string.feed_empty_subtitle)) }
                     } else {
-                        items(feed, key = { it.id }) { ev -> FeedEventCard(ev, onNavigateToRepo = onNavigateToRepo, onNavigateToUser = onNavigateToUser) }
+                        items(feed, key = { it.id }) { ev ->
+                            FeedEventCard(
+                                ev,
+                                onNavigateToRepo = onNavigateToRepo,
+                                onNavigateToUser = onNavigateToUser,
+                                modifier = Modifier.animateItem(),
+                            )
+                        }
                     }
                     // The following feed has no pagination: any non-empty reload is a
                     // pull-to-refresh, whose indicator is already at the top. A footer
@@ -428,6 +435,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.repoItems(
                     item = item,
                     onClick = { onNavigateToRepo(item.owner, item.repo) },
                     onNavigateToUser = onNavigateToUser,
+                    modifier = Modifier.animateItem(),
                 )
             }
             item { Spacer(Modifier.height(16.dp)) }
@@ -443,6 +451,7 @@ private fun FeedEventCard(
     ev: FeedEvent,
     onNavigateToRepo: (String, String) -> Unit,
     onNavigateToUser: (String) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val repoName = ev.repo?.name
     val ownerLogin = repoName?.substringBefore('/', "")?.ifEmpty { null }
@@ -450,18 +459,21 @@ private fun FeedEventCard(
 
     val (verb, secondary) = describeFeedEvent(ev)
 
-    val base = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
-    val modifier = if (ownerLogin != null && repoShort != null) {
+    val base = modifier.fillMaxWidth().padding(horizontal = 16.dp)
+    val mod = if (ownerLogin != null && repoShort != null) {
         base.clickable { onNavigateToRepo(ownerLogin, repoShort) }
     } else base
 
-    Card(
-        modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+    com.pockethub.ui.components.EnhancedCard(
+        modifier = mod,
+        onClick = if (ownerLogin != null && repoShort != null) {
+            { onNavigateToRepo(ownerLogin, repoShort) }
+        } else null,
+        elevation = 2.dp,
+        cornerRadius = 14.dp,
+        gradientIntensity = 0.05f,
     ) {
-        Column(Modifier.padding(14.dp)) {
+        Column {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 ev.actor?.avatarUrl?.let { url ->
                     AsyncImage(
@@ -591,17 +603,17 @@ private fun DiscoverItemCard(
     item: DiscoverItem,
     onClick: () -> Unit,
     onNavigateToUser: (String) -> Unit = {},
+    modifier: Modifier = Modifier,
 ) {
-    Card(
-        modifier = Modifier
+    com.pockethub.ui.components.EnhancedCard(
+        modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+            .padding(horizontal = 16.dp),
+        onClick = onClick,
+        elevation = 2.dp,
+        cornerRadius = 16.dp,
+        gradientIntensity = 0.06f,
     ) {
-        Column(Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 val avatar = item.ownerAvatarUrl
                 if (!avatar.isNullOrBlank()) {
@@ -720,8 +732,6 @@ private fun DiscoverItemCard(
                     }
                 }
             }
-        }
-    }
 }
 
 @Composable
@@ -777,34 +787,35 @@ private fun PinnedRepoCard(
     val parts = slug.split("/", limit = 2)
     val owner = parts.getOrNull(0).orEmpty()
     val repo = parts.getOrNull(1).orEmpty()
-    Card(
+    com.pockethub.ui.components.EnhancedCard(
         onClick = onClick,
         modifier = Modifier.widthIn(min = 180.dp, max = 200.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        elevation = 3.dp,
+        cornerRadius = 16.dp,
+        gradientIntensity = 0.10f,
     ) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    Icons.Outlined.PushPin,
-                    null,
-                    modifier = Modifier.size(14.dp),
-                    tint = MaterialTheme.colorScheme.primary,
-                )
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    repo,
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                Icons.Outlined.PushPin,
+                null,
+                modifier = Modifier.size(14.dp),
+                tint = MaterialTheme.colorScheme.primary,
+            )
+            Spacer(Modifier.width(6.dp))
             Text(
-                owner,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                repo,
+                style = MaterialTheme.typography.titleSmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            owner,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
