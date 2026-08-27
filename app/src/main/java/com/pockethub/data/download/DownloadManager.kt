@@ -4,7 +4,6 @@ import android.content.Context
 import android.os.Environment
 import com.pockethub.data.local.DownloadDao
 import com.pockethub.data.local.DownloadEntity
-import com.pockethub.data.remote.AuthInterceptor
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -29,7 +28,6 @@ class DownloadManager @Inject constructor(
     @ApplicationContext private val appContext: Context,
     private val client: OkHttpClient,
     private val dao: DownloadDao,
-    private val authInterceptor: AuthInterceptor,
 ) {
 
     data class EnqueueRequest(
@@ -160,14 +158,7 @@ class DownloadManager @Inject constructor(
         val job = scope.launch(start = CoroutineStart.LAZY) {
             try {
                 val request = Request.Builder().url(url).build()
-                // Preserve AuthInterceptor so redirects to Azure Blob Storage
-                // (GitHub artifact download URLs are 302→S3) still carry the
-                // Bearer token — otherwise the blob server returns 401.
-                val call = client.newBuilder()
-                    .followRedirects(true)
-                    .addInterceptor(authInterceptor)
-                    .build()
-                    .newCall(request)
+                val call = client.newBuilder().followRedirects(true).build().newCall(request)
                 currentCall = call
                 val response = call.execute()
                 response.use {
