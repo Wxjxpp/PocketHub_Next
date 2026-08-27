@@ -125,6 +125,9 @@ class DownloadManager @Inject constructor(
     private fun destFileOrNull(entity: DownloadEntity): File? =
         entity.localPath.takeIf { it.isNotBlank() }?.let { File(it) }
 
+    /** Directory where downloads for [repoKey] are stored. */
+    fun dirFor(repoKey: String): File = File(workRoot(), repoKey.ifBlank { "common" })
+
     private fun workRoot(): File {
         val root = File(
             appContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: appContext.filesDir,

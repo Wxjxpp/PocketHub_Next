@@ -262,6 +262,13 @@
     <string name="action_cancel_run">Cancel</string>
     <string name="action_rerun_run">Re-run</string>
     <string name="action_open_logs">View logs</string>
+    <string name="workflow_artifacts_title">artifacts</string>
+    <string name="workflow_artifacts_empty">No artifacts for this run.</string>
+    <string name="workflow_artifacts_expired">Expired</string>
+    <string name="workflow_artifact_download">Download</string>
+    <string name="workflow_artifact_download_failed">Download failed</string>
+    <string name="workflow_artifact_extracting">Extracting…</string>
+    <string name="workflow_artifact_empty_zip">Empty archive.</string>
     <string name="workflow_runs_jobs_count">jobs</string>
     <string name="workflow_run_steps_label">Steps</string>
     <string name="workflow_dispatch_title">Run a workflow</string>

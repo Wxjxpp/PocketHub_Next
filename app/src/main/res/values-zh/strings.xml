@@ -240,6 +240,13 @@
     <string name="action_cancel_run">取消</string>
     <string name="action_rerun_run">重新运行</string>
     <string name="action_open_logs">查看日志</string>
+    <string name="workflow_artifacts_title">个构建产物</string>
+    <string name="workflow_artifacts_empty">此运行没有构建产物。</string>
+    <string name="workflow_artifacts_expired">已过期</string>
+    <string name="workflow_artifact_download">下载</string>
+    <string name="workflow_artifact_download_failed">下载失败</string>
+    <string name="workflow_artifact_extracting">解压中…</string>
+    <string name="workflow_artifact_empty_zip">空压缩包。</string>
     <string name="workflow_runs_jobs_count">个任务</string>
     <string name="workflow_run_steps_label">步骤</string>
     <string name="workflow_dispatch_title">手动运行工作流</string>

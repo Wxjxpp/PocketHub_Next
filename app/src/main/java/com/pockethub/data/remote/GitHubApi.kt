@@ -1374,6 +1374,47 @@ interface GitHubApi {
     //  (https://docs.github.com/en/rest/actions/workflow-jobs)
     // ──────────────────────────────────────────────
 
+    /**
+     * List build artifacts produced by a workflow run. Covers everything a
+     * workflow uploaded via `actions/upload-artifact` regardless of format —
+     * GitHub stores each artifact as a single zip (download endpoint returns
+     * the zip). Expired artifacts (default 90-day retention) still appear in
+     * the list but their download URL 404s.
+     */
+    @GET("repos/{owner}/{repo}/actions/runs/{run_id}/artifacts")
+    suspend fun getWorkflowRunArtifacts(
+        @Path("owner") owner: String,
+        @Path("repo") repo: String,
+        @Path("run_id") runId: Long,
+        @Query("per_page") perPage: Int = 100,
+        @Query("page") page: Int = 1,
+    ): ArtifactsResponse
+
+    @kotlinx.serialization.Serializable
+    data class ArtifactsResponse(
+        @kotlinx.serialization.SerialName("total_count") val totalCount: Int = 0,
+        val artifacts: List<Artifact> = emptyList(),
+    )
+
+    @kotlinx.serialization.Serializable
+    data class Artifact(
+        val id: Long = 0,
+        val name: String = "",
+        @kotlinx.serialization.SerialName("size_in_bytes") val sizeInBytes: Long = 0,
+        @kotlinx.serialization.SerialName("archive_download_url") val archiveDownloadUrl: String = "",
+        val expired: Boolean = false,
+        @kotlinx.serialization.SerialName("created_at") val createdAt: String? = null,
+        @kotlinx.serialization.SerialName("expires_at") val expiresAt: String? = null,
+        @kotlinx.serialization.SerialName("workflow_run") val workflowRun: ArtifactWorkflowRun? = null,
+    )
+
+    @kotlinx.serialization.Serializable
+    data class ArtifactWorkflowRun(
+        val id: Long? = null,
+        @kotlinx.serialization.SerialName("head_branch") val headBranch: String? = null,
+        @kotlinx.serialization.SerialName("head_sha") val headSha: String? = null,
+    )
+
     /** List jobs for a specific workflow run. */
     @GET("repos/{owner}/{repo}/actions/runs/{run_id}/jobs")
     suspend fun getWorkflowRunJobs(

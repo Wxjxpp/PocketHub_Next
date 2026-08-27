@@ -81,6 +81,9 @@ fun WorkflowRunDetailScreen(
     val isLoading by vm.isLoading.collectAsState()
     val error by vm.error.collectAsState()
     val actionMessage by vm.actionMessage.collectAsState()
+    val artifacts by vm.artifacts.collectAsState()
+    val artifactsLoading by vm.artifactsLoading.collectAsState()
+    val artifactsError by vm.artifactsError.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -94,6 +97,7 @@ fun WorkflowRunDetailScreen(
     }
     LaunchedEffect(owner, repo, runId) {
         vm.loadRun(owner, repo, runId)
+        vm.loadArtifacts(owner, repo, runId)
     }
 
     fun open(url: String?) {
@@ -206,6 +210,20 @@ fun WorkflowRunDetailScreen(
                 items(jobs, key = { it.id }) { job ->
                     JobCard(job = job, dateFmt = dateFmt, onOpenLogs = { open(job.htmlUrl) })
                 }
+            }
+
+            item { HorizontalDivider() }
+
+            item {
+                ArtifactsSection(
+                    artifacts = artifacts,
+                    loading = artifactsLoading,
+                    error = artifactsError,
+                    onDownload = { vm.downloadArtifact(owner, repo, runId, it) },
+                    onRetryDownload = { vm.retryArtifactDownload(it) },
+                    onRetryList = { vm.retryArtifacts(owner, repo, runId) },
+                    dateFmt = dateFmt,
+                )
             }
 
             item { Spacer(Modifier.height(40.dp)) }
