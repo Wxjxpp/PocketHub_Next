@@ -9,10 +9,12 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -61,13 +63,16 @@ fun UpdateDialog(
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
         Surface(
-            shape = RoundedCornerShape(20.dp),
+            shape = RoundedCornerShape(24.dp),
             tonalElevation = 6.dp,
             color = MaterialTheme.colorScheme.surface,
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            modifier = Modifier
+                .padding(horizontal = 24.dp)
+                .widthIn(max = 360.dp)
+                .fillMaxWidth(),
         ) {
             Column(
-                modifier = Modifier.padding(horizontal = 22.dp, vertical = 20.dp),
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -106,7 +111,7 @@ fun UpdateDialog(
 
                 info.publishedAt?.let {
                     Text(
-                        text = stringResource(R.string.update_published, it),
+                        text = stringResource(R.string.update_published, formatPublishedDate(it)),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -139,13 +144,17 @@ fun UpdateDialog(
                                         style = MaterialTheme.typography.labelSmall,
                                         color = item.tagColor,
                                         fontWeight = FontWeight.SemiBold,
-                                        modifier = Modifier.width(64.dp),
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .background(item.tagColor.copy(alpha = 0.13f))
+                                            .padding(horizontal = 8.dp, vertical = 3.dp),
                                     )
-                                    Spacer(Modifier.size(6.dp))
+                                    Spacer(Modifier.size(8.dp))
                                     Text(
                                         text = item.text,
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(top = 2.dp),
                                     )
                                 }
                             }
@@ -159,7 +168,10 @@ fun UpdateDialog(
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             LinearProgressIndicator(
                                 progress = { ds.progressPct / 100f },
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(6.dp)
+                                    .clip(RoundedCornerShape(99.dp)),
                             )
                             val status = if (ds.totalBytes > 0) {
                                 "${humanBytes(ds.downloadedBytes)} / ${humanBytes(ds.totalBytes)}  ·  ${ds.progressPct}%"
@@ -192,46 +204,58 @@ fun UpdateDialog(
 
                 Spacer(Modifier.size(2.dp))
 
-                // Actions — wrapped so tight screens don't squeeze the labels.
-                FlowRow(
+                // Actions — primary CTA full-width, secondary actions as a
+                // compact text row underneath. No cramped wrapping.
+                Column(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     when (val ds = downloadState) {
                         is UpdateViewModel.DownloadState.Running -> {
-                            TextButton(onClick = onCancel) {
+                            Button(onClick = onCancel, modifier = Modifier.fillMaxWidth()) {
                                 Text(stringResource(R.string.action_cancel))
                             }
                         }
                         is UpdateViewModel.DownloadState.Done -> {
-                            Button(onClick = { onInstall(ds.path) }) {
+                            Button(onClick = { onInstall(ds.path) }, modifier = Modifier.fillMaxWidth()) {
                                 Text(stringResource(R.string.action_install))
                             }
-                            TextButton(onClick = onLater) {
+                            TextButton(onClick = onLater, modifier = Modifier.align(Alignment.CenterHorizontally)) {
                                 Text(stringResource(R.string.action_remind_later))
                             }
                         }
                         is UpdateViewModel.DownloadState.Failed -> {
-                            Button(onClick = onRetry) {
+                            Button(onClick = onRetry, modifier = Modifier.fillMaxWidth()) {
                                 Text(stringResource(R.string.action_retry))
                             }
-                            TextButton(onClick = onIgnore) {
-                                Text(stringResource(R.string.action_ignore_version))
-                            }
-                            TextButton(onClick = onLater) {
-                                Text(stringResource(R.string.action_remind_later))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                TextButton(onClick = onLater) {
+                                    Text(stringResource(R.string.action_remind_later))
+                                }
+                                TextButton(onClick = onIgnore) {
+                                    Text(stringResource(R.string.action_ignore_version))
+                                }
                             }
                         }
                         else -> {
-                            Button(onClick = onDownload) {
+                            Button(onClick = onDownload, modifier = Modifier.fillMaxWidth()) {
                                 Text(stringResource(R.string.action_download))
                             }
-                            TextButton(onClick = onIgnore) {
-                                Text(stringResource(R.string.action_ignore_version))
-                            }
-                            TextButton(onClick = onLater) {
-                                Text(stringResource(R.string.action_remind_later))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                TextButton(onClick = onLater) {
+                                    Text(stringResource(R.string.action_remind_later))
+                                }
+                                TextButton(onClick = onIgnore) {
+                                    Text(stringResource(R.string.action_ignore_version))
+                                }
                             }
                         }
                     }
@@ -239,6 +263,15 @@ fun UpdateDialog(
             }
         }
     }
+}
+
+/** Parse an ISO-8601 timestamp into a short localized "yyyy-MM-dd HH:mm" string. */
+private fun formatPublishedDate(iso: String): String = try {
+    val zdt = java.time.OffsetDateTime.parse(iso.trim().replace("Z", "+00:00")).toInstant()
+        .atZone(java.time.ZoneId.systemDefault())
+    java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").format(zdt)
+} catch (_: Exception) {
+    iso.take(16).replace('T', ' ')
 }
 
 // Helper: display bytes with a single-decimal unit string (e.g. "8.5 MB").
