@@ -70,6 +70,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import androidx.compose.material.icons.outlined.SearchOff
 import com.pockethub.ui.components.EmptyState
 import com.pockethub.ui.components.ErrorState
 import com.pockethub.ui.components.LoadingFooter
@@ -205,7 +206,7 @@ fun SearchScreen(
                 }
                 !hasResults -> {
                     EmptyState(
-                        icon = androidx.compose.material.icons.Icons.Outlined.SearchOff,
+                        icon = Icons.Outlined.SearchOff,
                         title = stringResource(R.string.search_results_empty, searchedQuery),
                     )
                 }

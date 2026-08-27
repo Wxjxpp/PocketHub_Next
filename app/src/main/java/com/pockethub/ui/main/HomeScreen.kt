@@ -1,5 +1,6 @@
 package com.pockethub.ui.main
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
@@ -157,7 +158,7 @@ fun HomeScreen(
                         ),
                         label = "nav_icon_scale",
                     )
-                    val tint by androidx.compose.animation.core.animateColorAsState(
+                    val tint by animateColorAsState(
                         targetValue = if (selected) MaterialTheme.colorScheme.primary
                         else MaterialTheme.colorScheme.onSurfaceVariant,
                         animationSpec = tween(200),

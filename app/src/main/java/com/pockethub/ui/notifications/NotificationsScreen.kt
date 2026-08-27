@@ -5,6 +5,7 @@ import com.pockethub.R
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -22,6 +23,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.CircleNotifications
 import androidx.compose.material.icons.outlined.Done
@@ -177,7 +179,7 @@ fun NotificationsScreen(
 
             if (notifications.isEmpty()) {
                 com.pockethub.ui.components.EmptyStateV2(
-                    icon = androidx.compose.material.icons.Icons.Outlined.Notifications,
+                    icon = Icons.Outlined.Notifications,
                     title = stringResource(R.string.no_notifications),
                 )
                 return@Column

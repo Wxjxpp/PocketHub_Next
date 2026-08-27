@@ -29,6 +29,7 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
@@ -153,7 +154,7 @@ fun ReposScreen(
                 com.pockethub.ui.components.ErrorState(message = error!!, onRetry = { vm.refresh() })
             repos.isEmpty() ->
                 com.pockethub.ui.components.EmptyStateV2(
-                    icon = androidx.compose.material.icons.Icons.Outlined.Code,
+                    icon = Icons.Outlined.Code,
                     title = stringResource(R.string.no_repositories_found),
                 )
             else -> {

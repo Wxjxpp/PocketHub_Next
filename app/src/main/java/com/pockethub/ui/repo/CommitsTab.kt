@@ -21,6 +21,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.ListAlt
 import androidx.compose.material.icons.outlined.Commit
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -98,7 +99,7 @@ fun CommitsTab(
             }
 
             commits.isEmpty() -> com.pockethub.ui.components.EmptyStateV2(
-                icon = Icons.AutoMirrored.Outlined.ListAlt,
+                icon = Icons.Outlined.ListAlt,
                 title = stringResource(R.string.commit_no_more),
             )
 

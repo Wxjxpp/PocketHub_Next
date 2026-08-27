@@ -78,11 +78,12 @@ object Motion {
  * Press feedback: the content scales down slightly while pressed and springs
  * back on release. Apply to any clickable element for a tactile feel.
  */
+@Composable
 fun Modifier.pressScale(
     pressedScale: Float = 0.97f,
     enabled: Boolean = true,
     interactionSource: MutableInteractionSource? = null,
-): Modifier = composed {
+): Modifier {
     val source = interactionSource ?: remember { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
     val scale by animateFloatAsState(
@@ -90,7 +91,7 @@ fun Modifier.pressScale(
         animationSpec = Motion.press(),
         label = "press_scale",
     )
-    graphicsLayer {
+    return graphicsLayer {
         scaleX = scale
         scaleY = scale
     }

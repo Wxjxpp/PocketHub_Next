@@ -703,7 +703,7 @@ private fun StatsRow(
             modifier = Modifier
                 .clip(MaterialTheme.shapes.small)
                 .pressScale(interactionSource = starInteraction)
-                .clickable(interactionSource = starInteraction, indication = androidx.compose.material.ripple.rememberRipple(), onClick = onToggleStar)
+                .clickable(interactionSource = starInteraction, indication = null, onClick = onToggleStar)
                 .padding(horizontal = 10.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -722,7 +722,7 @@ private fun StatsRow(
             modifier = Modifier
                 .clip(MaterialTheme.shapes.small)
                 .pressScale(interactionSource = forkInteraction)
-                .clickable(interactionSource = forkInteraction, indication = androidx.compose.material.ripple.rememberRipple(), onClick = onFork, enabled = !isForking)
+                .clickable(interactionSource = forkInteraction, indication = null, onClick = onFork, enabled = !isForking)
                 .padding(horizontal = 10.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
