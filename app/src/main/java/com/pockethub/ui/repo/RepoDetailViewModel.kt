@@ -323,15 +323,18 @@ class RepoDetailViewModel @Inject constructor(
      * Called by the screen when the Code tab's branch selection changes:
      * reloads the README for [ref] and resets the translation view (the cached
      * translated text belongs to the previous branch's README).
+     * Also mirrors the chosen branch to the workflows tab so the workflow run
+     * list and dispatch dialog follow the current Code tab branch automatically.
      */
     fun onBranchChanged(owner: String, repo: String, ref: String?) {
         if (readmeRef == ref && _readme.value != null) return
         _translatedReadme.update { null }
         _showTranslated.update { false }
         loadReadme(owner, repo, ref)
-        // When the Code tab changes branch, mirror it to the workflows tab so the
-        // workflow runs list & dispatch dialog follow the current branch automatically.
-        val branch = ref ?: repoData?.defaultBranch
+        // Mirror to workflows tab only after we've loaded the repo metadata so we
+        // can resolve the default branch. Use `repo.value` instead of the stale
+        // private field to stay consistent with the rest of this class.
+        val branch = ref ?: repo.value?.defaultBranch
         if (branch != null && branch != _workflowBranch.value) {
             _workflowBranch.update { branch }
             loadWorkflows(owner, repo, branch)
