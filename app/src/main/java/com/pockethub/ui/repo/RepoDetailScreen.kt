@@ -151,6 +151,8 @@ fun RepoDetailScreen(
     // Branch picked in the Code tab. Falls back to the repo default branch so
     // the Commits tab follows the Code tab's selection; null until loaded.
     val codeBrowserState by codeBrowserVm.state.collectAsState()
+    // Derive the live ref from codeBrowserState so Compose recomputes when the
+    // branch changes (plain val would only be evaluated once per recomposition).
     val codeBrowserRef = codeBrowserState.ref ?: repoData?.defaultBranch
     val isDispatching by vm.isDispatching.collectAsState()
     val dispatchMessage by vm.dispatchMessage.collectAsState()
@@ -236,7 +238,9 @@ fun RepoDetailScreen(
 
     // Load workflow list when the dispatch dialog opens (lazy load). Sync
     // with the current workflow branch (mirrored from the Code tab by default).
-    LaunchedEffect(showDispatchDialog, owner, repo) {
+    // React to branch changes even while the dialog is open so the user sees the
+    // updated workflow list without having to close and reopen the dialog.
+    LaunchedEffect(showDispatchDialog, owner, repo, vm.workflowBranch.value) {
         if (showDispatchDialog) {
             val branch = vm.workflowBranch.value ?: repoData?.defaultBranch ?: "main"
             vm.loadWorkflows(owner, repo, branch)
