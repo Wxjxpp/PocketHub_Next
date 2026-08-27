@@ -62,8 +62,8 @@ import androidx.compose.ui.unit.dp
  */
 object Motion {
     /** Interactive press / toggle springs — snappy with a slight bounce. */
-    fun press() = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMediumLow)
-    fun settle() = spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMedium)
+    fun press() = spring<Float>(dampingRatio = 0.55f, stiffness = Spring.StiffnessMediumLow)
+    fun settle() = spring<Float>(dampingRatio = 0.9f, stiffness = Spring.StiffnessMedium)
 
     /** Screen / element entrance tweens. */
     fun enter(millis: Int = 260) = tween<Float>(millis, easing = FastOutSlowInEasing)
