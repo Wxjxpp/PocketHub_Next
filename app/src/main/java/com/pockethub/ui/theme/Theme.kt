@@ -26,7 +26,7 @@ import androidx.core.view.WindowCompat
 enum class ThemeMode { System, Dark, Light }
 
 /** Complete visual definition of one style: palette + typography + shapes + tokens. */
-private data class AppStyleDef(
+data class AppStyleDef(
     val style: AppStyle,
     val isDark: Boolean,
     val colors: ColorScheme,
