@@ -1606,7 +1606,7 @@ private fun WorkflowDispatchDialog(
                         branchNames = branchNames,
                         enabled = !isDispatching,
                         isLoadingBranches = isLoadingBranches,
-                        onToggle = { /* already toggle-able via onSelect in the chip itself */ },
+                        onToggle = { /* unused — chip manages its own expanded state */ },
                         onSelect = { newRef -> ref = newRef },
                     )
                     Text(
@@ -1657,7 +1657,7 @@ private fun BranchSelectorChip(
         Modifier
             .fillMaxWidth()
             .padding(vertical = 6.dp)
-            .clickable(enabled = enabled) { onToggle() }
+            .clickable(enabled = enabled) { expanded = true }
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

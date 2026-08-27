@@ -600,9 +600,10 @@ class RepoDetailViewModel @Inject constructor(
             _isLoadingBranches.update { true }
             _branches.update { emptyList() }
             try {
-                // First page is enough — dispatch targets are usually branch names,
-                // not deep feature-branch lists. Pagination not exposed in dialog UI.
-                val resp = api.getBranches(owner, repo, perPage = 30)
+                // Fetch up to 100 branches (max per_page). If a repo has more,
+                // the dialog shows the first page which covers the common cases;
+                // pagination is not exposed in the dialog UI.
+                val resp = api.getBranches(owner, repo, perPage = 100)
                 _branches.update { resp }
             } catch (e: Exception) {
                 issueReporter.reportError("RepoDetail", "loadBranches", e)
