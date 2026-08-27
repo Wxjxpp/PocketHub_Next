@@ -18,8 +18,10 @@ import java.util.concurrent.ConcurrentHashMap
 import okhttp3.Call
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.Response
 import java.io.File
 import java.io.IOException
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -42,6 +44,19 @@ class DownloadManager @Inject constructor(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val queueSignals = Channel<Unit>(Channel.CONFLATED)
     private val cancelledUrls = ConcurrentHashMap.newKeySet<String>()
+
+    /**
+     * Bare client used for redirect hops. Built from scratch because OkHttp
+     * cannot REMOVE inherited interceptors via newBuilder() — the shared
+     * [client] carries [com.pockethub.data.remote.AuthInterceptor], which would
+     * attach the GitHub Bearer token to the redirect target (Azure Blob / CDN),
+     * and those hosts reject foreign tokens with 401.
+     */
+    private val redirectClient = OkHttpClient.Builder()
+        .followRedirects(false)
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .build()
 
     @Volatile private var currentJob: Job? = null
     @Volatile private var currentUrl: String? = null
@@ -150,6 +165,40 @@ class DownloadManager @Inject constructor(
         }
     }
 
+    /**
+     * Opens [url] following redirects manually:
+     *
+     * - The initial request goes through the shared [client] (in a
+     *   no-redirect derived copy), so [com.pockethub.data.remote.AuthInterceptor]
+     *   attaches the Bearer token — required because GitHub's artifact download
+     *   URLs (`archive_download_url`) only authenticate on the API host
+     *   (mandatory for private repos; public ones tolerate it).
+     * - GitHub answers with 302 → signed Azure Blob / CDN URL whose query string
+     *   already carries the authorization (SAS token). Those redirect targets
+     *   REJECT a foreign `Authorization` header with 401, and OkHttp would
+     *   otherwise copy the header across hosts — so each hop is issued via the
+     *   bare [redirectClient] with no auth header attached.
+     *
+     * Returns the final call (usable for cancellation) and its response.
+     */
+    private fun openDownload(url: String): Pair<Call, Response> {
+        var call = client.newBuilder().followRedirects(false).build()
+            .newCall(Request.Builder().url(url).build())
+        currentCall = call
+        var response = call.execute()
+        var hops = 0
+        while (response.isRedirect && hops < 5) {
+            val nextUrl = response.header("Location")?.let { response.request.url.resolve(it) }
+            response.close()
+            if (nextUrl == null) throw IOException("Redirect missing Location header")
+            call = redirectClient.newCall(Request.Builder().url(nextUrl).build())
+            currentCall = call
+            response = call.execute()
+            hops++
+        }
+        return call to response
+    }
+
     private suspend fun executeDownload(entity: DownloadEntity) {
         val targetFile = File(entity.localPath)
         targetFile.parentFile?.mkdirs()
@@ -157,10 +206,8 @@ class DownloadManager @Inject constructor(
         val destFile = File(targetFile.parentFile, "${targetFile.name}.part")
         val job = scope.launch(start = CoroutineStart.LAZY) {
             try {
-                val request = Request.Builder().url(url).build()
-                val call = client.newBuilder().followRedirects(true).build().newCall(request)
+                val (call, response) = openDownload(url)
                 currentCall = call
-                val response = call.execute()
                 response.use {
                     if (!it.isSuccessful) {
                         dao.upsert(entity.copy(status = "FAILED", errorMsg = "HTTP ${it.code}", updatedAt = System.currentTimeMillis()))
