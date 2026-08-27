@@ -31,16 +31,6 @@ fun adaptiveColumnCount(maxWidth: Dp): Int = when {
     else -> 1
 }
 
-/** Adaptive grid cells: single column on phones, multi-column on larger widths. */
-    // If caller doesn't pass a measured width, fall back to a floor-based
-    // Adaptive cell size so cards never get absurdly wide.
-    return if (contentWidth > 0.dp) {
-        androidx.compose.foundation.lazy.grid.GridCells.Fixed(adaptiveColumnCount(contentWidth))
-    } else {
-        androidx.compose.foundation.lazy.grid.GridCells.Adaptive(minSize = 320.dp)
-    }
-}
-
 /**
  * Enhanced card with elevation, subtle gradient, and press animation.
  * Redesigned: hairline border + whisper gradient + spring press feedback,

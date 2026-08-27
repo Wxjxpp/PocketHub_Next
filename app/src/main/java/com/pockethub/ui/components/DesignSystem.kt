@@ -261,20 +261,6 @@ fun SkeletonList(
 
 // ── Small functional atoms ───────────────────────────────────────────────────
 
-/** Rounded count/tag pill (stars, forks, unread…). */
-
-/** Colored language dot with its name. */
-    if (name.isBlank()) return
-    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        Box(
-            Modifier.size(9.dp).clip(CircleShape).background(
-                color ?: MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-            )
-        )
-        Text(name, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
 /**
  * Redesigned empty state: icon on a soft plate, scale-in, friendly copy.
  */
@@ -340,27 +326,5 @@ fun EmptyStateV2(
             Spacer(Modifier.height(4.dp))
             action()
         }
-    }
-}
-
-/** Section header with an accent tick — consistent section titles app-wide. */
-    Row(
-        modifier.fillMaxWidth().padding(vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            Modifier
-                .size(width = 4.dp, height = 16.dp)
-                .clip(RoundedCornerShape(2.dp))
-                .background(MaterialTheme.colorScheme.primary)
-        )
-        Spacer(Modifier.width(8.dp))
-        Text(
-            text,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f),
-        )
-        if (trailing != null) trailing()
     }
 }

@@ -65,6 +65,3 @@ data class Issue(
         @SerialName("diff_url") val diffUrl: String? = null,
     )
 }
-
-/** Wrapper returned by /repos/{owner}/{repo}/issues. */
-@Serializable
