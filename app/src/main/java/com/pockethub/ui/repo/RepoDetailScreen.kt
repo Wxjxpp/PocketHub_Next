@@ -643,6 +643,7 @@ fun RepoDetailScreen(
             isLoadingBranches = isLoadingBranches,
             defaultBranch = repoData?.defaultBranch,
             isDispatching = isDispatching,
+            currentBranch = vm.workflowBranch.value,
             onDismiss = { if (!isDispatching) showDispatchDialog = false },
             onDispatch = { workflowId, ref ->
                 vm.dispatchWorkflow(owner, repo, workflowId, ref)
@@ -1523,6 +1524,7 @@ private fun WorkflowDispatchDialog(
     isLoadingBranches: Boolean,
     defaultBranch: String?,
     isDispatching: Boolean,
+    currentBranch: String?,
     onDismiss: () -> Unit,
     onDispatch: (workflowId: Long, ref: String) -> Unit,
 ) {
@@ -1533,13 +1535,12 @@ private fun WorkflowDispatchDialog(
     // falling back to defaultBranch / "main" if the list isn't loaded yet.
     val branchNames = remember(branches) { branches.map { it.name } }
     var ref by remember(workflows.size) { mutableStateOf("___init___") }
-    // Mirror the VM's workflowBranch (driven by the Code tab) into the dialog so
-    // that switching branches in the Code tab updates the dispatch ref in real
-    // time even while the dialog is open. Once the user picks manually below,
-    // they stay on their choice until they switch repos.
-    val currentVmBranch = vm.workflowBranch.value ?: defaultBranch ?: "main"
-    LaunchedEffect(currentVmBranch, branchNames) {
-        ref = if (branchNames.contains(currentVmBranch)) currentVmBranch else ref
+    // Mirror the Code tab's branch into the dialog so switching branches in the
+    // Code tab updates the dispatch ref in real time even while the dialog is
+    // open. Once the user picks manually below, they stay on their choice.
+    val effectiveBranch = currentBranch ?: defaultBranch ?: "main"
+    LaunchedEffect(effectiveBranch, branchNames) {
+        ref = if (branchNames.contains(effectiveBranch)) effectiveBranch else ref
     }
 
     AlertDialog(
