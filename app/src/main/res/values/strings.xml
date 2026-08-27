@@ -264,6 +264,7 @@
     <string name="action_open_logs">View logs</string>
     <string name="workflow_artifacts_title">artifacts</string>
     <string name="workflow_artifacts_empty">No artifacts for this run.</string>
+    <string name="workflow_artifacts_empty_hint">The workflow didn\'t upload any artifacts (actions/upload-artifact). Outputs such as APKs may be attached to a Release instead.</string>
     <string name="workflow_artifacts_expired">Expired</string>
     <string name="workflow_artifact_download">Download</string>
     <string name="workflow_artifact_download_failed">Download failed</string>
