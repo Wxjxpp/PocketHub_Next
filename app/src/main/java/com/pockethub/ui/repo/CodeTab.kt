@@ -148,9 +148,9 @@ fun CodeTab(
         }
 
         when {
-            state.isLoading && state.entries.isEmpty() && state.viewingFile == null -> Box(
-                Modifier.fillMaxSize(), contentAlignment = Alignment.Center
-            ) { CircularProgressIndicator() }
+            state.isLoading && state.entries.isEmpty() && state.viewingFile == null -> com.pockethub.ui.components.SkeletonList(
+                Modifier.fillMaxSize(), rows = 8, topPadding = 8.dp,
+            )
 
             state.viewingFile != null -> FileViewerContent(
                 entry = state.viewingFile!!,
@@ -327,7 +327,12 @@ private fun ContentRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         val icon = if (entry.type == "dir") Icons.Outlined.Folder else Icons.Outlined.Description
-        Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Icon(
+            icon, contentDescription = null,
+            modifier = Modifier.size(18.dp),
+            tint = if (entry.type == "dir") MaterialTheme.colorScheme.tertiary
+                   else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Spacer(Modifier.width(10.dp))
         Text(
             entry.name,

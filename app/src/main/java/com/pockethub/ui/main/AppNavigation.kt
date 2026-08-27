@@ -188,10 +188,20 @@ fun PocketHubApp(
             NavHost(
                 navController = navController,
                 startDestination = route,
-                enterTransition = { fadeIn(animationSpec = tween(200)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(200)) },
-                exitTransition = { fadeOut(animationSpec = tween(200)) },
-                popEnterTransition = { fadeIn(animationSpec = tween(200)) },
-                popExitTransition = { fadeOut(animationSpec = tween(200)) + slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(200)) },
+                enterTransition = {
+                    fadeIn(tween(240)) + slideIntoContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Start,
+                        tween(320, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+                    ) { it / 4 }
+                },
+                exitTransition = { fadeOut(tween(180)) },
+                popEnterTransition = { fadeIn(tween(240)) },
+                popExitTransition = {
+                    fadeOut(tween(200)) + slideOutOfContainer(
+                        AnimatedContentTransitionScope.SlideDirection.End,
+                        tween(300, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+                    ) { it / 4 }
+                },
             ) {
                 composable(Routes.LOGIN) {
                     LoginScreen(onLoginSuccess = ::onLoginSuccess)

@@ -94,17 +94,16 @@ fun ActivityCard(
     }
     val createdAt = event.createdAt?.let { formatRelativeTime(it) } ?: ""
 
-    EnhancedCard(
+    PhCard(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 6.dp),
         onClick = if (repoName.isNotEmpty()) {
             { onNavigateToRepo(repoName) }
         } else null,
-        elevation = 3.dp,
-        cornerRadius = 14.dp,
-        gradientIntensity = 0.08f,
+        cornerRadius = 16.dp,
     ) {
+        Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
             // Icon with colored background circle
             androidx.compose.foundation.layout.Box(
@@ -154,6 +153,7 @@ fun ActivityCard(
                 overflow = TextOverflow.Ellipsis,
                 lineHeight = 18.sp
             )
+        }
         }
     }
 }

@@ -97,8 +97,10 @@ import com.pockethub.data.model.Repository
 import com.pockethub.ui.markdown.MarkdownText
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.animation.togetherWith
 import java.text.DateFormat
 import java.util.Locale
+import com.pockethub.ui.components.pressScale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -415,6 +417,20 @@ fun RepoDetailScreen(
                 onRefresh = { vm.refreshCurrentTab(owner, repo) },
                 modifier = Modifier.weight(1f),
             ) {
+            androidx.compose.animation.AnimatedContent(
+                targetState = tab,
+                transitionSpec = {
+                    val forward = targetState.ordinal >= initialState.ordinal
+                    (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(200)) +
+                        androidx.compose.animation.slideInHorizontally(androidx.compose.animation.core.tween(260, easing = androidx.compose.animation.core.FastOutSlowInEasing)) {
+                            if (forward) it / 8 else -it / 8
+                        })
+                        .togetherWith(
+                            androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(140))
+                        )
+                },
+                label = "repo_tab_content",
+            ) { tab ->
             when (tab) {
                 RepoTab.OVERVIEW -> OverviewTab(
                     owner,
@@ -502,6 +518,7 @@ fun RepoDetailScreen(
                     onNavigateToUser = onNavigateToUser,
                     onNavigateToWorkflowRun = onNavigateToWorkflowRun,
                 )
+            }
             }
             }
         }
@@ -662,6 +679,8 @@ private fun StatsRow(
     onFork: () -> Unit = {},
 ) {
     val userClickModifier = Modifier.clickable { onNavigateToUser(data.owner.login) }
+    val starInteraction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val forkInteraction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -683,7 +702,8 @@ private fun StatsRow(
         Row(
             modifier = Modifier
                 .clip(MaterialTheme.shapes.small)
-                .clickable(onClick = onToggleStar)
+                .pressScale(interactionSource = starInteraction)
+                .clickable(interactionSource = starInteraction, indication = androidx.compose.material.ripple.rememberRipple(), onClick = onToggleStar)
                 .padding(horizontal = 10.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -701,7 +721,8 @@ private fun StatsRow(
         Row(
             modifier = Modifier
                 .clip(MaterialTheme.shapes.small)
-                .clickable(onClick = onFork, enabled = !isForking)
+                .pressScale(interactionSource = forkInteraction)
+                .clickable(interactionSource = forkInteraction, indication = androidx.compose.material.ripple.rememberRipple(), onClick = onFork, enabled = !isForking)
                 .padding(horizontal = 10.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -739,7 +760,12 @@ private fun OverviewTab(
     onLinkClick: (String, com.pockethub.ui.markdown.LinkKind) -> Unit,
 ) {
     if (isLoading && repoData == null) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+        Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            com.pockethub.ui.components.SkeletonBox(Modifier.fillMaxWidth(0.85f).height(18.dp))
+            com.pockethub.ui.components.SkeletonBox(Modifier.fillMaxWidth(0.5f).height(14.dp))
+            com.pockethub.ui.components.SkeletonBox(Modifier.fillMaxWidth().height(120.dp), cornerRadius = 18.dp)
+            com.pockethub.ui.components.SkeletonBox(Modifier.fillMaxWidth().height(220.dp), cornerRadius = 18.dp)
+        }
         return
     }
     repoData?.let { data ->
@@ -939,9 +965,7 @@ private fun IssuesTab(
         IssueStateFilterChips(selected = stateFilter, onSelect = onSelectFilter)
 
         if (isLoading && issues.isEmpty()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
+            com.pockethub.ui.components.SkeletonList(Modifier.fillMaxSize(), rows = 8, topPadding = 8.dp)
             return@Column
         }
         if (issues.isEmpty()) {
@@ -1055,9 +1079,7 @@ private fun PullsTab(
         IssueStateFilterChips(selected = stateFilter, onSelect = onSelectFilter)
 
         if (isLoading && pulls.isEmpty()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
+            com.pockethub.ui.components.SkeletonList(Modifier.fillMaxSize(), rows = 8, topPadding = 8.dp)
             return@Column
         }
         if (pulls.isEmpty()) {
@@ -1150,9 +1172,7 @@ private fun ReleasesTab(
     onDeleteRelease: (Long) -> Unit = {},
 ) {
     if (isLoading && releases.isEmpty()) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
-        }
+        com.pockethub.ui.components.SkeletonList(Modifier.fillMaxSize(), rows = 6, topPadding = 8.dp)
         return
     }
     if (releases.isEmpty()) {
@@ -1305,15 +1325,14 @@ private fun WorkflowsTab(
     onNavigateToWorkflowRun: (Long) -> Unit = {},
 ) {
     if (isLoading && runs.isEmpty()) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
-        }
+        com.pockethub.ui.components.SkeletonList(Modifier.fillMaxSize(), rows = 7, topPadding = 8.dp)
         return
     }
     if (runs.isEmpty()) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(stringResource(R.string.no_workflow_runs), color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
+        com.pockethub.ui.components.EmptyStateV2(
+            icon = androidx.compose.material.icons.Icons.Outlined.PlayArrow,
+            title = stringResource(R.string.no_workflow_runs),
+        )
         return
     }
     // A refresh replaces the whole list — jump back to the newest run at the

@@ -13,6 +13,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.text.ClickableText
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -108,11 +112,49 @@ fun LoginScreen(
     }
 
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        // Entrance: whole card fades and settles upward with a spring.
+        var shown by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+        androidx.compose.runtime.LaunchedEffect(Unit) { shown = true }
+        val entrance by androidx.compose.animation.core.animateFloatAsState(
+            targetValue = if (shown) 1f else 0f,
+            animationSpec = androidx.compose.animation.core.tween(420, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+            label = "login_entrance",
+        )
         Column(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp).verticalScroll(rememberScrollState()),
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    alpha = entrance
+                    translationY = (1f - entrance) * 48f
+                }
+                .padding(horizontal = 24.dp)
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            // Logo plate
+            Box(
+                modifier = Modifier
+                    .size(84.dp)
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(24.dp))
+                    .background(
+                        Brush.linearGradient(
+                            listOf(
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.9f),
+                                MaterialTheme.colorScheme.tertiary.copy(alpha = 0.85f),
+                            )
+                        )
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Outlined.Code,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(40.dp),
+                )
+            }
+            Spacer(Modifier.height(20.dp))
             // Logo / Title
             Text(stringResource(R.string.app_name), style = MaterialTheme.typography.displayLarge, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
@@ -201,6 +243,7 @@ fun LoginScreen(
                 Spacer(Modifier.height(16.dp))
                 Surface(
                     color = MaterialTheme.colorScheme.errorContainer,
+                    shape = MaterialTheme.shapes.medium,
                     modifier = Modifier.fillMaxWidth().padding(12.dp),
                 ) {
                     Column(Modifier.padding(12.dp)) {

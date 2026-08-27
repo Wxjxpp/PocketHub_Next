@@ -299,9 +299,7 @@ fun ExploreScreen(
                 ExploreSection.FOLLOWING -> {
                     if (isLoading && feed.isEmpty()) {
                         item {
-                            Box(Modifier.fillMaxWidth().padding(48.dp), contentAlignment = Alignment.Center) {
-                                CircularProgressIndicator()
-                            }
+                            com.pockethub.ui.components.SkeletonList(Modifier.fillMaxWidth(), rows = 6, topPadding = 8.dp)
                         }
                     } else if (!feedAvailable) {
                         item {
@@ -419,9 +417,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.repoItems(
 ) {
     when {
         isLoading && repos.isEmpty() -> item {
-            Box(Modifier.fillMaxWidth().padding(48.dp), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
+            com.pockethub.ui.components.SkeletonList(Modifier.fillMaxWidth(), rows = 7, topPadding = 8.dp)
         }
         error != null && repos.isEmpty() -> item {
             ErrorState(message = error, onRetry = onRetry)
@@ -579,15 +575,11 @@ private fun formatTimeAgo(resources: android.content.res.Resources, iso: String)
 
 @Composable
 private fun EmptyState(title: String, subtitle: String) {
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(48.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Icon(Icons.AutoMirrored.Outlined.Article, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(36.dp))
-        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
-        Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-    }
+    com.pockethub.ui.components.EmptyStateV2(
+        icon = Icons.AutoMirrored.Outlined.Article,
+        title = title,
+        subtitle = subtitle,
+    )
 }
 
 @Composable

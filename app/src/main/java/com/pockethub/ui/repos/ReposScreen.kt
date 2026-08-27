@@ -145,14 +145,17 @@ fun ReposScreen(
         Spacer(Modifier.height(8.dp))
 
         when {
-            // First-load spinner.
+            // First-load skeleton — shimmering rows read as "fast", not stuck.
             isLoading && repos.isEmpty() ->
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                com.pockethub.ui.components.SkeletonList(Modifier.fillMaxSize(), rows = 9)
             // Error with nothing cached/stale to show.
             error != null && repos.isEmpty() ->
                 com.pockethub.ui.components.ErrorState(message = error!!, onRetry = { vm.refresh() })
             repos.isEmpty() ->
-                com.pockethub.ui.components.EmptyState(title = stringResource(R.string.no_repositories_found))
+                com.pockethub.ui.components.EmptyStateV2(
+                    icon = androidx.compose.material.icons.Icons.Outlined.Code,
+                    title = stringResource(R.string.no_repositories_found),
+                )
             else -> {
                     // Responsive grid: single column on phones, multi-column on tablets.
                     // BoxWithConstraints measures available width to pick column count.
@@ -167,12 +170,13 @@ fun ReposScreen(
                         ) {
                             items(repos.size, key = { repos[it].id }) { index ->
                                 val repo = repos[index]
-                                RepositoryRow(
-                                    repo = repo,
-                                    onOpen = { onNavigateToRepo(repo.owner.login, repo.name) },
-                                    onOpenOwner = { onNavigateToUser(repo.owner.login) },
-                                    modifier = Modifier.animateItem(),
-                                )
+                                com.pockethub.ui.components.StaggeredAppear(index = index) {
+                                    RepositoryRow(
+                                        repo = repo,
+                                        onOpen = { onNavigateToRepo(repo.owner.login, repo.name) },
+                                        onOpenOwner = { onNavigateToUser(repo.owner.login) },
+                                    )
+                                }
                             }
                             // Inline error banner when a page/refresh failed but stale data is visible.
                             if (error != null) {

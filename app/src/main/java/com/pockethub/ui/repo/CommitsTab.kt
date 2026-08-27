@@ -81,10 +81,9 @@ fun CommitsTab(
 
     Column(Modifier.fillMaxSize()) {
         when {
-            isLoading && commits.isEmpty() -> Box(
-                Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center,
-            ) { CircularProgressIndicator() }
+            isLoading && commits.isEmpty() -> com.pockethub.ui.components.SkeletonList(
+                Modifier.fillMaxSize(), rows = 9, topPadding = 8.dp,
+            )
 
             error != null && commits.isEmpty() -> Column(
                 Modifier.fillMaxSize(),
@@ -98,9 +97,10 @@ fun CommitsTab(
                 }
             }
 
-            commits.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(stringResource(R.string.commit_no_more), color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
+            commits.isEmpty() -> com.pockethub.ui.components.EmptyStateV2(
+                icon = Icons.AutoMirrored.Outlined.ListAlt,
+                title = stringResource(R.string.commit_no_more),
+            )
 
             else -> LazyColumn(state = listState, modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
                 items(commits, key = { it.sha }) { commit ->
@@ -128,12 +128,12 @@ private fun CommitRow(
     val authorLogin = commit.author?.login
     val authorClick = authorLogin?.let { Modifier.clickable { onNavigateToUser(it) } } ?: Modifier
 
-    Column(
-        Modifier.fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 10.dp),
+    com.pockethub.ui.components.PhCard(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        onClick = onClick,
+        cornerRadius = 14.dp,
     ) {
-        Row(verticalAlignment = Alignment.Top) {
+        Row(verticalAlignment = Alignment.Top, modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
             // SHA short
             Text(
                 text = commit.sha.take(7),
@@ -180,7 +180,6 @@ private fun CommitRow(
                 }
             }
         }
-        androidx.compose.material3.HorizontalDivider()
     }
 }
 

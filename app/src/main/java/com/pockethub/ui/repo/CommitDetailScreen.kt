@@ -217,9 +217,7 @@ fun CommitDetailScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
         if (isLoading && commit == null) {
-            Box(Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
+            com.pockethub.ui.components.SkeletonList(Modifier.padding(padding).fillMaxSize(), rows = 8, topPadding = 8.dp)
             return@Scaffold
         }
 

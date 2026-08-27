@@ -143,6 +143,8 @@ fun SettingsScreen(
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState())) {
             SectionHeader(stringResource(R.string.section_appearance))
+            com.pockethub.ui.components.PhCard(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), cornerRadius = 18.dp) {
+                Column {
             // Single appearance entry — combines the old "theme mode"
             // (Dark/Light/System) and "app style" pickers into one coherent
             // list. The available styles double as dark/light theme presets.
@@ -152,9 +154,12 @@ fun SettingsScreen(
                 supportingContent = { Text(styleLabel(appStyle)) },
                 modifier = Modifier.clickable { showStyleSheet = true },
             )
-            HorizontalDivider()
+                }
+            }
 
             SectionHeader(stringResource(R.string.section_language))
+            com.pockethub.ui.components.PhCard(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), cornerRadius = 18.dp) {
+                Column {
             ListItem(
                 leadingContent = { Icon(Icons.Outlined.Translate, contentDescription = null) },
                 headlineContent = { Text(stringResource(R.string.app_language)) },
@@ -173,9 +178,12 @@ fun SettingsScreen(
                 },
                 modifier = Modifier.clickable { showTranslateSheet = true },
             )
-            HorizontalDivider()
+                }
+            }
 
             SectionHeader(stringResource(R.string.section_notifications))
+            com.pockethub.ui.components.PhCard(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), cornerRadius = 18.dp) {
+                Column {
             ListItem(
                 leadingContent = { Icon(Icons.Outlined.Notifications, contentDescription = null) },
                 headlineContent = { Text(stringResource(R.string.polling_cadence)) },
@@ -188,18 +196,24 @@ fun SettingsScreen(
                 supportingContent = { Text(stringResource(R.string.system_notification_settings_summary)) },
                 modifier = Modifier.clickable { openAppNotificationSettings(context) },
             )
-            HorizontalDivider()
+                }
+            }
 
             SectionHeader(stringResource(R.string.section_explore))
+            com.pockethub.ui.components.PhCard(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), cornerRadius = 18.dp) {
+                Column {
             ListItem(
                 leadingContent = { Icon(Icons.Outlined.Public, contentDescription = null) },
                 headlineContent = { Text(stringResource(R.string.feed_sources)) },
                 supportingContent = { Text(stringResource(R.string.feed_sources_intro)) },
                 modifier = Modifier.clickable { onNavigateToFeedSources() },
             )
-            HorizontalDivider()
+                }
+            }
 
             SectionHeader(stringResource(R.string.section_account))
+            com.pockethub.ui.components.PhCard(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), cornerRadius = 18.dp) {
+                Column {
             ListItem(
                 leadingContent = { Icon(Icons.Outlined.ManageAccounts, contentDescription = null) },
                 headlineContent = { Text(stringResource(R.string.accounts)) },
@@ -229,9 +243,12 @@ fun SettingsScreen(
                 supportingContent = { Text(stringResource(R.string.sign_out_summary)) },
                 modifier = Modifier.clickable { showSignOutDialog = true },
             )
-            HorizontalDivider()
+                }
+            }
 
             SectionHeader(stringResource(R.string.section_severe_issues))
+            com.pockethub.ui.components.PhCard(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), cornerRadius = 18.dp) {
+                Column {
             ListItem(
                 leadingContent = { Icon(Icons.Outlined.BugReport, contentDescription = null) },
                 headlineContent = { Text(stringResource(R.string.severe_issues_send_now)) },
@@ -250,10 +267,13 @@ fun SettingsScreen(
                     }
                 },
             )
-            HorizontalDivider()
+                }
+            }
 
 
             SectionHeader(stringResource(R.string.section_about))
+            com.pockethub.ui.components.PhCard(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), cornerRadius = 18.dp) {
+                Column {
             ListItem(
                 leadingContent = { Icon(Icons.Outlined.SystemUpdate, contentDescription = null) },
                 headlineContent = { Text(stringResource(R.string.update_check_now)) },
@@ -279,6 +299,8 @@ fun SettingsScreen(
                 supportingContent = { Text(stringResource(R.string.version_template, BuildConfig.VERSION_NAME)) },
                 modifier = Modifier.clickable { showAbout = true },
             )
+                }
+            }
             Spacer(Modifier.height(48.dp))
         }
     }

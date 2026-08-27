@@ -27,6 +27,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -55,7 +56,8 @@ fun adaptiveGridCells(contentWidth: Dp = 0.dp): androidx.compose.foundation.lazy
 
 /**
  * Enhanced card with elevation, subtle gradient, and press animation.
- * Provides a more premium visual feel compared to plain Surface.
+ * Redesigned: hairline border + whisper gradient + spring press feedback,
+ * implemented on top of the shared design system for a consistent look.
  */
 @Composable
 fun EnhancedCard(
@@ -69,57 +71,45 @@ fun EnhancedCard(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
-    
-    // Animated elevation on press
-    val animatedElevation by animateDpAsState(
-        targetValue = if (isPressed && enablePressEffect) elevation * 0.5f else elevation,
-        animationSpec = spring(stiffness = 400f),
-        label = "card_elevation"
-    )
-    
-    // Animated scale on press
+
     val animatedScale by animateFloatAsState(
-        targetValue = if (isPressed && enablePressEffect) 0.98f else 1f,
-        animationSpec = spring(dampingRatio = 0.6f, stiffness = 400f),
+        targetValue = if (isPressed && enablePressEffect) 0.975f else 1f,
+        animationSpec = spring(dampingRatio = 0.55f, stiffness = 400f),
         label = "card_scale"
     )
-    
-    // Gradient colors based on theme
-    val surfaceColor = MaterialTheme.colorScheme.surfaceVariant
-    val primaryTint = MaterialTheme.colorScheme.primary.copy(alpha = gradientIntensity)
-    
-    val gradient = Brush.verticalGradient(
-        colors = listOf(
-            surfaceColor.copy(alpha = 0.6f),
-            surfaceColor.copy(alpha = 0.9f)
-        )
-    )
-    
+
+    val surfaceColor = MaterialTheme.colorScheme.surface
+    val primaryTint = MaterialTheme.colorScheme.primary.copy(alpha = gradientIntensity * 0.6f)
+    val borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = if (isPressed) 0.9f else 0.55f)
+    val shape = RoundedCornerShape(cornerRadius)
+
     Surface(
         modifier = modifier
-            .scale(animatedScale)
-            .then(
-                if (onClick != null) {
-                    Modifier.clickable(
-                        interactionSource = interactionSource,
-                        indication = null,
-                        onClick = onClick
-                    )
-                } else Modifier
-            ),
-        shape = RoundedCornerShape(cornerRadius),
-        shadowElevation = animatedElevation,
-        tonalElevation = animatedElevation / 2,
+            .graphicsLayer {
+                scaleX = animatedScale
+                scaleY = animatedScale
+            },
+        shape = shape,
+        color = surfaceColor,
     ) {
         Box(
             modifier = Modifier
-                .background(gradient)
-                .border(
-                    width = 0.5.dp,
-                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f),
-                    shape = RoundedCornerShape(cornerRadius)
+                .clip(shape)
+                .background(
+                    Brush.verticalGradient(
+                        0f to primaryTint.copy(alpha = primaryTint.alpha * 0.35f),
+                        1f to Color.Transparent,
+                    )
                 )
+                .border(1.dp, borderColor, shape)
                 .padding(16.dp)
+                .let { m ->
+                    if (onClick != null) m.clickable(
+                        interactionSource = interactionSource,
+                        indication = null,
+                        onClick = onClick,
+                    ) else m
+                }
         ) {
             Column(content = content)
         }

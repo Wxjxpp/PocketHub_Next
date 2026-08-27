@@ -166,7 +166,7 @@ fun NotificationsScreen(
             }
 
             if (isLoading && notifications.isEmpty()) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                com.pockethub.ui.components.SkeletonList(Modifier.fillMaxSize(), rows = 8)
                 return@Column
             }
 
@@ -176,9 +176,10 @@ fun NotificationsScreen(
             }
 
             if (notifications.isEmpty()) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(stringResource(R.string.no_notifications), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
+                com.pockethub.ui.components.EmptyStateV2(
+                    icon = androidx.compose.material.icons.Icons.Outlined.Notifications,
+                    title = stringResource(R.string.no_notifications),
+                )
                 return@Column
             }
 
@@ -273,10 +274,31 @@ private fun NotificationItem(
     onClick: () -> Unit,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
-    Row(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 10.dp),
-        verticalAlignment = Alignment.Top,
+    com.pockethub.ui.components.PhCard(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        onClick = onClick,
+        cornerRadius = 16.dp,
+        container = if (notif.unread)
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.07f)
+        else MaterialTheme.colorScheme.surface,
     ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+        // Unread dot
+        Box(Modifier.width(14.dp)) {
+            if (notif.unread) {
+                Box(
+                    Modifier
+                        .padding(top = 6.dp)
+                        .size(8.dp)
+                        .clip(androidx.compose.foundation.shape.CircleShape)
+                        .background(MaterialTheme.colorScheme.primary)
+                )
+            }
+        }
+        Spacer(Modifier.width(4.dp))
         // Type icon
         val icon = when (notif.subject.type) {
             "PullRequest" -> Icons.Outlined.Merge
@@ -284,7 +306,12 @@ private fun NotificationItem(
             "Issue"       -> Icons.Outlined.Email
             else          -> Icons.Outlined.CircleNotifications
         }
-        Icon(icon, contentDescription = notif.subject.type, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Icon(
+            icon, contentDescription = notif.subject.type,
+            modifier = Modifier.size(18.dp),
+            tint = if (notif.unread) MaterialTheme.colorScheme.primary
+                   else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Spacer(Modifier.width(10.dp))
 
         Column(Modifier.weight(1f)) {
@@ -324,6 +351,7 @@ private fun NotificationItem(
                 text = { Text(stringResource(R.string.action_copy)) },
                 onClick = { menuOpen = false; onCopy() },
             )
+        }
         }
     }
 }

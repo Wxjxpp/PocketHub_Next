@@ -71,40 +71,54 @@ fun HistoryScreen(
         },
     ) { padding ->
         if (history.isEmpty()) {
-            Box(
-                modifier = Modifier.padding(padding).fillMaxSize(),
-                contentAlignment = Alignment.Center,
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Outlined.History, null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.height(12.dp))
-                    Text(stringResource(R.string.history_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
+            com.pockethub.ui.components.EmptyStateV2(
+                icon = Icons.Outlined.History,
+                title = stringResource(R.string.history_empty),
+                modifier = Modifier.padding(padding),
+            )
         } else {
-            LazyColumn(Modifier.padding(padding).fillMaxSize()) {
+            LazyColumn(
+                Modifier.padding(padding).fillMaxSize(),
+                verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+            ) {
                 items(history, key = { "${it.owner}/${it.repo}@${it.visitedAt}" }) { entry ->
-                    ListItem(
-                        headlineContent = {
-                            Text(
-                                "${entry.owner}/${entry.repo}",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                        },
-                        supportingContent = {
-                            Text(
-                                formatAgo(entry.visitedAt),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        },
-                        leadingContent = {
-                            Box(Modifier.size(8.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary))
-                        },
-                        modifier = Modifier.clickable { onNavigateToRepo(entry.owner, entry.repo) },
-                    )
-                    HorizontalDivider()
+                    com.pockethub.ui.components.PhCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { onNavigateToRepo(entry.owner, entry.repo) },
+                        cornerRadius = 16.dp,
+                    ) {
+                        ListItem(
+                            headlineContent = {
+                                Text(
+                                    "${entry.owner}/${entry.repo}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                            },
+                            supportingContent = {
+                                Text(
+                                    formatAgo(entry.visitedAt),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            },
+                            leadingContent = {
+                                Box(
+                                    Modifier.size(36.dp).clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Icon(
+                                        Icons.Outlined.History, null,
+                                        modifier = Modifier.size(18.dp),
+                                        tint = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
+                            },
+                            modifier = Modifier,
+                        )
+                    }
                 }
             }
         }

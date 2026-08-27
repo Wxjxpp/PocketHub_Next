@@ -4,6 +4,7 @@ import com.pockethub.R
 import com.pockethub.ui.components.ChipListEditor
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -109,9 +110,7 @@ fun CreateIssueScreen(
         when {
             // Loading templates — show progress
             isLoadingTemplates && templates.isEmpty() && forms.isEmpty() && selectedTemplate == null && selectedForm == null -> {
-                Box(Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
+                com.pockethub.ui.components.SkeletonList(Modifier.padding(padding).fillMaxSize(), rows = 5, topPadding = 8.dp)
             }
             // Native form renderer for YAML issue-form templates
             selectedForm != null -> {
@@ -377,9 +376,10 @@ private fun TemplateCard(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .padding(horizontal = 16.dp, vertical = 4.dp)
+            .clip(RoundedCornerShape(16.dp))
             .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
             .clickable(onClick = onClick)
             .padding(14.dp),
         verticalAlignment = Alignment.CenterVertically,

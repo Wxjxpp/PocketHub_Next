@@ -7,6 +7,7 @@ import androidx.compose.ui.res.stringResource
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -132,9 +133,7 @@ fun UserDetailScreen(
         },
     ) { padding ->
         if (isLoading && user == null) {
-            Box(Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
+            com.pockethub.ui.components.SkeletonList(Modifier.padding(padding).fillMaxSize(), rows = 8, topPadding = 8.dp)
             return@Scaffold
         }
 
@@ -364,11 +363,25 @@ private fun UserHeader(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(0.dp),
     ) {
-        Column(Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(
+            Modifier
+                .padding(20.dp)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                            androidx.compose.ui.graphics.Color.Transparent,
+                        )
+                    ),
+                    shape = RoundedCornerShape(20.dp),
+                )
+                .fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
             AsyncImage(
                 model = user?.avatarUrl,
                 contentDescription = null,

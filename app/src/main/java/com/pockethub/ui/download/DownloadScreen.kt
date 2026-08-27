@@ -277,6 +277,7 @@ private fun DoneDownloadItem(
                         Icons.Outlined.InsertDriveFile,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.size(18.dp),
                     )
                 }
             }
@@ -305,11 +306,5 @@ private fun DoneDownloadItem(
 
 @Composable
 private fun DownloadEmptyState(icon: androidx.compose.ui.graphics.vector.ImageVector, message: String) {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(icon, null, modifier = Modifier.size(40.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(10.dp))
-            Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-        }
-    }
+    com.pockethub.ui.components.EmptyStateV2(icon = icon, title = message)
 }

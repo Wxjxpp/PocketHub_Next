@@ -31,7 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.pockethub.data.model.Repository
-import com.pockethub.ui.components.EnhancedCard
+import com.pockethub.ui.components.PhCard
 import com.pockethub.ui.components.languageColorHex
 import com.pockethub.ui.components.parseColorHex
 
@@ -42,14 +42,13 @@ internal fun RepositoryRow(
     onOpenOwner: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    EnhancedCard(
+    PhCard(
         modifier = modifier
             .fillMaxWidth(),
         onClick = onOpen,
-        elevation = 2.dp,
-        cornerRadius = 16.dp,
-        gradientIntensity = 0.05f,
+        cornerRadius = 18.dp,
     ) {
+        Column {
         // Header: Avatar + Owner
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -58,7 +57,6 @@ internal fun RepositoryRow(
             Surface(
                 modifier = Modifier.size(28.dp),
                 shape = CircleShape,
-                shadowElevation = 2.dp,
             ) {
                 AsyncImage(
                     model = repo.owner.avatarUrl,
@@ -109,6 +107,7 @@ internal fun RepositoryRow(
         
         // Meta info
         RepositoryMeta(repo)
+        }
     }
 }
 

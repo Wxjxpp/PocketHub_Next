@@ -192,18 +192,22 @@ fun SearchScreen(
         ) {
             when {
                 isLoading && !hasResults -> {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
-                    }
+                    com.pockethub.ui.components.SkeletonList(Modifier.fillMaxSize(), rows = 9)
                 }
                 error != null && !hasResults -> {
                     ErrorState(message = error!!, onRetry = { vm.search() })
                 }
                 searchedQuery.isBlank() -> {
-                    EmptyState(title = stringResource(R.string.search_initial_hint))
+                    EmptyState(
+                        icon = androidx.compose.material.icons.Icons.Outlined.Search,
+                        title = stringResource(R.string.search_initial_hint),
+                    )
                 }
                 !hasResults -> {
-                    EmptyState(title = stringResource(R.string.search_results_empty, searchedQuery))
+                    EmptyState(
+                        icon = androidx.compose.material.icons.Icons.Outlined.SearchOff,
+                        title = stringResource(R.string.search_results_empty, searchedQuery),
+                    )
                 }
                 else -> {
                     LazyColumn(

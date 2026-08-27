@@ -5,6 +5,7 @@ import com.pockethub.R
 import androidx.compose.ui.res.stringResource
 
 import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -195,9 +196,7 @@ fun ProfileScreen(
             if (sectionTab == 0) {
                 if (isLoadingRepos && topRepos.isEmpty()) {
                     item {
-                        Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator()
-                        }
+                        com.pockethub.ui.components.SkeletonList(Modifier.fillMaxWidth(), rows = 4, topPadding = 0.dp)
                     }
                 } else if (topRepos.isEmpty()) {
                     item {
@@ -235,9 +234,7 @@ fun ProfileScreen(
                 // Activity (segmented 1) — recent public events from the signed-in user.
                 if (isLoadingEvents && events.isEmpty()) {
                     item {
-                        Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator()
-                        }
+                        com.pockethub.ui.components.SkeletonList(Modifier.fillMaxWidth(), rows = 4, topPadding = 0.dp)
                     }
                 } else if (events.isEmpty()) {
                     item {
@@ -296,12 +293,22 @@ private fun ProfileHeader(user: User?, activeAccount: AccountEntity?) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
         elevation = CardDefaults.cardElevation(0.dp),
     ) {
         Column(
-            Modifier.fillMaxWidth().padding(20.dp),
+            Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
+                            androidx.compose.ui.graphics.Color.Transparent,
+                        )
+                    )
+                )
+                .padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             // Round avatar with a neutral surface placeholder so the circle is
