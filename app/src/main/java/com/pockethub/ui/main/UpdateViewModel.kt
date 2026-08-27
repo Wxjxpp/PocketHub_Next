@@ -5,6 +5,7 @@ import android.content.Intent
 import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.pockethub.data.remote.AuthInterceptor
 import com.pockethub.data.remote.SettingsRepository
 import com.pockethub.data.remote.UpdateChecker
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -37,6 +38,7 @@ class UpdateViewModel @Inject constructor(
     private val updater: UpdateChecker,
     private val settings: SettingsRepository,
     private val client: OkHttpClient,
+    private val authInterceptor: AuthInterceptor,
 ) : ViewModel() {
 
     private val owner = "wochatchat"
@@ -172,7 +174,12 @@ class UpdateViewModel @Inject constructor(
                 withContext(Dispatchers.IO) {
                     val request = Request.Builder().url(url).build()
                     // GitHub CDN issues redirects to release-assets; follow them.
-                    val dlClient = client.newBuilder().followRedirects(true).build()
+                    // Preserve AuthInterceptor so the redirect target (Azure Blob / CDN)
+                    // still carries the Bearer token — otherwise GitHub returns 401.
+                    val dlClient = client.newBuilder()
+                        .followRedirects(true)
+                        .addInterceptor(authInterceptor)
+                        .build()
                     dlClient.newCall(request).execute().use { resp ->
                         if (!resp.isSuccessful) {
                             _download.value = DownloadState.Failed("HTTP ${resp.code}")
