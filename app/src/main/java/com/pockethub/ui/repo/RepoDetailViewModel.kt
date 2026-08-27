@@ -334,7 +334,7 @@ class RepoDetailViewModel @Inject constructor(
         // Mirror to workflows tab only after we've loaded the repo metadata so we
         // can resolve the default branch. Use `repo.value` instead of the stale
         // private field to stay consistent with the rest of this class.
-        val branch = ref ?: repo.value?.defaultBranch
+        val branch = ref ?: _repo.value?.defaultBranch
         if (branch != null && branch != _workflowBranch.value) {
             _workflowBranch.update { branch }
             loadWorkflows(owner, repo, branch)
