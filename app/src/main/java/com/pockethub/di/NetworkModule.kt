@@ -74,6 +74,8 @@ object NetworkModule {
     }
 
     // Coil ImageLoader with SVG support so README badges / logos / charts (.svg) decode.
+    // Explicit 3-tier caching: memory cache (hot images) → disk cache (survives
+    // process death) → network. Crossfade smooths cache-miss loads.
     @Provides
     @Singleton
     fun provideImageLoader(@ApplicationContext context: Context): ImageLoader = ImageLoader.Builder(context)
@@ -81,5 +83,17 @@ object NetworkModule {
             add(SvgDecoder.Factory())
             add(GifDecoder.Factory())
         }
+        .memoryCache {
+            coil.memory.MemoryCache.Builder(context)
+                .maxSizePercent(0.25)
+                .build()
+        }
+        .diskCache {
+            coil.disk.DiskCache.Builder()
+                .directory(context.cacheDir.resolve("image_cache"))
+                .maxSizeBytes(100L * 1024 * 1024) // 100 MB
+                .build()
+        }
+        .crossfade(true)
         .build()
 }
