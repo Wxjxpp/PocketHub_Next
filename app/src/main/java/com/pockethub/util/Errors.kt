@@ -13,7 +13,7 @@ import retrofit2.HttpException
 fun Throwable.userMessage(fallback: String = "Something went wrong"): String {
     if (this is HttpException) {
         val apiMsg = runCatching { response()?.errorBody()?.string() }.getOrNull()
-            ?.let { body -> Regex("\"message\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"").find(body)?.groupValues?.1 }
+            ?.let { body -> Regex("\"message\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"").find(body)?.groupValues?.getOrNull(1) }
         if (!apiMsg.isNullOrBlank()) return apiMsg
         return "HTTP ${code()}"
     }
