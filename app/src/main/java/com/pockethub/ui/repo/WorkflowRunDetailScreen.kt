@@ -114,11 +114,7 @@ fun WorkflowRunDetailScreen(
                         Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = stringResource(R.string.action_back))
                     }
                 },
-                actions = {
-                    IconButton(onClick = { open(run?.htmlUrl) }) {
-                        Icon(Icons.AutoMirrored.Outlined.OpenInNew, contentDescription = stringResource(R.string.cd_open_in_browser))
-                    }
-                },
+                actions = { },
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
