@@ -89,7 +89,6 @@ fun ExploreScreen(
     val featuredSource by vm.featuredSourceOption.collectAsState()
     val followingSource by vm.followingSourceOption.collectAsState()
     val pinnedRepos by vm.pinnedRepos.collectAsState()
-    val pinnedRepoDetails by vm.pinnedRepoDetails.collectAsState()
 
     // Bring up trending data on first composition; later filter changes are driven
     // by the chips via vm.setTrendingFilters(...).
@@ -151,50 +150,44 @@ fun ExploreScreen(
                 Spacer(Modifier.height(4.dp))
             }
 
-            // Pinned repos — rendered with the same rich row as the Repos tab
-            // (RepositoryRow) so the home tab and the repos tab feel identical.
-            // Only rendered when the user has at least one pin so the empty state
-            // doesn't take real estate on first launch.
+            // Pinned repos — compact horizontal scroller; cards stay small so the
+            // section reads as a quick-access strip, not a full list. Only rendered
+            // when the user has at least one pin so the empty state doesn't take
+            // real estate on first launch.
             if (pinnedRepos.isNotEmpty()) {
-                item(key = "pinned-header") {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                    ) {
-                        Icon(
-                            Icons.Outlined.PushPin,
-                            null,
-                            modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            stringResource(R.string.pinned_repos_title),
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
-                }
-                items(pinnedRepos, key = { "pinned-$it" }) { slug ->
-                    val detail = pinnedRepoDetails[slug]
-                    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                        if (detail != null) {
-                            com.pockethub.ui.repos.RepositoryRow(
-                                repo = detail,
-                                onOpen = {
-                                    val parts = slug.split("/", limit = 2)
-                                    if (parts.size == 2) onNavigateToRepo(parts[0], parts[1])
-                                },
-                                onOpenOwner = { onNavigateToUser(slug.substringBefore('/')) },
+                item(key = "pinned") {
+                    Column(Modifier.fillMaxWidth()) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                        ) {
+                            Icon(
+                                Icons.Outlined.PushPin,
+                                null,
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.primary,
                             )
-                        } else {
-                            PinnedRepoRowFallback(
-                                slug = slug,
-                                onClick = {
-                                    val parts = slug.split("/", limit = 2)
-                                    if (parts.size == 2) onNavigateToRepo(parts[0], parts[1])
-                                },
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                stringResource(R.string.pinned_repos_title),
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
                             )
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        LazyRow(
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            items(pinnedRepos, key = { it }) { slug ->
+                                PinnedRepoCard(
+                                    slug = slug,
+                                    onClick = {
+                                        val parts = slug.split("/", limit = 2)
+                                        if (parts.size == 2) onNavigateToRepo(parts[0], parts[1])
+                                    },
+                                )
+                            }
                         }
                     }
                 }

@@ -209,9 +209,12 @@ fun ProfileScreen(
                     }
                 } else {
                     items(topRepos, key = { it.id }) { repo ->
-                        RepoMiniCard(
+                        // Same rich row as the Repos tab (仓库) list — one visual
+                        // language for repo cards app-wide.
+                        com.pockethub.ui.repos.RepositoryRow(
                             repo = repo,
-                            onClick = { onNavigateToRepo(repo.owner.login, repo.name) },
+                            onOpen = { onNavigateToRepo(repo.owner.login, repo.name) },
+                            onOpenOwner = { onNavigateToUserDetail(repo.owner.login) },
                         )
                     }
                     if (isLoadingMoreRepos) {
@@ -412,47 +415,6 @@ private fun AdditionalInfo(user: User?) {
                         Text(value, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
                     }
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun RepoMiniCard(repo: Repository, onClick: () -> Unit) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
-        elevation = CardDefaults.cardElevation(0.dp),
-    ) {
-        Column(Modifier.padding(14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                PhAsyncImage(
-                    model = repo.owner.avatarUrl,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp).clip(CircleShape),
-                )
-                Spacer(Modifier.width(6.dp))
-                Text(repo.owner.login, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(" / ", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(repo.name, style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold))
-            }
-            if (!repo.description.isNullOrBlank()) {
-                Spacer(Modifier.height(4.dp))
-                Text(repo.description!!, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            }
-            Spacer(Modifier.height(6.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                repo.language?.let {
-                    Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.width(12.dp))
-                }
-                Text("★ ${repo.stars}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.width(12.dp))
-                Text("⑂ ${repo.forks}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
