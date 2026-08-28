@@ -80,11 +80,11 @@
 - [x] 留尾去重: CodeTab.relativeTime、CodeBrowserViewModel.isoParser(实为死字段, 直接删) → util/Format.kt ✓
 - 审计残留同名私有 helper 5 组: formatCount ×2 已合并 ✓; 其余 4 组(EditCommentDialog/IssueEventRow/StatPill/StatsRow)为跨包小 UI 片段, 各自内聚, 保留
 
-## Phase 4 — 架构与健壮性/体验 [ ]
-- [ ] 分页/列表 key 与性能复查
-- [ ] 网络层统一错误处理复查
-- [ ] 体验问题清单（随拆分过程收集）
-- [ ] push + CI ✓
+## Phase 4 — 架构与健壮性/体验 [x]
+- [x] 分页/列表 key 复查: 实体列表全部已有 key；4 处无 key 均为静态小列表(语言/时间范围 chips、issue 表单、筛选 tabs)，不会重排，无需加
+- [x] 网络层统一错误处理: 新增 util/Errors.kt `Throwable.userMessage(fallback)` — GitHub API 错误体 message 字段 > HTTP 码 > localizedMessage > fallback；全仓 83 处 `e.localizedMessage ?: ...` 统一替换(25 文件)，用户现在能看到 GitHub 真实失败原因而非裸 "HTTP 404"；CI ✓ 33156644747
+- [x] 体验问题清单: 拆分过程中发现的问题均已就地修复(双 spinner、假刷新、分支联动等见 2026-08-26~28 日志)；本轮审计未新增条目
+- 刻意不做(避免过度工程): remember 深度审计与 LaunchedEffect 竞态全面重查(上轮刷新体系重构已覆盖主要竞态)，待真实性能问题出现再做针对性优化
 
 ## 变更日志
 | 批次 | commit | 内容 | CI |
@@ -101,6 +101,8 @@
 | APK | v0.3.14 | fix 分支 workflow_dispatch 打包（含 P1+P2+P3 全部），供功能验证 | ✓ 33153027548 |
 | P3f | split+1fixup | 去重 relativeTime/formatCount/死 isoParser + Search/Explore/Settings 拆缝 | ✓ 33154593671 |
 | APK | v0.3.15 | fix 分支最终验证包（含全部重构），未合 main | ✓ 33155123661 |
+| P4 | Errors.kt | userMessage 统一 83 处错误文案 | ✓ 33156644747 |
+| docs | [skip ci] | Phase 4 收尾记录 | 无 CI |
 
 ## 当前状态 (2026-08-28 P3 全部完成后)
 - fix 分支 = main + 20+ 个重构 commit，最新 CI ✓ 33152579518；v0.3.14 已从 fix 打包 (run 33153027548)
