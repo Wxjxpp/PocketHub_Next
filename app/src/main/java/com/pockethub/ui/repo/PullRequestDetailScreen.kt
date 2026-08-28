@@ -11,13 +11,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -39,7 +37,6 @@ import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.PersonAdd
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -58,14 +55,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.SheetState
-import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.InputChip
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -80,7 +71,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -185,104 +175,77 @@ fun PullRequestDetailScreen(
 
     // Add reviewers dialog (multi-input via chip list)
     if (showAddReviewer) {
-        val sheetState: SheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-        var reviewerInput by remember { mutableStateOf("") }
-        var pendingReviewers by remember { mutableStateOf<List<String>>(emptyList()) }
-        ModalBottomSheet(
-            onDismissRequest = { if (!reviewerWorking) showAddReviewer = false },
-            sheetState = sheetState,
-        ) {
-            Column(
-                Modifier.padding(20.dp).fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Text(stringResource(R.string.pr_add_reviewer_dialog_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                OutlinedTextField(
-                    value = reviewerInput,
-                    onValueChange = { reviewerInput = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text(stringResource(R.string.pr_add_reviewer_search_hint)) },
-                    singleLine = true,
-                    enabled = !reviewerWorking,
-                    trailingIcon = {
-                        IconButton(
-                            onClick = {
-                                val v = reviewerInput.trim().removePrefix("@")
-                                if (v.isNotEmpty() && pendingReviewers.none { it.equals(v, ignoreCase = true) }) {
-                                    pendingReviewers = pendingReviewers + v
-                                    reviewerInput = ""
-                                }
-                            },
-                            enabled = !reviewerWorking,
-                        ) { Icon(Icons.Outlined.Add, null) }
-                    },
-                    keyboardActions = KeyboardActions(onDone = {
-                        val v = reviewerInput.trim().removePrefix("@")
-                        if (v.isNotEmpty() && pendingReviewers.none { it.equals(v, ignoreCase = true) }) {
-                            pendingReviewers = pendingReviewers + v
-                            reviewerInput = ""
-                        }
-                    }),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                )
-                if (pendingReviewers.isEmpty()) {
-                    Text(
-                        stringResource(R.string.pr_add_reviewer_empty),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                } else {
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        pendingReviewers.forEach { login ->
-                            InputChip(
-                                label = { Text("@$login", style = MaterialTheme.typography.labelSmall, maxLines = 1) },
-                                trailingIcon = {
-                                    Icon(
-                                        Icons.Outlined.Close,
-                                        contentDescription = stringResource(R.string.action_remove),
-                                        modifier = Modifier.size(14.dp).clickable {
-                                            pendingReviewers = pendingReviewers.filterNot { it.equals(login, ignoreCase = true) }
-                                        },
-                                    )
-                                },
-                                onClick = { pendingReviewers = pendingReviewers.filterNot { it.equals(login, ignoreCase = true) } },
-                                selected = false,
-                                enabled = !reviewerWorking,
-                            )
-                        }
-                    }
-                }
-                reviewerError?.let { err ->
-                    Text(err, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
-                }
-                Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
-                    TextButton(
-                        onClick = { showAddReviewer = false },
-                        enabled = !reviewerWorking,
-                    ) { Text(stringResource(R.string.action_cancel)) }
-                    Spacer(Modifier.width(8.dp))
-                    Button(
-                        onClick = {
-                            showAddReviewer = false
-                            vm.requestReviewers(owner, repo, prNumber, pendingReviewers)
-                        },
-                        enabled = pendingReviewers.isNotEmpty() && !reviewerWorking,
-                    ) {
-                        if (reviewerWorking) {
-                            CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
-                        } else {
-                            Text(stringResource(R.string.pr_add_reviewer_submit))
-                        }
-                    }
-                }
-                Spacer(Modifier.height(8.dp))
-            }
-        }
+        AddReviewerSheet(
+            working = reviewerWorking,
+            error = reviewerError,
+            onDismiss = { showAddReviewer = false },
+            onSubmit = { vm.requestReviewers(owner, repo, prNumber, it) },
+        )
     }
-
+    // Merge dialog
+    if (showMergeDialog) {
+        MergeDialog(
+            prNumber = pr?.number ?: 0,
+            merging = isMerging,
+            onDismiss = { showMergeDialog = false },
+            onMerge = { vm.merge(owner, repo, prNumber, it) },
+        )
+    }
+    // Review submit bottom sheet (R1)
+    if (showReviewDialog) {
+        ReviewSheet(
+            reviewEvent = reviewEvent,
+            onReviewEventChange = { reviewEvent = it },
+            sending = isSendingReview,
+            onDismiss = { showReviewDialog = false },
+            onSubmit = { apiValue, body -> vm.submitReview(owner, repo, prNumber, apiValue, body) },
+        )
+    }
+    // Merge warning dialog (R5) — reviews requested changes; user taps "merge anyway"
+    if (showMergeWarningDialog) {
+        MergeWarningDialog(
+            changesRequestedCount = reviews.count { it.state == "CHANGES_REQUESTED" },
+            onDismiss = { showMergeWarningDialog = false },
+            onMergeAnyway = { showMergeWarningDialog = false; showMergeDialog = true },
+        )
+    }
+    // Edit inline (PR review) comment dialog (R4)
+    editingInlineId?.let { id ->
+        EditInlineCommentDialog(
+            id = id,
+            body = editingInlineBody,
+            onBodyChange = { editingInlineBody = it },
+            onDismiss = { editingInlineId = null },
+            onSave = { vid, newBody -> vm.editInlineComment(vid, newBody) },
+        )
+    }
+    // Delete inline (PR review) comment confirm (R4)
+    pendingDeleteInlineId?.let { id ->
+        DeleteInlineConfirmDialog(
+            id = id,
+            onDismiss = { pendingDeleteInlineId = null },
+            onDelete = { vm.deleteInlineComment(it) },
+        )
+    }
+    // Edit comment dialog
+    editingCommentId?.let { id ->
+        EditCommentDialog(
+            id = id,
+            body = editingBody,
+            onBodyChange = { editingBody = it },
+            onDismiss = { editingCommentId = null },
+            onSave = { vid, newBody -> vm.editComment(vid, newBody) },
+        )
+    }
+    // Delete comment confirm
+    pendingDeleteId?.let { id ->
+        DeleteCommentConfirmDialog(
+            id = id,
+            onDismiss = { pendingDeleteId = null },
+            onDelete = { vm.deleteComment(it) },
+        )
+    }
+}
     // Snackbar for results
     LaunchedEffect(mergeResult) {
         mergeResult?.let {
@@ -756,253 +719,6 @@ fun PullRequestDetailScreen(
         }
     }
 
-    // Merge dialog
-    if (showMergeDialog) {
-        var mergeMethod by remember { mutableStateOf("merge") }
-        AlertDialog(
-            onDismissRequest = { if (!isMerging) showMergeDialog = false },
-            title = { Text(stringResource(R.string.pr_merge_title)) },
-            text = {
-                Column {
-                    Text(stringResource(R.string.pr_merge_confirm, pr?.number ?: 0))
-                    Spacer(Modifier.height(12.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf("merge" to stringResource(R.string.pr_merge_method_merge), "squash" to stringResource(R.string.pr_merge_method_squash), "rebase" to stringResource(R.string.pr_merge_method_rebase)).forEach { (method, label) ->
-                            OutlinedButton(
-                                onClick = { mergeMethod = method },
-                                colors = if (mergeMethod == method) ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-                                else ButtonDefaults.outlinedButtonColors(),
-                            ) {
-                                Text(label, style = MaterialTheme.typography.labelSmall)
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = { showMergeDialog = false; vm.merge(owner, repo, prNumber, mergeMethod) },
-                    enabled = !isMerging,
-                ) {
-                    if (isMerging) {
-                        CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
-                    } else {
-                        Text(stringResource(R.string.action_merge))
-                    }
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showMergeDialog = false }) { Text(stringResource(R.string.action_cancel)) }
-            },
-        )
-    }
-
-    // Review submit bottom sheet (R1)
-    if (showReviewDialog) {
-        val sheetState: SheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-        var reviewBody by remember { mutableStateOf("") }
-        ModalBottomSheet(
-            onDismissRequest = { if (!isSendingReview) showReviewDialog = false },
-            sheetState = sheetState,
-        ) {
-            Column(
-                Modifier.padding(20.dp).fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Text(stringResource(R.string.pr_review_submit), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-
-                ReviewEvent.entries.forEach { ev ->
-                    Row(
-                        Modifier.fillMaxWidth().clickable(enabled = !isSendingReview) { reviewEvent = ev }.padding(vertical = 2.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        RadioButton(
-                            selected = reviewEvent == ev,
-                            onClick = { reviewEvent = ev },
-                            enabled = !isSendingReview,
-                            colors = RadioButtonDefaults.colors(selectedColor = when (ev) {
-                                ReviewEvent.APPROVE -> MaterialTheme.colorScheme.primary
-                                ReviewEvent.REQUEST_CHANGES -> MaterialTheme.colorScheme.error
-                                ReviewEvent.COMMENT -> MaterialTheme.colorScheme.onSurfaceVariant
-                            }),
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                when (ev) {
-                                    ReviewEvent.COMMENT -> stringResource(R.string.pr_review_event_comment)
-                                    ReviewEvent.APPROVE -> stringResource(R.string.pr_review_event_approve)
-                                    ReviewEvent.REQUEST_CHANGES -> stringResource(R.string.pr_review_event_request_changes)
-                                },
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                            Text(
-                                when (ev) {
-                                    ReviewEvent.COMMENT -> stringResource(R.string.pr_review_event_hint_comment)
-                                    ReviewEvent.APPROVE -> stringResource(R.string.pr_review_event_hint_approve)
-                                    ReviewEvent.REQUEST_CHANGES -> stringResource(R.string.pr_review_event_hint_request_changes)
-                                },
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
-
-                OutlinedTextField(
-                    value = reviewBody,
-                    onValueChange = { reviewBody = it },
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp),
-                    placeholder = {
-                        Text(when (reviewEvent) {
-                            ReviewEvent.COMMENT -> stringResource(R.string.pr_review_event_hint_comment)
-                            ReviewEvent.APPROVE -> stringResource(R.string.pr_review_event_hint_approve)
-                            ReviewEvent.REQUEST_CHANGES -> stringResource(R.string.pr_review_event_hint_request_changes)
-                        })
-                    },
-                    enabled = !isSendingReview,
-                    minLines = 3,
-                )
-
-                Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
-                    TextButton(
-                        onClick = { showReviewDialog = false },
-                        enabled = !isSendingReview,
-                    ) { Text(stringResource(R.string.action_cancel)) }
-                    Spacer(Modifier.width(8.dp))
-                    Button(
-                        onClick = {
-                            showReviewDialog = false
-                            vm.submitReview(owner, repo, prNumber, reviewEvent.apiValue, reviewBody)
-                        },
-                        enabled = !isSendingReview,
-                    ) {
-                        if (isSendingReview) {
-                            CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
-                        } else {
-                            Text(when (reviewEvent) {
-                                ReviewEvent.COMMENT -> stringResource(R.string.pr_review_comment)
-                                ReviewEvent.APPROVE -> stringResource(R.string.pr_approve)
-                                ReviewEvent.REQUEST_CHANGES -> stringResource(R.string.pr_request_changes)
-                            })
-                        }
-                    }
-                }
-                Spacer(Modifier.height(8.dp))
-            }
-        }
-    }
-
-    // Merge warning dialog (R5) — reviews requested changes; user taps "merge anyway"
-    if (showMergeWarningDialog) {
-        AlertDialog(
-            onDismissRequest = { showMergeWarningDialog = false },
-            title = { Text(stringResource(R.string.pr_merge_warning_title)) },
-            text = {
-                val count = reviews.count { it.state == "CHANGES_REQUESTED" }
-                Text(stringResource(R.string.pr_changes_requested_warning, count))
-            },
-            confirmButton = {
-                Button(onClick = { showMergeWarningDialog = false; showMergeDialog = true }) { Text(stringResource(R.string.action_merge)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showMergeWarningDialog = false }) { Text(stringResource(R.string.action_cancel)) }
-            },
-        )
-    }
-
-    // Edit inline (PR review) comment dialog (R4)
-    editingInlineId?.let { id ->
-        AlertDialog(
-            onDismissRequest = { editingInlineId = null },
-            title = { Text(stringResource(R.string.pr_inline_edit_title)) },
-            text = {
-                OutlinedTextField(
-                    value = editingInlineBody,
-                    onValueChange = { editingInlineBody = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 3,
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = { vm.editInlineComment(id, editingInlineBody.trim()); editingInlineId = null },
-                    enabled = editingInlineBody.isNotBlank(),
-                ) { Text(stringResource(R.string.action_save)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { editingInlineId = null }) { Text(stringResource(R.string.action_cancel)) }
-            },
-        )
-    }
-
-    // Delete inline (PR review) comment confirm (R4)
-    pendingDeleteInlineId?.let { id ->
-        AlertDialog(
-            onDismissRequest = { pendingDeleteInlineId = null },
-            title = { Text(stringResource(R.string.comment_delete_confirm_title)) },
-            text = { Text(stringResource(R.string.comment_delete_confirm_message)) },
-            confirmButton = {
-                Button(
-                    onClick = { vm.deleteInlineComment(id); pendingDeleteInlineId = null },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                ) { Text(stringResource(R.string.action_delete)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { pendingDeleteInlineId = null }) { Text(stringResource(R.string.action_cancel)) }
-            },
-        )
-    }
-
-    // Edit comment dialog
-    editingCommentId?.let { id ->
-        AlertDialog(
-            onDismissRequest = { editingCommentId = null },
-            title = { Text(stringResource(R.string.comment_edit_title)) },
-            text = {
-                OutlinedTextField(
-                    value = editingBody,
-                    onValueChange = { editingBody = it },
-                    label = { Text(stringResource(R.string.comment_placeholder)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 4,
-                )
-            },
-            confirmButton = {
-                Button(onClick = {
-                    vm.editComment(id, editingBody.trim())
-                    editingCommentId = null
-                }, enabled = editingBody.isNotBlank()) {
-                    Text(stringResource(R.string.action_save))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { editingCommentId = null }) { Text(stringResource(R.string.action_cancel)) }
-            },
-        )
-    }
-    // Delete comment confirm
-    pendingDeleteId?.let { id ->
-        AlertDialog(
-            onDismissRequest = { pendingDeleteId = null },
-            title = { Text(stringResource(R.string.comment_delete_confirm_title)) },
-            text = { Text(stringResource(R.string.comment_delete_confirm_message)) },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        vm.deleteComment(id)
-                        pendingDeleteId = null
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                ) { Text(stringResource(R.string.action_delete)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { pendingDeleteId = null }) { Text(stringResource(R.string.action_cancel)) }
-            },
-        )
-    }
-}
 
 @Composable
 private fun CommentInput(
