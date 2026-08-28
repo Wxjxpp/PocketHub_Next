@@ -112,20 +112,11 @@ class WorkflowRunDetailViewModel @Inject constructor(
             _isLoading.update { true }
             _error.update { null }
             try {
-                val resp = api.getWorkflowRuns(owner, repo, perPage = 1)
-                // API doesn't expose single-run GET here, so we filter the list — OK
-                // for the popular case (first page contains the run user clicked).
-                _run.update { resp.runs.firstOrNull { it.id == runId } ?: resp.runs.firstOrNull() }
-                if (_run.value == null) {
-                    // Fall back to per-page scan if first page didn't contain it.
-                    var page = 2
-                    while (_run.value == null && page <= 5) {
-                        val r = api.getWorkflowRuns(owner, repo, perPage = 50, page = page)
-                        _run.update { r.runs.firstOrNull { it.id == runId } }
-                        if (r.runs.isEmpty()) break
-                        page++
-                    }
-                }
+                // Exact single-run fetch. (An earlier implementation pulled the
+                // 1-item runs list and fell back to whichever run came back —
+                // that displayed the wrong run whenever the clicked run wasn't
+                // the repo's newest.)
+                _run.update { api.getWorkflowRun(owner, repo, runId) }
             } catch (e: Exception) {
                 issueReporter.reportError("WorkflowRunDetail", "loadRun", e)
                 _error.update { e.userMessage("Failed to load workflow run") }

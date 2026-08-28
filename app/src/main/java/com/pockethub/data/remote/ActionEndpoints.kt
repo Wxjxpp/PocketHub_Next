@@ -25,6 +25,14 @@ interface ActionEndpoints {
         @Query("branch") branch: String? = null,
     ): GitHubApi.WorkflowRunsResponse
 
+    /** Fetch exactly one workflow run by id — never guess from a list page. */
+    @GET("repos/{owner}/{repo}/actions/runs/{run_id}")
+    suspend fun getWorkflowRun(
+        @Path("owner") owner: String,
+        @Path("repo") repo: String,
+        @Path("run_id") runId: Long,
+    ): GitHubApi.WorkflowRun
+
     /**
      * List check runs for a given commit ref — the canonical source for "PR checks"
      * (the PR header on GitHub web shows exactly this aggregate). Includes GitHub
