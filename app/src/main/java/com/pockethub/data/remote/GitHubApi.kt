@@ -41,7 +41,7 @@ interface GitHubApi :
     // ──────────────────────────────────────────────
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.ReadmeResponse(
+    data class ReadmeResponse(
         val name: String = "",
         val path: String = "",
         val content: String = "",          // base64 encoded markdown body
@@ -52,7 +52,7 @@ interface GitHubApi :
     )
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.WatchSubscription(
+    data class WatchSubscription(
         val subscribed: Boolean = false,
         val ignored: Boolean = false,
         val reason: String? = null,
@@ -63,20 +63,20 @@ interface GitHubApi :
     )
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.WatchSubscriptionRequest(
+    data class WatchSubscriptionRequest(
         val subscribed: Boolean = true,
         val ignored: Boolean = false,
     )
 
     /** GitHub accepts `name` (and optional `default_branch_only`) on fork creation. */
     @kotlinx.serialization.Serializable
-    data class GitHubApi.ForkRequest(
+    data class ForkRequest(
         val name: String? = null,
         @kotlinx.serialization.SerialName("default_branch_only") val defaultBranchOnly: Boolean = false,
     )
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.RepoUpdateRequest(
+    data class RepoUpdateRequest(
         /**
          * `visibility: "public" | "private"` — GitHub's authoritative visibility
          * field. The legacy boolean `private` field still works but is deprecated
@@ -93,7 +93,7 @@ interface GitHubApi :
     )
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.ContentEntry(
+    data class ContentEntry(
         val name: String = "",
         val path: String = "",
         val sha: String = "",
@@ -109,7 +109,7 @@ interface GitHubApi :
     // ──────────────────────────────────────────────
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.IssueCreateRequest(
+    data class IssueCreateRequest(
         val title: String,
         val body: String? = null,
         val labels: List<String> = emptyList(),
@@ -118,7 +118,7 @@ interface GitHubApi :
     )
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.IssueEvent(
+    data class IssueEvent(
         val id: Long = 0,
         val event: String = "",
         @kotlinx.serialization.SerialName("commit_id") val commitId: String? = null,
@@ -132,7 +132,7 @@ interface GitHubApi :
     )
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.IssueComment(
+    data class IssueComment(
         val id: Long = 0,
         val body: String = "",
         val user: User? = null,
@@ -144,7 +144,7 @@ interface GitHubApi :
     )
 
     /** GitHub reaction content values accepted by the reactions API. */
-    enum class GitHubApi.ReactionContent(val apiValue: String) {
+    enum class ReactionContent(val apiValue: String) {
         PLUS_ONE("+1"),
         MINUS_ONE("-1"),
         LAUGH("laugh"),
@@ -156,7 +156,7 @@ interface GitHubApi :
     }
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.ReactionResponse(
+    data class ReactionResponse(
         val id: Long = 0,
         val user: User? = null,
         val content: String = "",
@@ -164,17 +164,17 @@ interface GitHubApi :
     )
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.ReactionRequest(val content: String)
+    data class ReactionRequest(val content: String)
 
     // ── Pull Requests (dedicated PR endpoints) ──────────
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.PullUpdateRequest(
+    data class PullUpdateRequest(
         val state: String, // "open" | "closed"
     )
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.ReviewComment(
+    data class ReviewComment(
         val id: Long = 0,
         @kotlinx.serialization.SerialName("node_id") val nodeId: String? = null,
         val path: String = "",
@@ -205,7 +205,7 @@ interface GitHubApi :
      * `subject_type` is "line" by default; `side` defaults to "RIGHT" (new file).
      */
     @kotlinx.serialization.Serializable
-    data class GitHubApi.ReviewCommentRequest(
+    data class ReviewCommentRequest(
         val body: String,
         @kotlinx.serialization.SerialName("in_reply_to_id") val inReplyToId: Long? = null,
         @kotlinx.serialization.SerialName("commit_id") val commitId: String? = null,
@@ -218,7 +218,7 @@ interface GitHubApi :
     )
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.PullRequest(
+    data class PullRequest(
         val id: Long = 0,
         val number: Int = 0,
         @kotlinx.serialization.SerialName("html_url") val htmlUrl: String? = null,
@@ -266,7 +266,7 @@ interface GitHubApi :
     }
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.PullRequestFile(
+    data class PullRequestFile(
         val sha: String = "",
         val filename: String = "",
         val status: String = "", // "added" | "modified" | "removed" | "renamed"
@@ -279,7 +279,7 @@ interface GitHubApi :
     )
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.PullRequestReview(
+    data class PullRequestReview(
         val id: Long = 0,
         @kotlinx.serialization.SerialName("node_id") val nodeId: String? = null,
         val user: User? = null,
@@ -292,33 +292,33 @@ interface GitHubApi :
     )
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.MergeRequest(
+    data class MergeRequest(
         val commit_title: String? = null,
         val commit_message: String? = null,
         val merge_method: String = "merge", // "merge" | "squash" | "rebase"
     )
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.MergeResult(
+    data class MergeResult(
         val sha: String? = null,
         val merged: Boolean = false,
         val message: String? = null,
     )
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.ReviewRequest(
+    data class ReviewRequest(
         val body: String? = null,
         val event: String, // "APPROVE" | "REQUEST_CHANGES" | "COMMENT"
         @kotlinx.serialization.SerialName("comments") val comments: List<GitHubApi.ReviewInlineComment> = emptyList(),
     )
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.RequestedReviewersBody(
+    data class RequestedReviewersBody(
         val reviewers: List<String> = emptyList(),
     )
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.ReviewInlineComment(
+    data class ReviewInlineComment(
         val path: String? = null,
         val position: Int? = null,
         val body: String = "",
@@ -327,10 +327,10 @@ interface GitHubApi :
     // ── Issue / PR actions ──────────────────────────────
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.CommentRequest(val body: String)
+    data class CommentRequest(val body: String)
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.IssueUpdateRequest(
+    data class IssueUpdateRequest(
         val title: String? = null,
         val body: String? = null,
         val state: String? = null,
@@ -340,7 +340,7 @@ interface GitHubApi :
     )
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.CommitCommentCreate(
+    data class CommitCommentCreate(
         val body: String,
         // Optional positional fields — omitted for top-level comments.
         val path: String? = null,
@@ -349,13 +349,13 @@ interface GitHubApi :
     )
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.UpdateRefRequest(
+    data class UpdateRefRequest(
         val sha: String,
         val force: Boolean = false,
     )
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.CommitComment(
+    data class CommitComment(
         val id: Long = 0,
         @kotlinx.serialization.SerialName("html_url") val htmlUrl: String? = null,
         val body: String = "",
@@ -368,7 +368,7 @@ interface GitHubApi :
     )
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.Commit(
+    data class Commit(
         val sha: String = "",
         @kotlinx.serialization.SerialName("html_url") val htmlUrl: String? = null,
         val commit: CommitInfo? = null,
@@ -394,7 +394,7 @@ interface GitHubApi :
     }
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.CommitDetail(
+    data class CommitDetail(
         val sha: String = "",
         @kotlinx.serialization.SerialName("html_url") val htmlUrl: String? = null,
         val commit: GitHubApi.Commit.CommitInfo? = null,
@@ -429,7 +429,7 @@ interface GitHubApi :
     // ── Branches ──────────────────────────────────────────
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.Branch(
+    data class Branch(
         val name: String = "",
         val commit: BranchCommit? = null,
         val `protected`: Boolean = false,
@@ -442,13 +442,13 @@ interface GitHubApi :
     }
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.CheckRunsResponse(
+    data class CheckRunsResponse(
         @kotlinx.serialization.SerialName("total_count") val totalCount: Int = 0,
         val runs: List<GitHubApi.CheckRun> = emptyList(),
     )
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.CheckRun(
+    data class CheckRun(
         val id: Long = 0,
         val name: String = "",
         val status: String? = null,              // queued | in_progress | completed
@@ -461,25 +461,25 @@ interface GitHubApi :
     )
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.CheckApp(
+    data class CheckApp(
         val name: String = "",
         @kotlinx.serialization.SerialName("slug") val slug: String? = null,
     )
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.WorkflowDispatchRequest(
+    data class WorkflowDispatchRequest(
         /** GitHubApi.Branch or tag name the workflow should run on. */
         val ref: String,
     )
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.WorkflowsResponse(
+    data class WorkflowsResponse(
         @kotlinx.serialization.SerialName("total_count") val totalCount: Int = 0,
         @kotlinx.serialization.SerialName("workflows") val workflows: List<GitHubApi.Workflow> = emptyList(),
     )
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.Workflow(
+    data class Workflow(
         val id: Long = 0,
         @kotlinx.serialization.SerialName("node_id") val nodeId: String? = null,
         val name: String = "",
@@ -493,13 +493,13 @@ interface GitHubApi :
     )
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.WorkflowRunsResponse(
+    data class WorkflowRunsResponse(
         @kotlinx.serialization.SerialName("total_count") val totalCount: Int = 0,
         @kotlinx.serialization.SerialName("workflow_runs") val runs: List<GitHubApi.WorkflowRun> = emptyList(),
     )
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.WorkflowRun(
+    data class WorkflowRun(
         val id: Long = 0,
         @kotlinx.serialization.SerialName("node_id") val nodeId: String? = null,
         val name: String = "",
@@ -522,12 +522,12 @@ interface GitHubApi :
     )
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.HeadCommit(
+    data class HeadCommit(
         val message: String? = null,
     )
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.Release(
+    data class Release(
         val id: Long = 0,
         @kotlinx.serialization.SerialName("tag_name") val tagName: String = "",
         @kotlinx.serialization.SerialName("name") val name: String? = null,
@@ -555,28 +555,28 @@ interface GitHubApi :
     // ──────────────────────────────────────────────
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.SearchRepoResult(
+    data class SearchRepoResult(
         val total_count: Int = 0,
         val incomplete_results: Boolean = false,
         val items: List<Repository> = emptyList(),
     )
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.SearchUserResult(
+    data class SearchUserResult(
         val total_count: Int = 0,
         val incomplete_results: Boolean = false,
         val items: List<User> = emptyList(),
     )
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.SearchCodeResult(
+    data class SearchCodeResult(
         val total_count: Int = 0,
         val incomplete_results: Boolean = false,
         val items: List<GitHubApi.CodeSearchItem> = emptyList(),
     )
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.CodeSearchItem(
+    data class CodeSearchItem(
         val name: String = "",
         val path: String = "",
         @kotlinx.serialization.SerialName("html_url") val htmlUrl: String = "",
@@ -585,14 +585,14 @@ interface GitHubApi :
 
     /** Wrapper returned by /search/issues (issues + PRs share this shape). */
     @kotlinx.serialization.Serializable
-    data class GitHubApi.SearchIssueResult(
+    data class SearchIssueResult(
         val total_count: Int = 0,
         val incomplete_results: Boolean = false,
         val items: List<com.pockethub.data.model.Issue> = emptyList(),
     )
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.OAuthTokenResponse(
+    data class OAuthTokenResponse(
         val access_token: String = "",
         val token_type: String = "",
         val scope: String = "",
@@ -607,7 +607,7 @@ interface GitHubApi :
 
     /** Body for editing a pull request review comment. */
     @kotlinx.serialization.Serializable
-    data class GitHubApi.EditReviewCommentRequest(val body: String)
+    data class EditReviewCommentRequest(val body: String)
 
     /**
      * Body for a GraphQL query / mutation request.
@@ -617,7 +617,7 @@ interface GitHubApi :
      * queries like the resolve / unresolve mutations used by this feature.
      */
     @kotlinx.serialization.Serializable
-    data class GitHubApi.GraphQLRequest(
+    data class GraphQLRequest(
         val query: String,
         @kotlinx.serialization.SerialName("variables") val variables: Map<String, kotlinx.serialization.json.JsonElement> = emptyMap(),
     )
@@ -627,25 +627,25 @@ interface GitHubApi :
      * `errors` is non-empty on failure; both are optional per the GraphQL spec.
      */
     @kotlinx.serialization.Serializable
-    data class GitHubApi.GraphQLResponse(
+    data class GraphQLResponse(
         val data: kotlinx.serialization.json.JsonObject? = null,
         val errors: List<GitHubApi.GraphQLError>? = null,
     )
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.GraphQLError(
+    data class GraphQLError(
         val message: String = "",
         @kotlinx.serialization.SerialName("type") val type: String? = null,
     )
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.ArtifactsResponse(
+    data class ArtifactsResponse(
         @kotlinx.serialization.SerialName("total_count") val totalCount: Int = 0,
         val artifacts: List<GitHubApi.Artifact> = emptyList(),
     )
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.Artifact(
+    data class Artifact(
         val id: Long = 0,
         val name: String = "",
         @kotlinx.serialization.SerialName("size_in_bytes") val sizeInBytes: Long = 0,
@@ -657,20 +657,20 @@ interface GitHubApi :
     )
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.ArtifactWorkflowRun(
+    data class ArtifactWorkflowRun(
         val id: Long? = null,
         @kotlinx.serialization.SerialName("head_branch") val headBranch: String? = null,
         @kotlinx.serialization.SerialName("head_sha") val headSha: String? = null,
     )
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.WorkflowJobsResponse(
+    data class WorkflowJobsResponse(
         @kotlinx.serialization.SerialName("total_count") val totalCount: Int = 0,
         val jobs: List<GitHubApi.WorkflowJob> = emptyList(),
     )
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.WorkflowJob(
+    data class WorkflowJob(
         val id: Long = 0,
         @kotlinx.serialization.SerialName("run_id") val runId: Long = 0,
         @kotlinx.serialization.SerialName("node_id") val nodeId: String? = null,
@@ -687,7 +687,7 @@ interface GitHubApi :
     )
 
     @kotlinx.serialization.Serializable
-    data class GitHubApi.WorkflowStep(
+    data class WorkflowStep(
         val name: String = "",
         val status: String = "",                // queued | in_progress | completed
         val conclusion: String? = null,         // success | failure | cancelled | skipped
