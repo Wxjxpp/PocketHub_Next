@@ -26,12 +26,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
-import androidx.compose.material.icons.automirrored.outlined.Send
-import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Comment
 import androidx.compose.material.icons.outlined.Merge
-import androidx.compose.material.icons.outlined.Pending
 import androidx.compose.material.icons.outlined.RateReview
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Warning
@@ -47,7 +44,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -71,11 +67,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
-import com.pockethub.data.remote.GitHubApi
 import com.pockethub.ui.components.CommentItem
 import com.pockethub.ui.markdown.MarkdownText
 import kotlinx.coroutines.launch
@@ -83,7 +77,6 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import java.text.DateFormat
-import com.pockethub.util.parseIso
 
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
@@ -209,43 +202,6 @@ fun PullRequestDetailScreen(
             onMergeAnyway = { showMergeWarningDialog = false; showMergeDialog = true },
         )
     }
-    // Edit inline (PR review) comment dialog (R4)
-    editingInlineId?.let { id ->
-        EditInlineCommentDialog(
-            id = id,
-            body = editingInlineBody,
-            onBodyChange = { editingInlineBody = it },
-            onDismiss = { editingInlineId = null },
-            onSave = { vid, newBody -> vm.editInlineComment(vid, newBody) },
-        )
-    }
-    // Delete inline (PR review) comment confirm (R4)
-    pendingDeleteInlineId?.let { id ->
-        DeleteInlineConfirmDialog(
-            id = id,
-            onDismiss = { pendingDeleteInlineId = null },
-            onDelete = { vm.deleteInlineComment(it) },
-        )
-    }
-    // Edit comment dialog
-    editingCommentId?.let { id ->
-        EditCommentDialog(
-            id = id,
-            body = editingBody,
-            onBodyChange = { editingBody = it },
-            onDismiss = { editingCommentId = null },
-            onSave = { vid, newBody -> vm.editComment(vid, newBody) },
-        )
-    }
-    // Delete comment confirm
-    pendingDeleteId?.let { id ->
-        DeleteCommentConfirmDialog(
-            id = id,
-            onDismiss = { pendingDeleteId = null },
-            onDelete = { vm.deleteComment(it) },
-        )
-    }
-}
     // Snackbar for results
     LaunchedEffect(mergeResult) {
         mergeResult?.let {
@@ -719,306 +675,40 @@ fun PullRequestDetailScreen(
         }
     }
 
-
-@Composable
-private fun CommentInput(
-    isSending: Boolean,
-    onSend: (String) -> Unit,
-) {
-    var text by remember { mutableStateOf("") }
-    Row(
-        Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        OutlinedTextField(
-            value = text,
-            onValueChange = { text = it },
-            modifier = Modifier.weight(1f),
-            placeholder = { Text(stringResource(R.string.comment_placeholder)) },
-            maxLines = 4,
+    // Edit inline (PR review) comment dialog (R4)
+    editingInlineId?.let { id ->
+        EditInlineCommentDialog(
+            id = id,
+            body = editingInlineBody,
+            onBodyChange = { editingInlineBody = it },
+            onDismiss = { editingInlineId = null },
+            onSave = { vid, newBody -> vm.editInlineComment(vid, newBody) },
         )
-        Spacer(Modifier.width(8.dp))
-        IconButton(
-            onClick = { if (text.isNotBlank()) { onSend(text); text = "" } },
-            enabled = text.isNotBlank() && !isSending,
-        ) {
-            if (isSending) {
-                CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-            } else {
-                Icon(Icons.AutoMirrored.Outlined.Send, contentDescription = stringResource(R.string.cd_send_comment))
-            }
-        }
     }
-}
-
-@Composable
-private fun ReviewItem(
-    review: GitHubApi.PullRequestReview,
-    onNavigateToUser: (String) -> Unit,
-    dateFmt: DateFormat,
-) {
-    Column(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            val stateColor = when (review.state) {
-                "APPROVED" -> Color(0xFF2EA043)
-                "CHANGES_REQUESTED" -> MaterialTheme.colorScheme.error
-                else -> MaterialTheme.colorScheme.onSurfaceVariant
-            }
-            val stateText = when (review.state) {
-                "APPROVED" -> "✓ Approved"
-                "CHANGES_REQUESTED" -> "✕ Changes requested"
-                "COMMENTED" -> "💬 Commented"
-                "DISMISSED" -> "Dismissed"
-                else -> review.state
-            }
-            Box(
-                Modifier.clip(CircleShape).background(stateColor.copy(alpha = 0.12f)).padding(horizontal = 6.dp, vertical = 2.dp)
-            ) {
-                Text(stateText, style = MaterialTheme.typography.labelSmall, color = stateColor)
-            }
-            Spacer(Modifier.width(8.dp))
-            val user = review.user
-            if (user != null) {
-                AsyncImage(
-                    model = user.avatarUrl,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp).clip(CircleShape)
-                        .clickable { onNavigateToUser(user.login) },
-                )
-                Spacer(Modifier.width(4.dp))
-                Text(
-                    user.login,
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.clickable { onNavigateToUser(user.login) },
-                )
-            }
-            review.submittedAt?.let {
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    dateFmt.format(parseIso(it)),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        if (!review.body.isNullOrBlank()) {
-            MarkdownText(
-                markdown = review.body,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-    }
-}
-
-@Composable
-private fun FileDiffItem(
-    file: GitHubApi.PullRequestFile,
-    commitId: String?,
-    reviewComments: List<GitHubApi.ReviewComment>,
-    isSendingLineComment: Boolean,
-    onPostLineComment: (filename: String, commitId: String?, line: Int, body: String, startLine: Int?) -> Unit,
-    onReply: (rootCommentId: Long, body: String) -> Unit,
-    onResolve: (rootCommentId: Long) -> Unit,
-    onUnresolve: (rootCommentId: Long) -> Unit,
-    onEditInline: (commentId: Long, currentBody: String) -> Unit,
-    onDeleteInline: (commentId: Long) -> Unit,
-    threadState: Map<Long, ThreadState>,
-    currentLogin: String?,
-    busyCommentIds: Set<Long>,
-) {
-    val statusColor = when (file.status) {
-        "added" -> Color(0xFF2EA043)
-        "removed" -> MaterialTheme.colorScheme.error
-        "modified" -> MaterialTheme.colorScheme.primary
-        "renamed" -> MaterialTheme.colorScheme.tertiary
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
-    val statusLabel = when (file.status) {
-        "added" -> "A"
-        "removed" -> "D"
-        "modified" -> "M"
-        "renamed" -> "R"
-        else -> "?"
-    }
-
-    Column(
-        Modifier.fillMaxWidth()
-            .clip(RoundedCornerShape(6.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
-            .padding(8.dp),
-    ) {
-        // File header
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier.clip(RoundedCornerShape(4.dp))
-                    .background(statusColor.copy(alpha = 0.15f))
-                    .padding(horizontal = 4.dp, vertical = 1.dp)
-            ) {
-                Text(statusLabel, style = MaterialTheme.typography.labelSmall, color = statusColor, fontWeight = FontWeight.Bold)
-            }
-            Spacer(Modifier.width(6.dp))
-            Text(
-                file.filename,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-            Spacer(Modifier.width(6.dp))
-            Text(
-                "+${file.additions} -${file.deletions}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        // Patch — line-commentable
-        if (!file.patch.isNullOrBlank()) {
-            Spacer(Modifier.height(6.dp))
-            DiffPatchWithComment(
-                patch = file.patch,
-                filename = file.filename,
-                commitId = commitId,
-                reviewComments = reviewComments.filter { it.path == file.filename },
-                isSendingComment = isSendingLineComment,
-                onPostLineComment = onPostLineComment,
-                onReply = onReply,
-                onResolve = onResolve,
-                onUnresolve = onUnresolve,
-                onEdit = onEditInline,
-                onDelete = onDeleteInline,
-                threadState = threadState,
-                currentLogin = currentLogin,
-                busyCommentIds = busyCommentIds,
-            )
-        }
-    }
-}
-
-/**
- * Single-line CI checks summary shown above labels / reviewers on PR detail.
- *
- * Renders Passed (all checks green) / Failed (any red) / Pending (queued or
- * running) / None (no checks configured). Tapping the trailing Refresh icon
- * refetches the check runs for the PR head SHA. When failed or pending, an
- * expandable list of individual checks is rendered below.
- */
-@Composable
-private fun ChecksCard(
-    summary: CheckSummary,
-    runs: List<GitHubApi.CheckRun>,
-    isRefreshing: Boolean = false,
-    onRefresh: () -> Unit,
-) {
-    if (runs.isEmpty() && summary is CheckSummary.NONE) return
-
-    var expanded by remember { mutableStateOf(false) }
-
-    val (icon, tint, label) = when (summary) {
-        is CheckSummary.Passed ->
-            Triple(Icons.Outlined.CheckCircle, MaterialTheme.colorScheme.primary,
-                stringResource(R.string.checks_passed, summary.passed, summary.total))
-        is CheckSummary.Failed ->
-            Triple(Icons.Outlined.Close, MaterialTheme.colorScheme.error,
-                stringResource(R.string.checks_failed, summary.failed, summary.total))
-        is CheckSummary.Pending ->
-            Triple(Icons.Outlined.Pending, MaterialTheme.colorScheme.tertiary,
-                stringResource(R.string.checks_pending, summary.pending, summary.total))
-        CheckSummary.NONE -> return
-    }
-
-    Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
-                .clickable {
-                    // Failed / Pending checks expand on tap so the user can see what failed.
-                    if (summary is CheckSummary.Failed || summary is CheckSummary.Pending) {
-                        expanded = !expanded
-                    }
-                }
-                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
-                .padding(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp), tint = tint)
-            Spacer(Modifier.width(8.dp))
-            Text(label, style = MaterialTheme.typography.labelMedium, color = tint, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-            // Refresh manually refreshes regardless of expansion state. A tiny inline
-            // spinner replaces the icon while the re-fetch is in flight, so the tap
-            // has visible feedback (previously the button looked dead).
-            IconButton(onClick = onRefresh, modifier = Modifier.size(24.dp), enabled = !isRefreshing) {
-                if (isRefreshing) {
-                    CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 1.5.dp)
-                } else {
-                    Icon(Icons.Outlined.Refresh, contentDescription = stringResource(R.string.action_refresh_checks), tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
-                }
-            }
-        }
-
-        if (expanded) {
-            Spacer(Modifier.height(6.dp))
-            runs.forEach { run ->
-                val runTint = when {
-                    run.status == "completed" && run.conclusion == "success" -> MaterialTheme.colorScheme.primary
-                    run.status == "completed" && run.conclusion in setOf("failure", "cancelled", "timed_out") -> MaterialTheme.colorScheme.error
-                    else -> MaterialTheme.colorScheme.onSurfaceVariant
-                }
-                Row(Modifier.fillMaxWidth().padding(vertical = 2.dp, horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    val (runIcon, stateLabel) = when {
-                        run.status == "completed" && run.conclusion == "success" -> Icons.Outlined.CheckCircle to stringResource(R.string.check_state_success)
-                        run.status == "completed" && run.conclusion in setOf("failure", "cancelled", "timed_out") -> Icons.Outlined.Close to stringResource(R.string.check_state_failed)
-                        run.status == "completed" && run.conclusion in setOf("neutral", "skipped", "stale") -> Icons.Outlined.CheckCircle to stringResource(R.string.check_state_skipped)
-                        run.status == "in_progress" -> Icons.Outlined.Pending to stringResource(R.string.check_state_in_progress)
-                        else -> Icons.Outlined.Pending to stringResource(R.string.check_state_queued)
-                    }
-                    Icon(runIcon, null, modifier = Modifier.size(14.dp), tint = runTint)
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        text = "${run.app?.name ?: "—"} / ${run.name}",
-                        style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier.weight(1f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(stateLabel, style = MaterialTheme.typography.labelSmall, color = runTint)
-                }
-            }
-        }
-    }
-}
-
-/**
- * Inline error + retry row rendered in place of a failed PR section (files, reviews,
- * review comments, comments). Mirrors [IssueDetailScreen]'s error affordance.
- */
-@Composable
-private fun SectionError(message: String, onRetry: () -> Unit) {
-    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-        Text(
-            text = message,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.error,
-            modifier = Modifier.weight(1f)
+    // Delete inline (PR review) comment confirm (R4)
+    pendingDeleteInlineId?.let { id ->
+        DeleteInlineConfirmDialog(
+            id = id,
+            onDismiss = { pendingDeleteInlineId = null },
+            onDelete = { vm.deleteInlineComment(it) },
         )
-        Spacer(Modifier.width(8.dp))
-        TextButton(onClick = onRetry) {
-            Icon(imageVector = Icons.Outlined.Refresh, contentDescription = null)
-            Spacer(Modifier.width(4.dp))
-            Text("Retry")
-        }
     }
-}
-
-/**
- * Review event types the UI can submit. Mirrors the GitHub v3 createReview event
- * values; indexed by the modal bottom sheet radio group.
- */
-private enum class ReviewEvent(val apiValue: String) {
-    COMMENT("COMMENT"),
-    APPROVE("APPROVE"),
-    REQUEST_CHANGES("REQUEST_CHANGES"),
+    // Edit comment dialog
+    editingCommentId?.let { id ->
+        EditCommentDialog(
+            id = id,
+            body = editingBody,
+            onBodyChange = { editingBody = it },
+            onDismiss = { editingCommentId = null },
+            onSave = { vid, newBody -> vm.editComment(vid, newBody) },
+        )
+    }
+    // Delete comment confirm
+    pendingDeleteId?.let { id ->
+        DeleteCommentConfirmDialog(
+            id = id,
+            onDismiss = { pendingDeleteId = null },
+            onDelete = { vm.deleteComment(it) },
+        )
+    }
 }
