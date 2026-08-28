@@ -1,6 +1,7 @@
 package com.pockethub.ui.repos
 
 import androidx.compose.foundation.background
+import com.pockethub.util.formatCount
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box

@@ -45,10 +45,6 @@ import com.pockethub.data.remote.feed.DiscoverItem
 import com.pockethub.ui.components.languageColorHex
 import com.pockethub.ui.components.parseColorHex
 
-/** Trending language filter chips. */
-private val LANGUAGES = listOf("All", "Kotlin", "TypeScript", "Python", "Rust", "Go", "Swift", "Java", "C++")
-private val TIME_RANGES = listOf("Daily", "Weekly", "Monthly")
-
 @Composable
 internal fun FeedEventCard(
     ev: FeedEvent,
