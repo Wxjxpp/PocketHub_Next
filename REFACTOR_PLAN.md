@@ -42,7 +42,7 @@
 - [x] 清 38 个死 import；commit "consolidate duplicated helpers"，Compile Check ✓ (run 33126999920)
 - 净变化: 约 -160 行
 
-## Phase 3 — 超长文件拆分 [~]
+## Phase 3 — 超长文件拆分 [x]
 按行数从大到小逐个拆，每拆 1-2 个文件一批：
 - [x] RepoDetailScreen.kt (1818) → RepoDetailScreen 711 + RepoOverviewTab 296 + RepoListTabs 292 + RepoReleasesTab 220 + RepoWorkflowsTab 474
   - commit "split RepoDetailScreen into per-tab files" + 2 个 fixup，CI ✓ (run 33128945828)
@@ -57,10 +57,27 @@
 - [x] PullRequestDetailScreen.kt (1308) → 主屏 714 + PullRequestDialogs 439（8 个参数化弹窗）+ PullRequestParts 357（CommentInput/ReviewItem/FileDiffItem/ChecksCard/SectionError/ReviewEvent）
   - commit + OptIn fixup，CI ✓ (run 33132359139)
   - 踩坑: ①拆出的 Composable 用 ModalBottomSheet/FlowRow 需要 @file:OptIn（原主函数上的 @OptIn 不跟随）②组装脚本里旧的 `calls +=` 块没删导致调用重复——生成类脚本重构后必须全文检查残留
-- [ ] MarkdownText.kt (1302)
-- [ ] PullRequestDetailViewModel.kt (920) / RepoDetailViewModel.kt (875)
-- [ ] ExploreScreen / SettingsScreen / SearchScreen / FeedSourceService / CommitDetailScreen / ProfileScreen / IssueDetailScreen / UserDetailScreen / CodeTab / CreateIssueScreen / CodeHighlighter
-- 留尾去重: CodeTab.relativeTime、CodeBrowserViewModel.isoParser → util/Format.kt（拆 CodeTab 时做）
+- [x] MarkdownText.kt (1301) → 主入口 255 + MarkdownParser 343 + MarkdownRender 566 + MarkdownLinks 174
+  - 3 次 fixup 后 CI ✓ (run 33146893746)
+  - 踩坑: ①主文件切割上边界差一行留了孤立 @Composable(语法错误, KDoc 则无害) ②private 检查正则漏 `const val` 和 `sealed class` ③脚本对同一文件连续 edit 必须重读文件, 否则后一次覆盖前一次
+- [x] PullRequestDetailViewModel.kt (920) → core 346 + Inline 310 + Reviews 134 + Comments 141（扩展函数按域拆）
+- [x] RepoDetailViewModel.kt (875) → core 448 + Workflows 113 + Admin 161 + Issues 62 + Releases 57 + Translation 66
+  - 多轮 fixup 后 CI ✓ (run 33152579518)
+  - 踩坑: ①to_extensions 必须先套 receiver 正则再去缩进 ②类属性会被域范围误切进扩展文件, 需回迁 ③companion 里的嵌套类类型引用不享受外层名捷径(ThreadInfo 提为顶层) ④`}    fun loadPulls(` 同行声明要拆行 ⑤域分隔注释锚点要防 `// ── Translation` 撞 `// ── Translation state` ⑥搬走的 GraphQL 常量插文件要放 import 之后
+
+---
+
+## Phase 3 完成总结 (2026-08-28)
+已提交范围全部完成! 5 个巨石文件 → 22 个域文件, 提交物无一超过 ~714 行:
+- RepoDetailScreen 1818→711+4 | GitHubApi 1495→698+16 | PullRequestDetailScreen 1308→714+2
+- MarkdownText 1301→255+3 | 两个 ViewModel 920/875→346/448+8
+- 所有产物在 fix 分支, CI 全绿; REFACTOR_PLAN.md 已入库
+
+### 遗留待办 (转入 Phase 4 前置清单)
+- [ ] 二梯队拆分(500-780 行, 11 个): ExploreScreen 781 / SearchScreen 762 / SettingsScreen 752 / FeedSourceService 721 / CommitDetailScreen 684 / ProfileScreen 634 / IssueDetailScreen 611 / UserDetailScreen 538 / CodeTab 510 / CreateIssueScreen 509 / CodeHighlighter 504
+  - 注: 这些多为"单一屏幕内聚文件", 是否拆需逐个判断(参数面过大则不值得), >700 的 4 个优先
+- [ ] 留尾去重: CodeTab.relativeTime、CodeBrowserViewModel.isoParser → util/Format.kt（拆 CodeTab 时做）
+- 审计残留同名私有 helper 5 组(跨包, 非本轮引入): EditCommentDialog ×2 / IssueEventRow ×2 / StatPill ×2 / StatsRow ×2 / formatCount ×2 — 拆对应文件时顺带合并
 
 ## Phase 4 — 架构与健壮性/体验 [ ]
 - [ ] 分页/列表 key 与性能复查
@@ -76,15 +93,19 @@
 | P3a | split+2fixup | RepoDetailScreen 1818→711+4 个 tab 文件 | ✓ 33128945828 |
 | P3b | split+3fixup | GitHubApi 1495→698+16 个域接口文件 | ✓ 33130763304 |
 | P3c | split+1fixup | PullRequestDetailScreen 1308→714+Dialogs 439+Parts 357 | ✓ 33132359139 |
+| P3d | split+3fixup | MarkdownText 1301→255+Parser 343+Render 566+Links 174 | ✓ 33146893746 |
+| P3e | split+7fixup | PR VM 920→346+3ext \| Repo VM 875→448+5ext | ✓ 33152579518 |
+| docs | [skip ci] | REFACTOR_PLAN.md 入库 fix 分支 | 无 CI |
 | APK | v0.3.13 | fix 分支 workflow_dispatch 打包（含 P1+P2），已可安装 | ✓ 33127328233 |
+| APK | v0.3.14 | fix 分支 workflow_dispatch 打包（含 P1+P2+P3 全部），供功能验证 | ✓ 33153027548 |
 
-## 当前状态 (2026-08-28 会话末)
-- fix 分支 = main + 11 个重构 commit + 1 个 release bump commit (f3f183b)，最新 CI ✓ 33132359139
-- Phase 3 进度: P3a/P3b/P3c 完成，剩余 MarkdownText 1302 / PullRequestDetailViewModel 920 / RepoDetailViewModel 875
-- 净效果: 三个 1300+ 巨石文件全部拆到 ≤714 行，最大新文件 PullRequestDialogs 439 行
-- 工具链(可复用): /var/minis/workspace/phase3{a,b,b_fix,b_v2,c}*.py + fix_imports.py + check_balance.py（均已覆盖 untracked 文件）
-- 下一批动作: MarkdownText.kt 按"渲染管线/代码高亮/链接处理"拆分；两个 ViewModel 按 StateFlow 域拆
-- 本地 APK 缓存: /var/minis/workspace/apk-cache/pockethub-fix-v0.3.13.apk（含 P1+P2，P3 未打包）
+## 当前状态 (2026-08-28 P3 全部完成后)
+- fix 分支 = main + 20+ 个重构 commit，最新 CI ✓ 33152579518；v0.3.14 已从 fix 打包 (run 33153027548)
+- 已完成: P1 死代码 / P2 去重 / P3 五巨石拆分（提交范围全绿）
+- 未完成: 二梯队 11 个 500-780 行文件拆分(可选)、CodeTab 留尾去重、Phase 4 性能/健壮性/体验复查
+- 工具链(可复用): /var/minis/workspace/phase3{a,b,b_fix,b_v2,c,d,e}*.py + fix_imports.py + check_balance.py
+- 本地 APK 缓存: /var/minis/workspace/apk-cache/pockethub-0.3.14.apk（含全部重构，供功能验证）
+- 注意: 每次 workflow_dispatch 会在远端 fix 产生 bump commit，push 前必须 git fetch origin fix + rebase
 
 ## 经验教训 (Phase 2)
 1. phase2.py 首次运行失败后重跑会重复插 import —— 脚本要幂等或失败即回滚
