@@ -170,5 +170,7 @@ internal fun isBadgeUrl(url: String): Boolean {
 // Patterns pre-compiled once per rendering call. Each uses the *anchor at start*
 // semantic by requiring the match to begin at position 0 of the substring passed.
 // In the loop we slice off the part from i onward and try matching.
-internal val WRAPPED_IMG_PATTERN = Regex("^\\[!?\\[([^\\]]*)\\]\\(([^)]+)\\)\\]\\(([^)]+)\\)")
-internal val STANDALONE_IMG_PATTERN = Regex("^!\\[([^\\]]*)\\]\\(([^)]+)\\)")
+// Whitespace-tolerant (incl. newlines) so multi-line badge/link markup like
+// [ \n ![alt](src) \n ](href) — produced by HTML <a><img></a> READMEs — matches.
+internal val WRAPPED_IMG_PATTERN = Regex("^\\[\\s*!\\[([^\\]]*)\\]\\(\\s*([^)]+?)\\s*\\)\\s*\\]\\(\\s*([^)]+?)\\s*\\)")
+internal val STANDALONE_IMG_PATTERN = Regex("^!\\[([^\\]]*)\\]\\(\\s*([^)]+?)\\s*\\)")

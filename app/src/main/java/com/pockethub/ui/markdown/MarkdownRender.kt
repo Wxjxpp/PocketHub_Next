@@ -388,6 +388,21 @@ internal fun renderRichInline(
         }
     }
 
+    /**
+     * Flush before an image — except drop pure-whitespace buffers that sit
+     * between two images, so a wall of badges stays one adjacent run and
+     * renders in a single [BadgesRow] FlowRow instead of one row per badge.
+     */
+    fun flushImageGap() {
+        if (textBuffer.isNotBlank()) {
+            flushText()
+        } else if (out.lastOrNull() is InlineToken.Image) {
+            textBuffer.clear()
+        } else {
+            flushText()
+        }
+    }
+
     var i = 0
     val len = text.length
     while (i < len) {
@@ -395,7 +410,7 @@ internal fun renderRichInline(
         // Try wrapped image link [![alt](src)](href) — only if it begins at i.
         val wrappedMatch = WRAPPED_IMG_PATTERN.find(rest)
         if (wrappedMatch != null) {
-            flushText()
+            flushImageGap()
             val alt = wrappedMatch.groupValues[1]
             val src = imageResolver(wrappedMatch.groupValues[2].trim())
             val href = wrappedMatch.groupValues[3].trim()
@@ -407,7 +422,7 @@ internal fun renderRichInline(
         // Try standalone image ![alt](src)
         val imgMatch = STANDALONE_IMG_PATTERN.find(rest)
         if (imgMatch != null) {
-            flushText()
+            flushImageGap()
             val alt = imgMatch.groupValues[1]
             val src = imageResolver(imgMatch.groupValues[2].trim())
             out.add(InlineToken.Image(src = src, alt = alt, wrapUrl = null))

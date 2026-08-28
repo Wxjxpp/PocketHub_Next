@@ -8,7 +8,28 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 
 internal fun cleanMarkdown(markdown: String): String {
+    // Normalize CRLF first so line-based parsing (headings, lists, tables)
+    // doesn't trip over stray \r characters from Windows-edited READMEs.
+    val normalized = markdown.replace("\r\n", "\n")
+    // Protect fenced code blocks — HTML cleaning / entity decoding must not
+    // rewrite code samples (a `<!-- -->` or `<b>` inside a fence is content).
+    val fenceRegex = Regex("```[\\s\\S]*?```|~~~[\\s\\S]*?~~~")
+    val parts = mutableListOf<String>()
+    var last = 0
+    for (m in fenceRegex.findAll(normalized)) {
+        parts.add(cleanSegment(normalized.substring(last, m.range.first)))
+        parts.add(m.value)
+        last = m.range.last + 1
+    }
+    parts.add(cleanSegment(normalized.substring(last)))
+    return parts.joinToString("")
+}
+
+private fun cleanSegment(markdown: String): String {
     return markdown
+            // Strip HTML comments (<!-- … -->) — README sections use them to
+            // organize badge blocks; they must never surface as literal text.
+            .replace(Regex("<!--[\\s\\S]*?-->"), "")
             // Convert common standalone raw-HTML <img src> into markdown ![](...) so our
             // image rendering kicks in. (<img> tags inside <a> won't convert cleanly here, but
             // those are far less common than markdown form below.)
@@ -30,7 +51,10 @@ internal fun cleanMarkdown(markdown: String): String {
                     setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
                 )
             ) { m ->
-                "[${m.groupValues[2]}](${m.groupValues[1]})"
+                // Collapse inner whitespace/newlines so multi-line anchors like
+                // <a href="…">\n  <img …>\n</a> become a single-line markdown
+                // link the inline tokenizer can match.
+                "[${m.groupValues[2].replace(Regex("\\s+"), " ").trim()}](${m.groupValues[1]})"
             }
             // ── New block-level handlers for tags the original cleaner did not
             // cover. Converting them to markdown keeps README prose scannable

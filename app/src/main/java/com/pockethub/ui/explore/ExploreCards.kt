@@ -23,7 +23,6 @@ import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material.icons.outlined.DeveloperMode
 import androidx.compose.material.icons.outlined.ForkRight
 import androidx.compose.material.icons.outlined.Public
-import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -118,46 +117,35 @@ internal fun FeedEventCard(
 
 /**
  * Compact pinned-repo card for the horizontal scroller at the top of Explore.
- * Deliberately small-footprint (fixed narrow width, tight padding) so the strip
- * reads as quick-access chips rather than full list rows.
+ * Sized so ~2.2 cards fit the content width (the 0.2 peeks from the edge to
+ * signal scrollability) while matching the lists' 16dp horizontal padding.
+ * Name-only — no icon, no owner line.
  */
 @Composable
 internal fun PinnedRepoCard(
     slug: String,
     onClick: () -> Unit,
 ) {
-    val owner = slug.substringBefore('/')
-    val repo = slug.substringAfter('/', "")
+    val repo = slug.substringAfter('/', slug)
+    // content width = screen - 32dp list padding; minus one 8dp gap → /2.2 cards.
+    val screenW = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp
+    val cardWidth = ((screenW - 40) / 2.2f).dp
     com.pockethub.ui.components.PhCard(
         onClick = onClick,
-        modifier = Modifier.width(132.dp),
-        cornerRadius = 14.dp,
+        modifier = Modifier.width(cardWidth),
+        cornerRadius = 16.dp,
     ) {
-        Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    Icons.Outlined.PushPin,
-                    null,
-                    modifier = Modifier.size(11.dp),
-                    tint = MaterialTheme.colorScheme.primary,
-                )
-                Spacer(Modifier.width(4.dp))
-                Text(
-                    repo.ifBlank { slug },
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-            }
-            Spacer(Modifier.height(2.dp))
+        Box(
+            Modifier.padding(horizontal = 14.dp, vertical = 16.dp),
+            contentAlignment = Alignment.CenterStart,
+        ) {
             Text(
-                owner,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                repo,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onSurface,
             )
         }
     }
