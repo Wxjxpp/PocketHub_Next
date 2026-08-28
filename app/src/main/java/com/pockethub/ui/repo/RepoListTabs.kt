@@ -288,5 +288,3 @@ internal fun PullsTab(
         }
     }
 }
-
-@OptIn(ExperimentalLayoutApi::class)

@@ -49,6 +49,7 @@ import coil.compose.AsyncImage
 import com.pockethub.ui.markdown.MarkdownText
 import java.text.DateFormat
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun ReleasesTab(
     releases: List<GitHubApi.Release>,
