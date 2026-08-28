@@ -77,9 +77,11 @@ fun PhAsyncImage(
                     animationSpec = tween(220),
                     label = "ph_image_fade",
                 )
-                Box(Modifier.fillMaxSize().graphicsLayer { this.alpha = alpha }) {
-                    SubcomposeAsyncImageContent(modifier = Modifier.fillMaxSize())
-                }
+                SubcomposeAsyncImageContent(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer { this.alpha = alpha }
+                )
             }
         }
     }
