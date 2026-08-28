@@ -51,7 +51,7 @@ import androidx.compose.ui.unit.sp
  * image links, and external links at a glance.
  */
 
-private const val LINK_TAG = "url"
+internal const val LINK_TAG = "url"
 internal const val LINK_KIND_TAG = "kind"
 
 /** Visual/logical kind of a clickable link. Lets the host screen route it appropriately. */
