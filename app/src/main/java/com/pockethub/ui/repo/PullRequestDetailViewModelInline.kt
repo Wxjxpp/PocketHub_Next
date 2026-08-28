@@ -1,5 +1,12 @@
 package com.pockethub.ui.repo
 
+import androidx.lifecycle.viewModelScope
+import com.pockethub.data.remote.GitHubApi
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 
 internal const val REVIEW_THREADS_QUERY = """
     query ReviewThreads(${'$'}owner: String!, ${'$'}repo: String!, ${'$'}number: Int!) {
@@ -36,13 +43,6 @@ internal const val UNRESOLVE_MUTATION = """
 """
 
 
-import androidx.lifecycle.viewModelScope
-import com.pockethub.data.remote.GitHubApi
-import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
 
 /**
  * Post a line-level review comment anchored to a file + line on the PR diff.
