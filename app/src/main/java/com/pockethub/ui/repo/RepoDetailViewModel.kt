@@ -1,6 +1,5 @@
 package com.pockethub.ui.repo
 
-import android.util.Base64
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.pockethub.data.model.Issue
@@ -8,11 +7,9 @@ import com.pockethub.data.model.Repository
 import com.pockethub.data.remote.AccountRepository
 import com.pockethub.data.remote.CachedRepository
 import com.pockethub.data.remote.GitHubApi
-import com.pockethub.data.remote.GoogleTranslate
 import com.pockethub.data.remote.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -23,9 +20,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
-import okhttp3.Request
 import javax.inject.Inject
 
 enum class RepoTab { OVERVIEW, CODE, ISSUES, PRS, RELEASES, COMMITS, WORKFLOWS }
@@ -48,46 +43,46 @@ enum class IssueStateFilter(val apiValue: String) {
 
 @HiltViewModel
 class RepoDetailViewModel @Inject constructor(
-    private val api: GitHubApi,
-    private val cache: CachedRepository,
-    private val history: com.pockethub.data.remote.HistoryRepository,
-    private val settings: SettingsRepository,
-    private val accountRepository: AccountRepository,
-    private val issueReporter: com.pockethub.data.reporting.IssueReporter,
-    private val okHttp: OkHttpClient,
+    internal val api: GitHubApi,
+    internal val cache: CachedRepository,
+    internal val history: com.pockethub.data.remote.HistoryRepository,
+    internal val settings: SettingsRepository,
+    internal val accountRepository: AccountRepository,
+    internal val issueReporter: com.pockethub.data.reporting.IssueReporter,
+    internal val okHttp: OkHttpClient,
 ) : ViewModel() {
 
-    private val _repo = MutableStateFlow<Repository?>(null)
+    internal val _repo = MutableStateFlow<Repository?>(null)
     val repo: StateFlow<Repository?> = _repo
 
-    private val _issues = MutableStateFlow<List<Issue>>(emptyList())
+    internal val _issues = MutableStateFlow<List<Issue>>(emptyList())
     val issues: StateFlow<List<Issue>> = _issues
 
-    private val _pulls = MutableStateFlow<List<Issue>>(emptyList())
+    internal val _pulls = MutableStateFlow<List<Issue>>(emptyList())
     val pulls: StateFlow<List<Issue>> = _pulls
 
     /** Current state filter shared by the Issues and PRs tabs. */
-    private val _issueStateFilter = MutableStateFlow(IssueStateFilter.OPEN)
+    internal val _issueStateFilter = MutableStateFlow(IssueStateFilter.OPEN)
     val issueStateFilter: StateFlow<IssueStateFilter> = _issueStateFilter
 
     /** True while a further page is being fetched. */
-    private val _isLoadingMoreIssues = MutableStateFlow(false)
+    internal val _isLoadingMoreIssues = MutableStateFlow(false)
     val isLoadingMoreIssues: StateFlow<Boolean> = _isLoadingMoreIssues
 
     // ── Ren: first-load flags so tabs can show a progress indicator
     // before the first page arrives. isLoadingMoreIssues only covers append
     // loads, which left the screen visibly empty for a few seconds on the
     // first switch to Issues / PRs / Releases.
-    private val _isLoadingIssues = MutableStateFlow(false)
+    internal val _isLoadingIssues = MutableStateFlow(false)
     val isLoadingIssues: StateFlow<Boolean> = _isLoadingIssues.asStateFlow()
 
-    private val _isLoadingReleases = MutableStateFlow(false)
+    internal val _isLoadingReleases = MutableStateFlow(false)
     val isLoadingReleases: StateFlow<Boolean> = _isLoadingReleases.asStateFlow()
 
     // Pagination state for the issues/PRs list.
-    private var issuePage = 1
-    private var issuesCanLoadMore = true
-    private var loadedIssueState: String? = null
+    internal var issuePage = 1
+    internal var issuesCanLoadMore = true
+    internal var loadedIssueState: String? = null
 
     /** Select a state explicitly and reload the current issue/PR source. */
     fun setIssueStateFilter(owner: String, repo: String, filter: IssueStateFilter) {
@@ -96,17 +91,17 @@ class RepoDetailViewModel @Inject constructor(
         loadIssues(owner, repo, force = true)
     }
 
-    private val _error = MutableStateFlow<String?>(null)
+    internal val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
 
-    private val _releases = MutableStateFlow<List<GitHubApi.Release>>(emptyList())
+    internal val _releases = MutableStateFlow<List<GitHubApi.Release>>(emptyList())
     val releases: StateFlow<List<GitHubApi.Release>> = _releases
 
     // ── Release delete state ───────────────────────────────
-    private val _isDeletingRelease = MutableStateFlow(false)
+    internal val _isDeletingRelease = MutableStateFlow(false)
     val isDeletingRelease: StateFlow<Boolean> = _isDeletingRelease
 
-    private val _releaseDeleteMessage = MutableStateFlow<String?>(null)
+    internal val _releaseDeleteMessage = MutableStateFlow<String?>(null)
     val releaseDeleteMessage: StateFlow<String?> = _releaseDeleteMessage
 
     /** Whether the signed-in user can delete releases on the current repo. */
@@ -119,69 +114,69 @@ class RepoDetailViewModel @Inject constructor(
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
-    private val _workflowRuns = MutableStateFlow<List<GitHubApi.WorkflowRun>>(emptyList())
+    internal val _workflowRuns = MutableStateFlow<List<GitHubApi.WorkflowRun>>(emptyList())
     val workflowRuns: StateFlow<List<GitHubApi.WorkflowRun>> = _workflowRuns
 
-    private val _workflows = MutableStateFlow<List<GitHubApi.Workflow>>(emptyList())
+    internal val _workflows = MutableStateFlow<List<GitHubApi.Workflow>>(emptyList())
     val workflows: StateFlow<List<GitHubApi.Workflow>> = _workflows
 
-    private val _isLoadingWorkflows = MutableStateFlow(false)
+    internal val _isLoadingWorkflows = MutableStateFlow(false)
     val isLoadingWorkflows: StateFlow<Boolean> = _isLoadingWorkflows.asStateFlow()
 
     // Ren: drives the spinner on the Workflows *tab* — the existing
     // _isLoadingWorkflows above is owned by loadWorkflows() (the dispatch
     // dialog's definitions list), not loadWorkflowRuns() (the tab's run list),
     // so the tab previously saw a permanently-false flag and never spun.
-    private val _isLoadingWorkflowRuns = MutableStateFlow(false)
+    internal val _isLoadingWorkflowRuns = MutableStateFlow(false)
     val isLoadingWorkflowRuns: StateFlow<Boolean> = _isLoadingWorkflowRuns.asStateFlow()
 
     // Branch that the workflow list / dispatch dialog are currently pinned to.
     // Mirrors the Code tab's branch so switching branches in Code also updates
     // what workflows/runs the user sees. Reset to null when the repo changes.
-    private val _workflowBranch = MutableStateFlow<String?>(null)
+    internal val _workflowBranch = MutableStateFlow<String?>(null)
     val workflowBranch: StateFlow<String?> = _workflowBranch.asStateFlow()
 
-    private val _isDispatching = MutableStateFlow(false)
+    internal val _isDispatching = MutableStateFlow(false)
     val isDispatching: StateFlow<Boolean> = _isDispatching.asStateFlow()
 
-    private val _dispatchMessage = MutableStateFlow<String?>(null)
+    internal val _dispatchMessage = MutableStateFlow<String?>(null)
     val dispatchMessage: StateFlow<String?> = _dispatchMessage.asStateFlow()
 
     /** Branches for the repo; used by the dispatch dialog's branch picker. */
-    private val _branches = MutableStateFlow<List<GitHubApi.Branch>>(emptyList())
+    internal val _branches = MutableStateFlow<List<GitHubApi.Branch>>(emptyList())
     val branches: StateFlow<List<GitHubApi.Branch>> = _branches.asStateFlow()
 
-    private val _isLoadingBranches = MutableStateFlow(false)
+    internal val _isLoadingBranches = MutableStateFlow(false)
     val isLoadingBranches: StateFlow<Boolean> = _isLoadingBranches.asStateFlow()
 
-    private val _readme = MutableStateFlow<String?>(null)
+    internal val _readme = MutableStateFlow<String?>(null)
     val readme: StateFlow<String?> = _readme
 
     // ── Translation state ─────────────────────────────────────
-    private val _translatedReadme = MutableStateFlow<String?>(null)
+    internal val _translatedReadme = MutableStateFlow<String?>(null)
     val translatedReadme: StateFlow<String?> = _translatedReadme
 
-    private val _showTranslated = MutableStateFlow(false)
+    internal val _showTranslated = MutableStateFlow(false)
     val showTranslated: StateFlow<Boolean> = _showTranslated
 
-    private val _isTranslating = MutableStateFlow(false)
+    internal val _isTranslating = MutableStateFlow(false)
     val isTranslating: StateFlow<Boolean> = _isTranslating.asStateFlow()
 
     /** One-shot translate failure message, surfaced as a Snackbar. */
-    private val _translateMessage = MutableStateFlow<String?>(null)
+    internal val _translateMessage = MutableStateFlow<String?>(null)
     val translateMessage: StateFlow<String?> = _translateMessage.asStateFlow()
 
     val translateTarget: StateFlow<String?> = settings.translateTarget
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
-    private val _isLoading = MutableStateFlow(false)
+    internal val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
     /** Pull-to-refresh state for tabs that do not use the repo loader. */
-    private val _isRefreshing = MutableStateFlow(false)
+    internal val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
-    private val _isStarred = MutableStateFlow(false)
+    internal val _isStarred = MutableStateFlow(false)
     val isStarred: StateFlow<Boolean> = _isStarred.asStateFlow()
 
     /** Whether this repo is pinned locally (independent from GitHub star). */
@@ -189,27 +184,27 @@ class RepoDetailViewModel @Inject constructor(
         .map { list -> list.contains(_currentSlug) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
-    private var _currentSlug: String = ""
+    internal var _currentSlug: String = ""
 
     /** Whether the current user is watching (subscribed to) this repo's notifications. */
-    private val _watchState = MutableStateFlow<WatchState>(WatchState.UNKNOWN)
+    internal val _watchState = MutableStateFlow<WatchState>(WatchState.UNKNOWN)
     val watchState: StateFlow<WatchState> = _watchState.asStateFlow()
 
-    private val _isForking = MutableStateFlow(false)
+    internal val _isForking = MutableStateFlow(false)
     val isForking: StateFlow<Boolean> = _isForking.asStateFlow()
 
-    private val _forkMessage = MutableStateFlow<String?>(null)
+    internal val _forkMessage = MutableStateFlow<String?>(null)
     val forkMessage: StateFlow<String?> = _forkMessage.asStateFlow()
 
     // ── Delete state ──────────────────────────────────────────
-    private val _isDeleting = MutableStateFlow(false)
+    internal val _isDeleting = MutableStateFlow(false)
     val isDeleting: StateFlow<Boolean> = _isDeleting.asStateFlow()
 
-    private val _deleteMessage = MutableStateFlow<String?>(null)
+    internal val _deleteMessage = MutableStateFlow<String?>(null)
     val deleteMessage: StateFlow<String?> = _deleteMessage.asStateFlow()
 
     /** One-shot signal: the repository was deleted successfully (navigate back). */
-    private val _deleteSuccess = MutableStateFlow(false)
+    internal val _deleteSuccess = MutableStateFlow(false)
     val deleteSuccess: StateFlow<Boolean> = _deleteSuccess.asStateFlow()
 
     /**
@@ -227,8 +222,8 @@ class RepoDetailViewModel @Inject constructor(
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     var currentTab = MutableStateFlow(RepoTab.OVERVIEW)
-    private var loadedOwner: String? = null
-    private var loadedRepo: String? = null
+    internal var loadedOwner: String? = null
+    internal var loadedRepo: String? = null
 
     fun loadRepo(owner: String, repo: String, force: Boolean = false): Job? {
         if (!force && loadedOwner == owner && loadedRepo == repo && _repo.value != null) return null
@@ -296,13 +291,13 @@ class RepoDetailViewModel @Inject constructor(
     }
 
     /** Incremented when pull-to-refresh should also reload the Commits tab. */
-    private val _commitsRefreshTick = MutableStateFlow(0)
+    internal val _commitsRefreshTick = MutableStateFlow(0)
     val commitsRefreshTick: StateFlow<Int> = _commitsRefreshTick.asStateFlow()
 
     /** Branch the current README was loaded for — used to skip redundant reloads. */
-    private var readmeRef: String? = null
+    internal var readmeRef: String? = null
 
-    private fun loadReadme(owner: String, repo: String, ref: String? = null): Job = viewModelScope.launch {
+    internal fun loadReadme(owner: String, repo: String, ref: String? = null): Job = viewModelScope.launch {
         try {
             val resp = cache.getReadme(owner, repo, ref = ref)
             val markdown = if (resp.encoding == "base64" && resp.content.isNotBlank()) {
@@ -339,7 +334,7 @@ class RepoDetailViewModel @Inject constructor(
         }
     }
 
-    private fun checkStar(owner: String, repo: String) = viewModelScope.launch {
+    internal fun checkStar(owner: String, repo: String) = viewModelScope.launch {
         try {
             val resp = api.checkStarred(owner, repo)
             _isStarred.update { resp.isSuccessful }
@@ -349,7 +344,7 @@ class RepoDetailViewModel @Inject constructor(
     }
 
     /** Resolves the current user's subscription status on this repo. */
-    private fun checkWatch(owner: String, repo: String) = viewModelScope.launch {
+    internal fun checkWatch(owner: String, repo: String) = viewModelScope.launch {
         try {
             val resp = api.getSubscription(owner, repo)
             if (resp.isSuccessful) {
@@ -415,7 +410,7 @@ class RepoDetailViewModel @Inject constructor(
         }
     }
 
-    private var _isWatchToggling: Boolean = false
+    internal var _isWatchToggling: Boolean = false
 
     fun toggleStar(owner: String, repo: String) {
         viewModelScope.launch {
@@ -445,431 +440,9 @@ class RepoDetailViewModel @Inject constructor(
         }
     }
 
-    fun loadIssues(owner: String, repo: String, state: String? = null, force: Boolean = false): Job? {
-        val effectiveState = state ?: _issueStateFilter.value.apiValue
-        if (!force && loadedIssueState == effectiveState && (_issues.value.isNotEmpty() || _pulls.value.isNotEmpty())) return null
-        loadedIssueState = effectiveState
-        issuePage = 1
-        issuesCanLoadMore = true
-        return fetchIssuesPage(owner, repo, effectiveState, append = false, forceFresh = force)
-    }    fun loadPulls(owner: String, repo: String, state: String? = null, force: Boolean = false): Job? {
-        // Shares the issues fetch (PRs come from the same endpoint); just ensure loaded.
-        return loadIssues(owner, repo, state, force)
-    }
-
-    /** Fetch the next page of issues/PRs for the current filter. */
-    fun loadMoreIssues(owner: String, repo: String) {
-        if (!issuesCanLoadMore || _isLoadingMoreIssues.value) return
-        val state = _issueStateFilter.value.apiValue
-        issuePage++
-        fetchIssuesPage(owner, repo, state, append = true)
-    }
-
-    private fun fetchIssuesPage(owner: String, repo: String, state: String, append: Boolean, forceFresh: Boolean = false): Job {
-        return viewModelScope.launch {
-            if (append) _isLoadingMoreIssues.update { true } else _isLoadingIssues.update { true }
-            try {
-                // forceFresh goes straight to the network (bypassing the 5-min TTL)
-                // so pull-to-refresh always re-fetches instead of serving the same
-                // cached blob — the "spinner spins but nothing changes" bug.
-                val all = cache.getIssues(owner, repo, state = state, page = issuePage, forceFresh = forceFresh)
-                val issuesOnly = all.filter { it.pullRequest == null }
-                val pullsOnly = all.filter { it.pullRequest != null }
-                if (append) {
-                    val existingIssueIds = _issues.value.map { it.id }.toSet()
-                    val existingPrIds = _pulls.value.map { it.id }.toSet()
-                    _issues.update { it + issuesOnly.filter { n -> n.id !in existingIssueIds } }
-                    _pulls.update { it + pullsOnly.filter { n -> n.id !in existingPrIds } }
-                } else {
-                    _issues.update { issuesOnly }
-                    _pulls.update { pullsOnly }
-                }
-                issuesCanLoadMore = all.size >= 30
-            } catch (e: Exception) {
-                issueReporter.reportError("RepoDetail", "fetchIssuesPage", e)
-                if (!append) {
-                    _issues.update { emptyList() }
-                    _pulls.update { emptyList() }
-                }
-                _error.update { e.localizedMessage ?: "Failed to load issues" }
-            } finally {
-                if (append) _isLoadingMoreIssues.update { false } else _isLoadingIssues.update { false }
-            }
-        }
-    }
-
-    fun loadReleases(owner: String, repo: String): Job {
-        return viewModelScope.launch {
-            _isLoadingReleases.update { true }
-            try {
-                _releases.update { cache.getReleases(owner, repo) }
-            } catch (e: Exception) {
-                issueReporter.reportError("RepoDetail", "loadReleases", e)
-                _releases.update { emptyList() }
-                _error.update { e.localizedMessage ?: "Failed to load releases" }
-            } finally {
-                _isLoadingReleases.update { false }
-            }
-        }
-    }
-
-    fun loadWorkflowRuns(owner: String, repo: String, branch: String? = null): Job {
-        return viewModelScope.launch {
-            _isLoadingWorkflowRuns.update { true }
-            try {
-                val resp = api.getWorkflowRuns(owner, repo, branch = branch)
-                _workflowRuns.update { resp.runs }
-            } catch (e: Exception) {
-                issueReporter.reportError("RepoDetail", "loadWorkflowRuns", e)
-                _workflowRuns.update { emptyList() }
-                _error.update { e.localizedMessage ?: "Failed to load workflows" }
-            } finally {
-                _isLoadingWorkflowRuns.update { false }
-            }
-        }
-    }
-
-    /** Load workflow definitions so the user can pick one to dispatch manually. */
-    fun loadWorkflows(owner: String, repo: String, branch: String? = null) {
-        viewModelScope.launch {
-            if (_isLoadingWorkflows.value) return@launch
-            _isLoadingWorkflows.update { true }
-            try {
-                val resp = api.getWorkflows(owner, repo, ref = branch)
-                _workflows.update { resp.workflows.filter { it.state == "active" && it.deletedAt == null } }
-                // Sync the tracked branch once we've resolved it from the API response.
-                branch?.let { _workflowBranch.update { it } }
-            } catch (e: Exception) {
-                issueReporter.reportError("RepoDetail", "loadWorkflows", e)
-                _workflows.update { emptyList() }
-                _dispatchMessage.update { e.localizedMessage ?: "Failed to load workflow" }
-            } finally {
-                _isLoadingWorkflows.update { false }
-            }
-        }
-    }
-
-    /** Reset the workflow branch; called when owner/repo changes so the dialog
-     *  doesn't carry over stale branch selections from a different repo. */
-    fun resetWorkflowBranch() {
-        _workflowBranch.update { null }
-        _branches.update { emptyList() }
-    }
-
-    /** Trigger a `workflow_dispatch` event for the given workflow on the given ref. */
-    fun dispatchWorkflow(owner: String, repo: String, workflowId: Long, ref: String) {
-        viewModelScope.launch {
-            if (_isDispatching.value) return@launch
-            _isDispatching.update { true }
-            _dispatchMessage.update { null }
-            try {
-                val resp = api.dispatchWorkflow(owner, repo, workflowId, GitHubApi.WorkflowDispatchRequest(ref = ref))
-                if (resp.isSuccessful) {
-                    _dispatchMessage.update { "Triggered: a new run will appear shortly" }
-                } else {
-                    val err = resp.errorBody()?.string()
-                    val reason = when (resp.code()) {
-                        403 -> "Forbidden: needs write access to this repo"
-                        404 -> "Workflow or repo not found, or no Actions access"
-                        422 -> "Trigger failed: the workflow may not declare `on: workflow_dispatch`, or the ref doesn't exist"
-                        else -> "Trigger failed (${resp.code()}): ${err?.take(200)}"
-                    }
-                    _dispatchMessage.update { reason }
-                }
-            } catch (e: Exception) {
-                issueReporter.reportError("RepoDetail", "dispatchWorkflow", e)
-                _dispatchMessage.update { e.localizedMessage ?: "Failed to trigger workflow" }
-            } finally {
-                _isDispatching.update { false }
-            }
-        }
-    }
-
-    /** Branch to use for the workflow dispatch dialog (mirrors Code tab by default). */
-    fun setWorkflowBranch(owner: String, repo: String, branch: String) {
-        if (_workflowBranch.value == branch) return
-        _workflowBranch.update { branch }
-        loadWorkflows(owner, repo, branch)
-        loadBranches(owner, repo)
-    }
-
-    /** Load branches for the given repo; called when the dispatch dialog opens or branch changes. */
-    fun loadBranches(owner: String, repo: String) {
-        viewModelScope.launch {
-            if (_isLoadingBranches.value) return@launch
-            _isLoadingBranches.update { true }
-            _branches.update { emptyList() }
-            try {
-                // Fetch up to 100 branches (max per_page). If a repo has more,
-                // the dialog shows the first page which covers the common cases;
-                // pagination is not exposed in the dialog UI.
-                val resp = api.getBranches(owner, repo, perPage = 100)
-                _branches.update { resp }
-            } catch (e: Exception) {
-                issueReporter.reportError("RepoDetail", "loadBranches", e)
-                // Silent — dialog will keep falling back to defaultBranch.
-            } finally {
-                _isLoadingBranches.update { false }
-            }
-        }
-    }
-
-    fun clearDispatchMessage() {
-        _dispatchMessage.update { null }
-    }
-
-    fun fork(owner: String, repo: String, newName: String? = null) {
-        viewModelScope.launch {
-            if (_isForking.value) return@launch
-            _isForking.update { true }
-            try {
-                val trimmed = newName?.trim().orEmpty()
-                // Empty input means "keep the source name" — send no name field.
-                val body = if (trimmed.isEmpty() || trimmed == repo) GitHubApi.ForkRequest()
-                else GitHubApi.ForkRequest(name = trimmed)
-                val resp = api.forkRepository(owner, repo, body)
-                if (resp.isSuccessful) {
-                    _forkMessage.update {
-                        if (trimmed.isEmpty() || trimmed == repo) "Forked to current account"
-                        else "Forked to $trimmed"
-                    }
-                } else {
-                    _forkMessage.update { "Fork failed: ${resp.code()}" }
-                }
-            } catch (e: Exception) {
-                issueReporter.reportError("RepoDetail", "fork", e)
-                _forkMessage.update { e.localizedMessage ?: "Fork 失败" }
-            } finally {
-                _isForking.update { false }
-            }
-        }
-    }
-
-    fun clearForkMessage() {
-        _forkMessage.update { null }
-    }
-
-    /**
-     * Delete the repository. Requires owner/admin rights and a token carrying the
-     * `delete_repo` scope; the API returns 204 on success.
-     */
-    fun deleteRepository(owner: String, repo: String) {
-        viewModelScope.launch {
-            if (_isDeleting.value) return@launch
-            _isDeleting.update { true }
-            _deleteMessage.update { null }
-            try {
-                val resp = api.deleteRepository(owner, repo)
-                if (resp.isSuccessful) {
-                    cache.invalidateRepo(owner, repo)
-                    // The list endpoint is cached independently from the repo detail.
-                    // Without this eviction, navigating back can show the deleted row
-                    // until the five-minute repository-list TTL expires.
-                    cache.invalidateMyRepositories()
-                    _deleteSuccess.update { true }
-                } else {
-                    val err = resp.errorBody()?.string()
-                    val reason = when (resp.code()) {
-                        403 -> "Forbidden: only the repo owner or admin can delete, and the token needs the delete_repo scope"
-                        404 -> "Repo not found or no access"
-                        else -> "Delete failed (${resp.code()}): ${err?.take(200)}"
-                    }
-                    _deleteMessage.update { reason }
-                }
-            } catch (e: Exception) {
-                issueReporter.reportError("RepoDetail", "deleteRepository", e)
-                _deleteMessage.update { e.localizedMessage ?: "Delete failed" }
-            } finally {
-                _isDeleting.update { false }
-            }
-        }
-    }
-
-    fun consumeDeleteSuccess() {
-        _deleteSuccess.update { false }
-    }
-
-    fun clearDeleteMessage() {
-        _deleteMessage.update { null }
-    }
-
-    fun clearReleaseDeleteMessage() {
-        _releaseDeleteMessage.update { null }
-    }
-
     // ── Visibility toggle (private ⇄ public) ──────────────────
-    private val _isTogglingVisibility = MutableStateFlow(false)
+    internal val _isTogglingVisibility = MutableStateFlow(false)
     val isTogglingVisibility: StateFlow<Boolean> = _isTogglingVisibility.asStateFlow()
-
-    private val _visibilityMessage = MutableStateFlow<String?>(null)
+    internal val _visibilityMessage = MutableStateFlow<String?>(null)
     val visibilityMessage: StateFlow<String?> = _visibilityMessage.asStateFlow()
-
-    /**
-     * Toggle this repository between private and public. Only callable when the
-     * current user has admin rights on the repo (see [canDelete]). Uses the
-     * PATCH /repos/{owner}/{repo} endpoint with the `private` field — GitHub treats
-     * this as the authoritative toggle for visibility. Refreshes the in-memory
-     * repo state on success so the UI locks/unlocks immediately.
-     */
-    fun toggleVisibility(owner: String, repo: String) {
-        val current = _repo.value ?: return
-        if (_isTogglingVisibility.value) return
-        viewModelScope.launch {
-            _isTogglingVisibility.update { true }
-            _visibilityMessage.update { null }
-            try {
-                val target = !current.private
-                val targetVisibility = if (target) "private" else "public"
-                val resp = api.updateRepository(
-                    owner,
-                    repo,
-                    // `visibility` is GitHub's authoritative field (the legacy
-                    // boolean `private` still works but is deprecated and some
-                    // accounts/endpoints reject it without the `visibility`
-                    // counterpart). Send only `visibility` to stay unambiguous.
-                    GitHubApi.RepoUpdateRequest(visibility = targetVisibility),
-                )
-                if (resp.isSuccessful) {
-                    resp.body()?.let { updated ->
-                        _repo.update { updated }
-                        cache.invalidateRepo(owner, repo)
-                        // Visibility changes can move the repo in or out of a filtered list.
-                        cache.invalidateMyRepositories()
-                    }
-                    _visibilityMessage.update {
-                        if (target) "Repository set to private" else "Repository set to public"
-                    }
-                } else {
-                    // Surface GitHub's actual error message rather than just the
-                    // status code. On 422 ("A previous visibility change is still
-                    // in progress") the user gets a meaningful "wait a moment"
-                    // nudge instead of an opaque "(422)".
-                    val ghMsg = runCatching {
-                        resp.errorBody()?.charStream()?.use { reader ->
-                            kotlinx.serialization.json.Json {
-                                ignoreUnknownKeys = true
-                                isLenient = true
-                            }.decodeFromString(
-                                GitHubApi.GitHubErrorBody.serializer(),
-                                reader.readText(),
-                            ).message
-                        }
-                    }.getOrNull()
-                    _visibilityMessage.update {
-                        when {
-                            // GitHub returns this when a previous visibility
-                            // change is still being processed server-side.
-                            resp.code() == 422 && ghMsg != null ->
-                                "$ghMsg Try again in a few seconds."
-                            ghMsg != null -> "$ghMsg (${resp.code()})"
-                            else -> "Failed to update visibility (${resp.code()})"
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                issueReporter.reportError("RepoDetail", "toggleVisibility", e)
-                _visibilityMessage.update { e.localizedMessage ?: "Failed to update visibility" }
-            } finally {
-                _isTogglingVisibility.update { false }
-            }
-        }
-    }
-
-    fun clearVisibilityMessage() {
-        _visibilityMessage.update { null }
-    }
-
-    /**
-     * Delete a release. GitHub's release-delete endpoint requires the same
-     * repo owner/admin permission as deleting the repo, but does NOT need the
-     * `delete_repo` token scope. Returns 204 on success.
-     */
-    fun deleteRelease(owner: String, repo: String, releaseId: Long) {
-        viewModelScope.launch {
-            if (_isDeletingRelease.value) return@launch
-            _isDeletingRelease.update { true }
-            _releaseDeleteMessage.update { null }
-            try {
-                val resp = api.deleteRelease(owner, repo, releaseId)
-                if (resp.isSuccessful) {
-                    cache.invalidateReleases(owner, repo)
-                    // Remove the deleted release from the live list so the UI
-                    // reflects the change immediately without a refetch.
-                    _releases.update { list -> list.filterNot { it.id == releaseId } }
-                    _releaseDeleteMessage.update { "Deleted" }
-                } else {
-                    val err = resp.errorBody()?.string()
-                    val reason = when (resp.code()) {
-                        403 -> "Forbidden: only the repo owner or admin can delete releases"
-                        404 -> "Release not found or no access"
-                        else -> "Delete failed (${resp.code()}): ${err?.take(200)}"
-                    }
-                    _releaseDeleteMessage.update { reason }
-                }
-            } catch (e: Exception) {
-                issueReporter.reportError("RepoDetail", "deleteRelease", e)
-                _releaseDeleteMessage.update { e.localizedMessage ?: "Delete failed" }
-            } finally {
-                _isDeletingRelease.update { false }
-            }
-        }
-    }
-
-    // ── Translation ──────────────────────────────────────────
-
-    /** Toggle between original and translated README. Triggers translation if needed. */
-    fun toggleTranslation() {
-        val target = translateTarget.value ?: return
-        if (_showTranslated.value) {
-            // Switch back to original
-            _showTranslated.update { false }
-            return
-        }
-        // If already translated, just switch
-        if (_translatedReadme.value != null) {
-            _showTranslated.update { true }
-            return
-        }
-        // Need to translate first
-        val original = _readme.value ?: return
-        viewModelScope.launch {
-            _isTranslating.update { true }
-            try {
-                val lang = if (target == "zh") "zh-CN" else "en"
-                // One automatic retry: 429s from the free endpoints are usually
-                // transient, and the multi-provider fallback inside
-                // GoogleTranslate already spreads load across services.
-                val translated = try {
-                    GoogleTranslate.translate(original, lang)
-                } catch (e: kotlinx.coroutines.CancellationException) {
-                    throw e
-                } catch (first: Exception) {
-                    kotlinx.coroutines.delay(1500)
-                    GoogleTranslate.translate(original, lang)
-                }
-                _translatedReadme.update { translated }
-                _showTranslated.update { true }
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e // don't swallow real coroutine cancellation
-            } catch (e: Exception) {
-                issueReporter.reportError("RepoDetail", "translateReadme", e, mapOf("target" to target))
-                _translateMessage.update { e.message ?: "Translation failed — check your network or try again later" }
-            } finally {
-                _isTranslating.update { false }
-            }
-        }
-    }
-
-    fun clearTranslateMessage() {
-        _translateMessage.update { null }
-    }
-
-    fun decodeBase64(b64: String): String {
-        return try {
-            val cleaned = b64.replace("\n", "")
-            String(Base64.decode(cleaned, Base64.DEFAULT), Charsets.UTF_8)
-        } catch (_: Exception) {
-            b64
-        }
-    }
 }
