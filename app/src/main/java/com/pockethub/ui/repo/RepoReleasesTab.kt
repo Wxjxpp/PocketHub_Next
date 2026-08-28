@@ -46,8 +46,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.pockethub.data.remote.GitHubApi
-import coil.compose.AsyncImage
 import com.pockethub.ui.markdown.MarkdownText
+import com.pockethub.ui.components.PhAsyncImage
 import java.text.DateFormat
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -126,7 +126,7 @@ internal fun ReleasesTab(
                     val authorClick = Modifier.clickable { onNavigateToUser(author.login) }
                     Spacer(Modifier.height(4.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        AsyncImage(
+                        PhAsyncImage(
                             model = author.avatarUrl,
                             contentDescription = null,
                             modifier = Modifier.size(14.dp).clip(CircleShape).then(authorClick),

@@ -55,7 +55,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.pockethub.data.remote.GitHubApi
-import coil.compose.AsyncImage
+import com.pockethub.ui.components.PhAsyncImage
 import androidx.compose.foundation.lazy.rememberLazyListState
 import java.util.Locale
 
@@ -166,7 +166,7 @@ internal fun WorkflowRunRow(
                 }
                 val actor = run.actor
                 if (actor != null) {
-                    AsyncImage(
+                    PhAsyncImage(
                         model = actor.avatarUrl,
                         contentDescription = null,
                         modifier = Modifier.size(14.dp).clip(CircleShape)

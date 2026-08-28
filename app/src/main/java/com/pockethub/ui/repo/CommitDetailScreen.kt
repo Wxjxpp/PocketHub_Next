@@ -72,8 +72,8 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import coil.compose.AsyncImage
 import com.pockethub.data.remote.GitHubApi
+import com.pockethub.ui.components.PhAsyncImage
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
@@ -260,7 +260,7 @@ fun CommitDetailScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         val login = data.author?.login
                         if (data.author?.avatarUrl != null) {
-                            AsyncImage(
+                            PhAsyncImage(
                                 model = data.author.avatarUrl,
                                 contentDescription = null,
                                 modifier = Modifier
@@ -597,7 +597,7 @@ private fun CommitCommentItem(
         Row(verticalAlignment = Alignment.CenterVertically) {
             val login = comment.user?.login
             if (comment.user?.avatarUrl != null) {
-                AsyncImage(
+                PhAsyncImage(
                     model = comment.user.avatarUrl,
                     contentDescription = null,
                     modifier = Modifier

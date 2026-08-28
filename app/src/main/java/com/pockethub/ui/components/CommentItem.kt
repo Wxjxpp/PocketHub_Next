@@ -40,10 +40,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
 import com.pockethub.R
 import com.pockethub.data.model.User
 import com.pockethub.data.remote.GitHubApi
+import com.pockethub.ui.components.PhAsyncImage
 
 /**
  * UI state for a single comment row. Wraps the raw GitHub comment plus the
@@ -104,7 +104,7 @@ fun CommentItem(
         Row(verticalAlignment = Alignment.CenterVertically) {
             val user = c.user
             if (user != null) {
-                AsyncImage(
+                PhAsyncImage(
                     model = user.avatarUrl,
                     contentDescription = null,
                     modifier = Modifier

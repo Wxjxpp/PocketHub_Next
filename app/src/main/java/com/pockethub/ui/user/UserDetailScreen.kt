@@ -79,10 +79,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import coil.compose.AsyncImage
 import com.pockethub.data.model.FeedEvent
 import com.pockethub.data.model.Repository
 import com.pockethub.data.model.User
+import com.pockethub.ui.components.PhAsyncImage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -339,7 +339,7 @@ private fun FollowListSheet(
                         Modifier.fillMaxWidth().clickable { onUserClick(u.login) }.padding(vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        AsyncImage(model = u.avatarUrl, contentDescription = null, modifier = Modifier.size(36.dp).clip(CircleShape))
+                        PhAsyncImage(model = u.avatarUrl, contentDescription = null, modifier = Modifier.size(36.dp).clip(CircleShape))
                         Spacer(Modifier.width(12.dp))
                         Column {
                             Text(u.name ?: "@${u.login}", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
@@ -382,7 +382,7 @@ private fun UserHeader(
                 .fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            AsyncImage(
+            PhAsyncImage(
                 model = user?.avatarUrl,
                 contentDescription = null,
                 modifier = Modifier.size(88.dp).clip(CircleShape)
@@ -508,7 +508,7 @@ private fun UserRepoCard(repo: Repository, onClick: () -> Unit) {
     ) {
         Column(Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                AsyncImage(
+                PhAsyncImage(
                     model = repo.owner.avatarUrl,
                     contentDescription = null,
                     modifier = Modifier.size(16.dp).clip(CircleShape),

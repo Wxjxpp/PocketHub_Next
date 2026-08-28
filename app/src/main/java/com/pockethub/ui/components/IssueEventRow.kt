@@ -30,8 +30,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
 import com.pockethub.data.remote.GitHubApi
+import com.pockethub.ui.components.PhAsyncImage
 
 /**
  * One timeline event row — labeled / assigned / closed / reopened / referenced / etc.
@@ -58,7 +58,7 @@ fun IssueEventRow(
         )
         Spacer(Modifier.width(8.dp))
         event.actor?.let { actor ->
-            AsyncImage(
+            PhAsyncImage(
                 model = actor.avatarUrl,
                 contentDescription = actor.login,
                 modifier = Modifier

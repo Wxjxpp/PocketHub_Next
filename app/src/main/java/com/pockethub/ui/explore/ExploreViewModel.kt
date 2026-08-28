@@ -32,11 +32,43 @@ class ExploreViewModel @Inject constructor(
     private val sourceRepo: FeedSourceRepository,
     private val accounts: AccountRepository,
     private val settings: com.pockethub.data.remote.SettingsRepository,
+    private val cache: com.pockethub.data.remote.CachedRepository,
 ) : ViewModel() {
 
     /** Pinned repos (owner/repo slugs) shown at the top of the Explore tab. */
     val pinnedRepos: StateFlow<List<String>> = settings.pinnedRepos
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /**
+     * Metadata for pinned repos, keyed by "owner/repo". Fetched through the
+     * (TTL-cached) repository loader so the pinned list renders the same rich
+     * card as the Repos tab; slugs whose fetch fails are simply absent and
+     * fall back to a minimal card in the UI.
+     */
+    private val _pinnedRepoDetails = MutableStateFlow<Map<String, com.pockethub.data.model.Repository>>(emptyMap())
+    val pinnedRepoDetails: StateFlow<Map<String, com.pockethub.data.model.Repository>> = _pinnedRepoDetails.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            pinnedRepos.collect { slugs ->
+                // Fetch missing details in parallel; failures leave the slug out.
+                slugs.forEach { slug ->
+                    if (_pinnedRepoDetails.value.containsKey(slug)) return@forEach
+                    launch {
+                        val (owner, repo) = slug.split("/", limit = 2).let { it[0] to it.getOrElse(1) { "" } }
+                        try {
+                            val detail = cache.getRepository(owner, repo)
+                            _pinnedRepoDetails.update { it + (slug to detail) }
+                        } catch (e: Exception) {
+                            issueReporter.reportError("Explore", "pinnedDetails", e)
+                        }
+                    }
+                }
+                // Drop details for unpinned slugs.
+                _pinnedRepoDetails.update { m -> m.filterKeys { it in slugs } }
+            }
+        }
+    }
 
     fun togglePin(slug: String) {
         viewModelScope.launch {

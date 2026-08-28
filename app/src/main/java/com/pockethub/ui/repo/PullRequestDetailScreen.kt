@@ -69,9 +69,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import coil.compose.AsyncImage
 import com.pockethub.ui.components.CommentItem
 import com.pockethub.ui.markdown.MarkdownText
+import com.pockethub.ui.components.PhAsyncImage
 import kotlinx.coroutines.launch
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -329,7 +329,7 @@ fun PullRequestDetailScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     val user = data.user
                     if (user != null) {
-                        AsyncImage(
+                        PhAsyncImage(
                             model = user.avatarUrl,
                             contentDescription = null,
                             modifier = Modifier.size(18.dp).clip(CircleShape)
@@ -455,7 +455,7 @@ fun PullRequestDetailScreen(
                     )
                     Spacer(Modifier.width(6.dp))
                     data.requestedReviewers.forEach { reviewer ->
-                        AsyncImage(
+                        PhAsyncImage(
                             model = reviewer.avatarUrl,
                             contentDescription = reviewer.login,
                             modifier = Modifier.size(18.dp).clip(CircleShape)
@@ -470,7 +470,7 @@ fun PullRequestDetailScreen(
                                 selected = false,
                                 onClick = { vm.removeReviewer(owner, repo, prNumber, reviewer.login) },
                                 label = { Text("@${reviewer.login}", style = MaterialTheme.typography.labelSmall, maxLines = 1) },
-                                avatar = { AsyncImage(model = reviewer.avatarUrl, contentDescription = null, modifier = Modifier.size(16.dp).clip(CircleShape)) },
+                                avatar = { PhAsyncImage(model = reviewer.avatarUrl, contentDescription = null, modifier = Modifier.size(16.dp).clip(CircleShape)) },
                                 trailingIcon = {
                                     Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.action_remove), modifier = Modifier.size(14.dp))
                                 },

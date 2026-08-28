@@ -47,11 +47,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
 import com.pockethub.data.remote.GitHubApi
 import com.pockethub.ui.markdown.MarkdownText
 import java.text.DateFormat
 import com.pockethub.util.parseIso
+import com.pockethub.ui.components.PhAsyncImage
 
 
 @Composable
@@ -113,7 +113,7 @@ internal fun ReviewItem(
             Spacer(Modifier.width(8.dp))
             val user = review.user
             if (user != null) {
-                AsyncImage(
+                PhAsyncImage(
                     model = user.avatarUrl,
                     contentDescription = null,
                     modifier = Modifier.size(16.dp).clip(CircleShape)

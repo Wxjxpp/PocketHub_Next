@@ -30,11 +30,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
 import com.pockethub.data.model.Repository
 import com.pockethub.ui.components.PhCard
 import com.pockethub.ui.components.languageColorHex
 import com.pockethub.ui.components.parseColorHex
+import com.pockethub.ui.components.PhAsyncImage
 
 @Composable
 internal fun RepositoryRow(
@@ -59,7 +59,7 @@ internal fun RepositoryRow(
                 modifier = Modifier.size(28.dp),
                 shape = CircleShape,
             ) {
-                AsyncImage(
+                PhAsyncImage(
                     model = repo.owner.avatarUrl,
                     contentDescription = null,
                     modifier = Modifier.size(28.dp),

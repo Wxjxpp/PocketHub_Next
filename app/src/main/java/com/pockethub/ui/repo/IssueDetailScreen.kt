@@ -71,10 +71,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import coil.compose.AsyncImage
 import com.pockethub.ui.components.CommentItem
 import com.pockethub.ui.components.rememberContrastColor
 import com.pockethub.ui.markdown.MarkdownText
+import com.pockethub.ui.components.PhAsyncImage
 import kotlinx.coroutines.launch
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -252,7 +252,7 @@ fun IssueDetailScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     val user = data.user
                     if (user != null) {
-                        AsyncImage(
+                        PhAsyncImage(
                             model = user.avatarUrl,
                             contentDescription = null,
                             modifier = Modifier.size(18.dp).clip(CircleShape)
@@ -304,7 +304,7 @@ fun IssueDetailScreen(
                             }
                         }
                         data.assignees.take(4).forEach { assignee ->
-                            AsyncImage(model = assignee.avatarUrl, contentDescription = assignee.login,
+                            PhAsyncImage(model = assignee.avatarUrl, contentDescription = assignee.login,
                                 modifier = Modifier.size(20.dp).clip(CircleShape).clickable { onNavigateToUser(assignee.login) })
                         }
                     }

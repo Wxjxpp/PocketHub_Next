@@ -42,8 +42,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import coil.compose.AsyncImage
 import com.pockethub.data.remote.GitHubApi
+import com.pockethub.ui.components.PhAsyncImage
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
@@ -157,7 +157,7 @@ private fun CommitRow(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     val avatarUrl = commit.author?.avatarUrl
                     if (avatarUrl != null) {
-                        AsyncImage(
+                        PhAsyncImage(
                             model = avatarUrl,
                             contentDescription = null,
                             modifier = Modifier.size(14.dp).clip(CircleShape).then(authorClick),

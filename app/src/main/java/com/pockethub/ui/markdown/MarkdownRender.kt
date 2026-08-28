@@ -49,9 +49,9 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
 import coil.compose.SubcomposeAsyncImage
 import com.pockethub.ui.LocalAppImageLoader
+import com.pockethub.ui.components.PhAsyncImage
 
 @Composable
 internal fun RenderInlineParts(parts: List<InlineToken>, style: androidx.compose.ui.text.TextStyle, onTap: (String, LinkKind) -> Unit) {
@@ -200,7 +200,7 @@ internal fun BadgesRow(images: List<InlineToken.Image>, onTap: (String, LinkKind
                 Modifier.clip(RoundedCornerShape(4.dp)).clickable { onTap(img.src, LinkKind.IMAGE_URL) }
             }
             Box(modifier = clickableModifier) {
-                AsyncImage(
+                PhAsyncImage(
                     model = img.src,
                     imageLoader = LocalAppImageLoader.current,
                     contentDescription = img.alt.takeIf { it.isNotBlank() },

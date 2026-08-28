@@ -17,13 +17,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material.icons.outlined.DeveloperMode
 import androidx.compose.material.icons.outlined.ForkRight
-import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.Icon
@@ -38,12 +36,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
 import com.pockethub.data.model.FeedEvent
 import com.pockethub.data.remote.feed.CommunitySignal
 import com.pockethub.data.remote.feed.DiscoverItem
 import com.pockethub.ui.components.languageColorHex
 import com.pockethub.ui.components.parseColorHex
+import com.pockethub.ui.components.PhAsyncImage
 
 @Composable
 internal fun FeedEventCard(
@@ -75,7 +73,7 @@ internal fun FeedEventCard(
         Column {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 ev.actor?.avatarUrl?.let { url ->
-                    AsyncImage(
+                    PhAsyncImage(
                         model = url,
                         contentDescription = ev.actor.login,
                         modifier = Modifier
@@ -112,6 +110,54 @@ internal fun FeedEventCard(
             ev.createdAt?.let { ts ->
                 Spacer(Modifier.height(6.dp))
                 Text(formatTimeAgo(LocalContext.current.resources, ts), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+/**
+ * Fallback pinned row shown when the repo's metadata hasn't loaded (or failed):
+ * same card language as [RepositoryRow] but with only the slug's owner/name.
+ */
+@Composable
+internal fun PinnedRepoRowFallback(
+    slug: String,
+    onClick: () -> Unit,
+) {
+    val owner = slug.substringBefore('/')
+    val repo = slug.substringAfter('/', "")
+    com.pockethub.ui.components.PhCard(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        cornerRadius = 18.dp,
+    ) {
+        Row(
+            Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                Icons.Outlined.DeveloperMode,
+                null,
+                modifier = Modifier.size(18.dp),
+                tint = MaterialTheme.colorScheme.primary,
+            )
+            Spacer(Modifier.width(10.dp))
+            Column {
+                Text(
+                    text = repo.ifBlank { slug },
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = owner,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
     }
@@ -196,7 +242,7 @@ internal fun DiscoverItemCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 val avatar = item.ownerAvatarUrl
                 if (!avatar.isNullOrBlank()) {
-                    AsyncImage(
+                    PhAsyncImage(
                         model = avatar,
                         contentDescription = item.owner,
                         modifier = Modifier
@@ -359,43 +405,3 @@ internal fun formatCount(n: Int): String = when {
  * Compact card for a pinned repo entry. The slug is "owner/repo"; we split it for
  * visual hierarchy and route to the repo detail screen on tap.
  */
-@Composable
-internal fun PinnedRepoCard(
-    slug: String,
-    onClick: () -> Unit,
-) {
-    val parts = slug.split("/", limit = 2)
-    val owner = parts.getOrNull(0).orEmpty()
-    val repo = parts.getOrNull(1).orEmpty()
-    com.pockethub.ui.components.EnhancedCard(
-        onClick = onClick,
-        modifier = Modifier.widthIn(min = 180.dp, max = 200.dp),
-        elevation = 3.dp,
-        cornerRadius = 16.dp,
-        gradientIntensity = 0.10f,
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                Icons.Outlined.PushPin,
-                null,
-                modifier = Modifier.size(14.dp),
-                tint = MaterialTheme.colorScheme.primary,
-            )
-            Spacer(Modifier.width(6.dp))
-            Text(
-                repo,
-                style = MaterialTheme.typography.titleSmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        Spacer(Modifier.height(6.dp))
-        Text(
-            owner,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
-}

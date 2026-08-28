@@ -69,10 +69,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import coil.compose.AsyncImage
 import com.pockethub.data.local.AccountEntity
 import com.pockethub.data.model.Repository
 import com.pockethub.data.model.User
+import com.pockethub.ui.components.PhAsyncImage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -313,7 +313,7 @@ private fun ProfileHeader(user: User?, activeAccount: AccountEntity?) {
         ) {
             // Round avatar with a neutral surface placeholder so the circle is
             // visible even before the asynchronous image resolves.
-            AsyncImage(
+            PhAsyncImage(
                 model = user?.avatarUrl ?: activeAccount?.avatarUrl,
                 contentDescription = null,
                 contentScale = androidx.compose.ui.layout.ContentScale.Crop,
@@ -430,7 +430,7 @@ private fun RepoMiniCard(repo: Repository, onClick: () -> Unit) {
     ) {
         Column(Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                AsyncImage(
+                PhAsyncImage(
                     model = repo.owner.avatarUrl,
                     contentDescription = null,
                     modifier = Modifier.size(16.dp).clip(CircleShape),
@@ -469,7 +469,7 @@ private fun AccountRow(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        AsyncImage(
+        PhAsyncImage(
             model = account.avatarUrl,
             contentDescription = null,
             modifier = Modifier.size(28.dp).clip(CircleShape),

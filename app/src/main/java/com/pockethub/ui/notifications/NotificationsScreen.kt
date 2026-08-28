@@ -67,9 +67,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import coil.compose.AsyncImage
 import com.pockethub.data.model.GitHubNotification
 import com.pockethub.data.model.NotificationReason
+import com.pockethub.ui.components.PhAsyncImage
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -194,7 +194,7 @@ fun NotificationsScreen(
                         val avatarUrl = items.firstOrNull { it.repository?.owner?.avatarUrl != null }?.repository?.owner?.avatarUrl
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { onNavigateToRepo(owner, repoName) }.padding(vertical = 4.dp)) {
                             if (avatarUrl != null) {
-                                AsyncImage(model = avatarUrl, contentDescription = null, modifier = Modifier.size(14.dp).clip(CircleShape))
+                                PhAsyncImage(model = avatarUrl, contentDescription = null, modifier = Modifier.size(14.dp).clip(CircleShape))
                                 Spacer(Modifier.width(6.dp))
                             }
                             Text(
