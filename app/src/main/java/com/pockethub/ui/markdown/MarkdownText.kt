@@ -253,5 +253,3 @@ internal sealed class InlineToken {
     /** Standalone image. `wrapUrl` non-null → image is wrapped in a link (render with hover style). */
     data class Image(val src: String, val alt: String, val wrapUrl: String?) : InlineToken()
 }
-
-@Composable

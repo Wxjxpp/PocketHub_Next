@@ -74,6 +74,15 @@ internal val IMAGE_EXTS = setOf(
     "png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "ico",
 )
 
+/**
+ * Resolve a raw GitHub reference to an absolute URL.
+ *  - absolute http(s) → returned as-is
+ *  - `#123`            → https://github.com/<owner/repo>/issues/123  (needs repoContext)
+ *  - `@user`           → https://github.com/<user>
+ *  - `owner/repo` or `owner/repo#123` → https://github.com/...
+ *  - 40-hex-char SHA   → https://github.com/<repo>/commit/<sha>  (needs repoContext)
+ *  - otherwise         → null (will be rendered as plain text)
+ */
 fun interface LinkResolver {
     operator fun invoke(ref: String): String?
 }
@@ -163,12 +172,3 @@ internal fun isBadgeUrl(url: String): Boolean {
 // In the loop we slice off the part from i onward and try matching.
 internal val WRAPPED_IMG_PATTERN = Regex("^\\[!?\\[([^\\]]*)\\]\\(([^)]+)\\)\\]\\(([^)]+)\\)")
 internal val STANDALONE_IMG_PATTERN = Regex("^!\\[([^\\]]*)\\]\\(([^)]+)\\)")
-
-/**
- * Render a paragraph/inline text into a mix of [InlineToken]s. Images (`![alt](src)`)
- * and badge-wrapped images (`[![alt](src)](href)`) are extracted as [InlineToken.Image]
- * (with [imageResolver] applied to their src) so they can be composed with Coil instead
- * of turning into junk text.
- *
- * Pattern starts at the current scan position to avoid jumping past plain text.
- */

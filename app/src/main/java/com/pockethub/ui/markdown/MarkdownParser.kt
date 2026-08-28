@@ -341,13 +341,3 @@ internal fun parseMarkdown(src: String): List<MdBlock> {
 }
 
 // ── Link resolver ────────────────────────────────────────────────────
-
-/**
- * Resolve a raw GitHub reference to an absolute URL.
- *  - absolute http(s) → returned as-is
- *  - `#123`            → https://github.com/<owner/repo>/issues/123  (needs repoContext)
- *  - `@user`           → https://github.com/<user>
- *  - `owner/repo` or `owner/repo#123` → https://github.com/...
- *  - 40-hex-char SHA   → https://github.com/<repo>/commit/<sha>  (needs repoContext)
- *  - otherwise         → null (will be rendered as plain text)
- */
