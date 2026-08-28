@@ -162,7 +162,7 @@ fun ProfileScreen(
             // identical to UserDetailScreen so toggling between "all repos" and "feed"
             // lives behind one control instead of being a long scroll.
             item {
-                Column(Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
+                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
                     SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                         listOf(R.string.user_repos_chip, R.string.user_activity_chip).forEachIndexed { idx, label ->
                             SegmentedButton(
@@ -175,7 +175,7 @@ fun ProfileScreen(
                         }
                     }
                     Spacer(Modifier.height(8.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             if (sectionTab == 0) Icons.Outlined.Folder else Icons.Outlined.History,
                             null,
@@ -210,11 +210,13 @@ fun ProfileScreen(
                 } else {
                     items(topRepos, key = { it.id }) { repo ->
                         // Same rich row as the Repos tab (仓库) list — one visual
-                        // language for repo cards app-wide.
+                        // language for repo cards app-wide. 16dp side padding keeps
+                        // the card aligned with every other section on this page.
                         com.pockethub.ui.repos.RepositoryRow(
                             repo = repo,
                             onOpen = { onNavigateToRepo(repo.owner.login, repo.name) },
                             onOpenOwner = { onNavigateToUserDetail(repo.owner.login) },
+                            modifier = Modifier.padding(horizontal = 16.dp),
                         )
                     }
                     if (isLoadingMoreRepos) {
@@ -225,7 +227,7 @@ fun ProfileScreen(
                         }
                     } else if (hasMoreRepos) {
                         item {
-                            Row(Modifier.fillMaxWidth().padding(8.dp), horizontalArrangement = Arrangement.Center) {
+                            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.Center) {
                                 TextButton(onClick = { vm.loadMoreRepos() }) {
                                     Text(stringResource(R.string.load_more_repos))
                                 }
