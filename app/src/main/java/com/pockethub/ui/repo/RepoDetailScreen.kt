@@ -155,7 +155,10 @@ fun RepoDetailScreen(
         if (tab == RepoTab.ISSUES) vm.loadIssues(owner, repo)
         if (tab == RepoTab.PRS) vm.loadPulls(owner, repo)
         if (tab == RepoTab.RELEASES) vm.loadReleases(owner, repo)
-        if (tab == RepoTab.WORKFLOWS) vm.loadWorkflowRuns(owner, repo, vm.workflowBranch.value)
+        // Run list intentionally ignores the Code tab branch — show ALL workflow
+        // runs regardless of which branch is being browsed. (The dispatch dialog
+        // still uses the branch for choosing where to run a workflow.)
+        if (tab == RepoTab.WORKFLOWS) vm.loadWorkflowRuns(owner, repo)
     }
     LaunchedEffect(forkMessage) {
         forkMessage?.let {

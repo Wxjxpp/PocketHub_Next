@@ -22,32 +22,35 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.ForkRight
+import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.runtime.remember
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
+import androidx.compose.ui.unit.sp
 import com.pockethub.data.model.Repository
 import com.pockethub.ui.markdown.MarkdownText
 import com.pockethub.ui.components.pressScale
+import com.pockethub.ui.components.PhAsyncImage
+import com.pockethub.util.formatCount
 
 @Composable
 internal fun StatsRow(
@@ -65,7 +68,7 @@ internal fun StatsRow(
         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        AsyncImage(
+        PhAsyncImage(
             model = data.owner.avatarUrl,
             contentDescription = null,
             modifier = Modifier.size(28.dp).clip(CircleShape).then(userClickModifier),
@@ -153,144 +156,236 @@ internal fun OverviewTab(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            if (!data.description.isNullOrBlank()) {
-                Text(data.description, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-            }
-            // Fork source chip — shown only when this repo is itself a fork and
-            // the upstream parent slug is available, matching GitHub's
-            // "forked from owner/repo" affordance. Tapping navigates into the
-            // parent detail screen within the app (not an external browser), so
-            // users can keep browsing without losing context.
-            if (data.fork && data.parent != null) {
-                val p = data.parent
-                val parentOwner = p.owner.login
-                val parentName = p.name
-                Box(
-                    modifier = Modifier
-                        .clip(MaterialTheme.shapes.small)
-                        .background(MaterialTheme.colorScheme.secondaryContainer)
-                        .clickable { onNavigateToRepo(parentOwner, parentName) },
-                ) {
+            // ── Info card: owner, description, homepage, stats, topics ──
+            com.pockethub.ui.components.PhCard(modifier = Modifier.fillMaxWidth(), cornerRadius = 18.dp) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    // Owner row — tap to open the profile.
                     Row(
-                        Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { onLinkClick(data.owner.htmlUrl ?: "https://github.com/${data.owner.login}", com.pockethub.ui.markdown.LinkKind.GITHUB_USER) },
                     ) {
-                        Icon(
-                            Icons.Outlined.ForkRight,
-                            null,
-                            modifier = Modifier.size(13.dp),
-                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        PhAsyncImage(
+                            model = data.owner.avatarUrl,
+                            contentDescription = data.owner.login,
+                            modifier = Modifier.size(32.dp).clip(CircleShape),
                         )
-                        Spacer(Modifier.width(6.dp))
+                        Spacer(Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = data.fullName,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                            Text(
+                                text = data.owner.login,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+
+                    if (!data.description.isNullOrBlank()) {
                         Text(
-                            stringResource(R.string.repo_forked_from, "$parentOwner/$parentName"),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            data.description,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            lineHeight = 20.sp,
                         )
+                    }
+
+                    // Fork source chip — navigates into the upstream repo.
+                    if (data.fork && data.parent != null) {
+                        val p = data.parent
+                        val parentOwner = p.owner.login
+                        val parentName = p.name
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clip(MaterialTheme.shapes.small)
+                                .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f))
+                                .clickable { onNavigateToRepo(parentOwner, parentName) }
+                                .padding(horizontal = 10.dp, vertical = 6.dp),
+                        ) {
+                            Icon(
+                                Icons.Outlined.ForkRight,
+                                null,
+                                modifier = Modifier.size(13.dp),
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                stringResource(R.string.repo_forked_from, "$parentOwner/$parentName"),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            )
+                        }
+                    }
+
+                    // Homepage — clickable through the shared link handler.
+                    if (!data.homepage.isNullOrBlank()) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clip(MaterialTheme.shapes.small)
+                                .clickable { onLinkClick(data.homepage!!, com.pockethub.ui.markdown.LinkKind.EXTERNAL) }
+                                .padding(horizontal = 2.dp, vertical = 2.dp),
+                        ) {
+                            Icon(
+                                Icons.Outlined.Language,
+                                null,
+                                modifier = Modifier.size(14.dp),
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                data.homepage!!,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+
+                    // Stats strip — stars / forks / issues in one quiet row.
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        OverviewStat(Icons.Outlined.Star, formatCount(data.stars), MaterialTheme.colorScheme.tertiary)
+                        OverviewStat(Icons.Outlined.ForkRight, formatCount(data.forks), MaterialTheme.colorScheme.secondary)
+                        OverviewStat(Icons.Outlined.ErrorOutline, formatCount(data.openIssues), MaterialTheme.colorScheme.primary)
+                        data.language?.let { language ->
+                            Spacer(Modifier.weight(1f))
+                            val color = com.pockethub.ui.components.parseColorHex(com.pockethub.ui.components.languageColorHex(language)) ?: MaterialTheme.colorScheme.outline
+                            Box(Modifier.size(10.dp).clip(CircleShape).background(color))
+                            Spacer(Modifier.width(5.dp))
+                            Text(language, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+
+                    // Topics — quiet capsule chips.
+                    if (data.topics.isNotEmpty()) {
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            data.topics.take(12).forEach { topic ->
+                                Text(
+                                    topic,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(999.dp))
+                                        .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f))
+                                        .clickable { onTopicClick(topic) }
+                                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                                )
+                            }
+                            if (data.topics.size > 12) {
+                                Text(
+                                    "+${data.topics.size - 12}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(vertical = 4.dp),
+                                )
+                            }
+                        }
                     }
                 }
             }
-            if (!data.homepage.isNullOrBlank()) {
-                Text(
-                    data.homepage,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-            if (data.topics.isNotEmpty()) {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    data.topics.forEach {
-                        AssistChip(
-                            onClick = { onTopicClick(it) },
-                            label = { Text(it, style = MaterialTheme.typography.labelSmall) },
-                            colors = AssistChipDefaults.assistChipColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
-                        )
-                    }
-                }
-            }
-            HorizontalDivider()
-            // README header with optional translation toggle — hidden entirely
-            // when there is no README and we're not still loading it, so empty
-            // repos don't show a dangling "README" title followed by "unavailable".
+
+            // ── README section ──
             val showReadmeSection = readme != null || isLoading
             if (showReadmeSection) {
                 Row(
-                Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text(stringResource(R.string.readme_title), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                if (readme != null && translateTarget != null) {
-                    // Capsule toggle: 原文 / 译文
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        if (isTranslating) {
-                            CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp)
-                            Spacer(Modifier.width(4.dp))
-                        }
-                        // 原文 button
-                        Box(
-                            modifier = Modifier
-                                .clip(MaterialTheme.shapes.small)
-                                .background(
-                                    if (!showTranslated) MaterialTheme.colorScheme.primaryContainer
-                                    else MaterialTheme.colorScheme.surfaceVariant
-                                )
-                                .clickable(enabled = !isTranslating) { if (showTranslated) onToggleTranslation() }
-                                .padding(horizontal = 10.dp, vertical = 4.dp),
-                            contentAlignment = Alignment.Center,
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(stringResource(R.string.readme_title), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                    if (readme != null && translateTarget != null) {
+                        // Capsule toggle: 原文 / 译文
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text(
-                                stringResource(R.string.translate_original),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = if (!showTranslated) MaterialTheme.colorScheme.onPrimaryContainer
-                                else MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        // 译文 button
-                        Box(
-                            modifier = Modifier
-                                .clip(MaterialTheme.shapes.small)
-                                .background(
-                                    if (showTranslated) MaterialTheme.colorScheme.primaryContainer
-                                    else MaterialTheme.colorScheme.surfaceVariant
+                            if (isTranslating) {
+                                CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp)
+                                Spacer(Modifier.width(4.dp))
+                            }
+                            // 原文 button
+                            Box(
+                                modifier = Modifier
+                                    .clip(MaterialTheme.shapes.small)
+                                    .background(
+                                        if (!showTranslated) MaterialTheme.colorScheme.primaryContainer
+                                        else MaterialTheme.colorScheme.surfaceVariant
+                                    )
+                                    .clickable(enabled = !isTranslating) { if (showTranslated) onToggleTranslation() }
+                                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    stringResource(R.string.translate_original),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (!showTranslated) MaterialTheme.colorScheme.onPrimaryContainer
+                                    else MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
-                                .clickable(enabled = !isTranslating) { if (!showTranslated) onToggleTranslation() }
-                                .padding(horizontal = 10.dp, vertical = 4.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                stringResource(R.string.translate_translated),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = if (showTranslated) MaterialTheme.colorScheme.onPrimaryContainer
-                                else MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                            }
+                            // 译文 button
+                            Box(
+                                modifier = Modifier
+                                    .clip(MaterialTheme.shapes.small)
+                                    .background(
+                                        if (showTranslated) MaterialTheme.colorScheme.primaryContainer
+                                        else MaterialTheme.colorScheme.surfaceVariant
+                                    )
+                                    .clickable(enabled = !isTranslating) { if (!showTranslated) onToggleTranslation() }
+                                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    stringResource(R.string.translate_translated),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (showTranslated) MaterialTheme.colorScheme.onPrimaryContainer
+                                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                         }
                     }
                 }
-            }
-            // README content — show translated or original
-            val displayReadme = if (showTranslated && translatedReadme != null) translatedReadme else readme
-            if (displayReadme != null) {
-                MarkdownText(
-                    markdown = displayReadme,
-                    modifier = Modifier.fillMaxWidth(),
-                    repoContext = "$owner/$repo",
-                    defaultBranch = repoData?.defaultBranch,
-                    onLinkClick = onLinkClick,
-                )
-            } else if (isLoading) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.readme_loading), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                // README content — show translated or original
+                val displayReadme = if (showTranslated && translatedReadme != null) translatedReadme else readme
+                if (displayReadme != null) {
+                    MarkdownText(
+                        markdown = displayReadme,
+                        modifier = Modifier.fillMaxWidth(),
+                        repoContext = "$owner/$repo",
+                        defaultBranch = repoData?.defaultBranch,
+                        onLinkClick = onLinkClick,
+                    )
+                } else if (isLoading) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.readme_loading), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
-            }
             } // showReadmeSection
             Spacer(Modifier.height(40.dp))
         }
+    }
+}
+
+/** Small icon+value stat used in the overview info card. */
+@Composable
+private fun OverviewStat(icon: androidx.compose.ui.graphics.vector.ImageVector, value: String, tint: Color) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, null, modifier = Modifier.size(14.dp), tint = tint)
+        Spacer(Modifier.width(4.dp))
+        Text(value, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Medium)
     }
 }
 

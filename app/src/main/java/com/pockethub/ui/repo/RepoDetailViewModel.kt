@@ -283,7 +283,8 @@ class RepoDetailViewModel @Inject constructor(
                         cache.invalidateReleases(owner, repo)
                         loadReleases(owner, repo)?.join()
                     }
-                    RepoTab.WORKFLOWS -> loadWorkflowRuns(owner, repo, _workflowBranch.value)?.join()
+                    // Run list shows all runs — branch-independent (see RepoDetailScreen).
+                    RepoTab.WORKFLOWS -> loadWorkflowRuns(owner, repo)?.join()
                 }
             } finally {
                 _isRefreshing.value = false
