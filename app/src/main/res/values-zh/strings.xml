@@ -81,7 +81,7 @@
     <!-- Explore -->
     <string name="section_trending">趋势</string>
     <string name="section_featured">精选</string>
-    <string name="pinned_repos_title">收藏仓库</string>
+    <string name="pinned_repos_title">本地置顶仓库</string>
     <string name="section_following">关注</string>
     <string name="trending_language_all">全部</string>
     <string name="time_range_daily">今日</string>
@@ -566,4 +566,6 @@
     <string name="tag_update">更新</string>
     <string name="update_downloaded_ready">下载完成，点击「安装」启动系统更新。</string>
     <string name="update_download_failed">下载失败：%1$s</string>
+    <string name="update_downloading">下载中…</string>
+    <string name="update_changelog_title">更新内容</string>
 </resources>

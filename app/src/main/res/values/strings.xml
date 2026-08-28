@@ -54,8 +54,8 @@
     <string name="tag_update">Update</string>
     <string name="update_downloaded_ready">Download complete — tapping Install will run the system updater.</string>
     <string name="update_download_failed">Download failed: %1$s</string>
-
-    <string name="create_issue_title">New issue</string>
+    <string name="update_downloading">Downloading…</string>
+    <string name="update_changelog_title">What\'s new</string>
     <string name="hint_issue_title">Title</string>
     <string name="hint_issue_body">Body (optional)</string>
     <string name="issue_template_picker_hint">Pick a template to get started, or open a blank issue.</string>
