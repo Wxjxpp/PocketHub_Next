@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+
 internal fun RepoDetailViewModel.loadReleases(owner: String, repo: String): Job {
     return viewModelScope.launch {
         _isLoadingReleases.update { true }
@@ -18,9 +19,6 @@ internal fun RepoDetailViewModel.loadReleases(owner: String, repo: String): Job 
             _isLoadingReleases.update { false }
         }
     }
-}
-internal fun RepoDetailViewModel.clearReleaseDeleteMessage() {
-    _releaseDeleteMessage.update { null }
 }
 /**
  * Delete a release. GitHub's release-delete endpoint requires the same
