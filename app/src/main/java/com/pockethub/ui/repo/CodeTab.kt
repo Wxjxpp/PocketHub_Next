@@ -1,6 +1,7 @@
 package com.pockethub.ui.repo
 
 import com.pockethub.R
+import com.pockethub.util.relativeTime
 import com.pockethub.data.download.DownloadManager
 import com.pockethub.ui.download.DownloadViewModel
 
@@ -33,7 +34,6 @@ import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.FolderZip
-import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -418,31 +418,8 @@ private fun FileViewerContent(
 }
 
 /**
- * GitHub-style relative time, e.g. "now", "3 minutes ago", "5 days ago", "2 months ago".
- * Falls back to a short absolute date for anything older than a year.
+ * Files larger than this render without highlighting to keep the UI responsive.
  */
-private fun relativeTime(iso: String): String {
-    val fmt = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US).apply {
-        timeZone = java.util.TimeZone.getTimeZone("UTC")
-    }
-    val then = runCatching { fmt.parse(iso) }.getOrNull() ?: return iso
-    val diffMs = System.currentTimeMillis() - then.time
-    if (diffMs < 0) return "now"
-    val sec = diffMs / 1000
-    if (sec < 60) return "now"
-    val min = sec / 60
-    if (min < 60) return if (min == 1L) "1 minute ago" else "$min minutes ago"
-    val hours = min / 60
-    if (hours < 24) return if (hours == 1L) "1 hour ago" else "$hours hours ago"
-    val days = hours / 24
-    if (days < 30) return if (days == 1L) "1 day ago" else "$days days ago"
-    val months = days / 30
-    if (months < 12) return if (months == 1L) "1 month ago" else "$months months ago"
-    val years = days / 365
-    return if (years == 1L) "1 year ago" else "$years years ago"
-}
-
-/** Files larger than this render without highlighting to keep the UI responsive. */
 private const val HIGHLIGHT_MAX_CHARS = 200_000
 
 /**

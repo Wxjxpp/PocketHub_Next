@@ -21,12 +21,8 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
-import kotlinx.serialization.json.jsonArray
 import retrofit2.HttpException
 import javax.inject.Inject
-import java.text.SimpleDateFormat
-import java.util.Locale
-import java.util.TimeZone
 
 /**
  * Simple file-tree browser backed by GitHub's Contents API.
@@ -245,10 +241,6 @@ class CodeBrowserViewModel @Inject constructor(
             stack.add(acc)
         }
         return stack
-    }
-
-    private val isoParser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply {
-        timeZone = TimeZone.getTimeZone("UTC")
     }
 
     /**

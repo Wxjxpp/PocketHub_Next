@@ -201,7 +201,3 @@ private fun RepositoryMeta(repo: Repository) {
     }
 }
 
-private fun formatCount(count: Int): String = when {
-    count >= 1000 -> "%.1fk".format(count / 1000.0)
-    else -> count.toString()
-}
