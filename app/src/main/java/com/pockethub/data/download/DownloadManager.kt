@@ -31,6 +31,7 @@ class DownloadManager @Inject constructor(
     @ApplicationContext private val appContext: Context,
     private val client: OkHttpClient,
     private val dao: DownloadDao,
+    private val settings: com.pockethub.data.remote.SettingsRepository,
 ) {
 
     data class EnqueueRequest(
@@ -144,6 +145,28 @@ class DownloadManager @Inject constructor(
     /** Directory where downloads for [repoKey] are stored. */
     fun dirFor(repoKey: String): File = File(workRoot(), repoKey.ifBlank { "common" })
 
+    /**
+     * Copy a finished download into the user's chosen SAF folder (when set).
+     * Failures are swallowed — the user can still open the internal copy, and
+     * a broken export must never flip the download back to FAILED.
+     */
+    private suspend fun exportToUserFolder(entity: DownloadEntity, source: File) {
+        val treeUri = settings.downloadFolderUri.first() ?: return
+        runCatching {
+            val root = androidx.documentfile.provider.DocumentFile.fromTreeUri(
+                appContext, android.net.Uri.parse(treeUri),
+            ) ?: return
+            // Replace an older export of the same name (re-download case).
+            root.findFile(source.name)?.delete()
+            val mime = entity.contentType.takeIf { it.contains('/') }
+                ?: "application/octet-stream"
+            val doc = root.createFile(mime, source.name) ?: return
+            appContext.contentResolver.openOutputStream(doc.uri)?.use { out ->
+                source.inputStream().use { it.copyTo(out) }
+            }
+        }
+    }
+
     private fun workRoot(): File {
         val root = File(
             appContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: appContext.filesDir,
@@ -244,6 +267,10 @@ class DownloadManager @Inject constructor(
                         destFile.delete()
                     }
                     dao.upsert(entity.copy(status = "DONE", downloadedBytes = totalBytes, progressPct = 100, updatedAt = System.currentTimeMillis()))
+                    // Mirror into the user-chosen download folder (best-effort;
+                    // the app-private copy above stays authoritative for APK
+                    // install / artifact extraction flows).
+                    exportToUserFolder(entity, targetFile)
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 destFile.delete()

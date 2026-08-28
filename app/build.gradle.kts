@@ -92,6 +92,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.documentfile)
 
     // Compose (BOM-managed)
     implementation(platform(libs.androidx.compose.bom))

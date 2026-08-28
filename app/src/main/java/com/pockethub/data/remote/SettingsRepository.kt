@@ -44,6 +44,7 @@ class SettingsRepository @Inject constructor(
         val LAST_UPDATE_CHECK_MS = intPreferencesKey("last_update_check_epoch_ms")
         val LAST_UPDATE_PROMPT_MS = intPreferencesKey("last_update_prompt_epoch_ms")
         val PINNED_REPOS = stringPreferencesKey("pinned_repos_json")
+        val DOWNLOAD_FOLDER_URI = stringPreferencesKey("download_folder_tree_uri")
         val ISSUE_REPORT_ENABLED = intPreferencesKey("issue_report_enabled")
         val ISSUE_REPORT_INTERVAL_DAYS = intPreferencesKey("issue_report_interval_days")
         val ISSUE_REPORT_EMAIL = stringPreferencesKey("issue_report_email")
@@ -115,6 +116,23 @@ class SettingsRepository @Inject constructor(
         context.dataStore.edit { prefs ->
             if (target != null) prefs[Keys.TRANSLATE_TARGET] = target
             else prefs.remove(Keys.TRANSLATE_TARGET)
+        }
+    }
+
+    // ── Download folder ───────────────────────────────────
+    /**
+     * User-chosen download folder as a persisted SAF tree URI (from
+     * ACTION_OPEN_DOCUMENT_TREE). Null = app-private download dir (default).
+     * Completed downloads are mirrored into this folder when set.
+     */
+    val downloadFolderUri: Flow<String?> = context.dataStore.data.map { prefs ->
+        prefs[Keys.DOWNLOAD_FOLDER_URI]?.takeIf { it.isNotBlank() }
+    }
+
+    suspend fun setDownloadFolderUri(uri: String?) {
+        context.dataStore.edit { prefs ->
+            if (uri.isNullOrBlank()) prefs.remove(Keys.DOWNLOAD_FOLDER_URI)
+            else prefs[Keys.DOWNLOAD_FOLDER_URI] = uri
         }
     }
 

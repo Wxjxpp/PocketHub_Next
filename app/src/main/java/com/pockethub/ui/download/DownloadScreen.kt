@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.InsertDriveFile
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.TaskAlt
@@ -108,8 +109,92 @@ fun DownloadScreen(
                 )
             }
             when (selectedTab) {
-                0 -> ActiveDownloadsTab(vm = vm)
-                else -> DoneDownloadsTab(vm = vm)
+                0 -> {
+                    DownloadFolderRow(vm = vm)
+                    ActiveDownloadsTab(vm = vm)
+                }
+                else -> {
+                    DownloadFolderRow(vm = vm)
+                    DoneDownloadsTab(vm = vm)
+                }
+            }
+        }
+    }
+}
+
+/**
+ * "Download location" row: shows the user-chosen folder (SAF tree) or the
+ * app default, and opens the system folder picker (which supports creating
+ * a new folder). When set, finished downloads are mirrored there.
+ */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun DownloadFolderRow(vm: DownloadViewModel) {
+    val context = LocalContext.current
+    val folderUri by vm.downloadFolderUri.collectAsState()
+    val folderName = remember(folderUri) {
+        folderUri?.let { uri ->
+            runCatching {
+                androidx.documentfile.provider.DocumentFile.fromTreeUri(context, android.net.Uri.parse(uri))?.name
+            }.getOrNull()
+        }
+    }
+    val picker = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocumentTree(),
+    ) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                        android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                )
+            }
+            vm.setDownloadFolder(uri.toString())
+        }
+    }
+    com.pockethub.ui.components.PhCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        cornerRadius = 14.dp,
+        onClick = { picker.launch(null) },
+    ) {
+        Row(
+            Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                Icons.Outlined.Folder,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    stringResource(R.string.download_folder_label),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    folderName ?: stringResource(R.string.download_folder_default),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (folderUri != null) {
+                androidx.compose.material3.TextButton(onClick = { vm.setDownloadFolder(null) }) {
+                    Text(stringResource(R.string.download_folder_reset))
+                }
+            } else {
+                Text(
+                    stringResource(R.string.download_folder_pick),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
             }
         }
     }

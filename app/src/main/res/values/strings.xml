@@ -56,6 +56,10 @@
     <string name="update_download_failed">Download failed: %1$s</string>
     <string name="update_downloading">Downloading…</string>
     <string name="update_changelog_title">What\'s new</string>
+    <string name="download_folder_label">Download location</string>
+    <string name="download_folder_default">App directory (default)</string>
+    <string name="download_folder_pick">Pick folder</string>
+    <string name="download_folder_reset">Default</string>
 
     <string name="create_issue_title">New issue</string>
     <string name="hint_issue_title">Title</string>

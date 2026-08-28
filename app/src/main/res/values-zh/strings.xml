@@ -568,4 +568,8 @@
     <string name="update_download_failed">下载失败：%1$s</string>
     <string name="update_downloading">下载中…</string>
     <string name="update_changelog_title">更新内容</string>
+    <string name="download_folder_label">下载位置</string>
+    <string name="download_folder_default">应用目录（默认）</string>
+    <string name="download_folder_pick">选择文件夹</string>
+    <string name="download_folder_reset">默认</string>
 </resources>
