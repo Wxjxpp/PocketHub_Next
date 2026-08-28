@@ -572,4 +572,5 @@
     <string name="download_folder_default">应用目录（默认）</string>
     <string name="download_folder_pick">选择文件夹</string>
     <string name="download_folder_reset">默认</string>
+    <string name="download_folder_change">更改下载路径</string>
 </resources>

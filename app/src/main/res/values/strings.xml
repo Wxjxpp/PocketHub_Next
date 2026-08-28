@@ -60,6 +60,7 @@
     <string name="download_folder_default">App directory (default)</string>
     <string name="download_folder_pick">Pick folder</string>
     <string name="download_folder_reset">Default</string>
+    <string name="download_folder_change">Change download path</string>
 
     <string name="create_issue_title">New issue</string>
     <string name="hint_issue_title">Title</string>

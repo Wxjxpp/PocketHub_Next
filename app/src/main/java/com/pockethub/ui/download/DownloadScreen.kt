@@ -20,7 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Download
-import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.InsertDriveFile
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.TaskAlt
@@ -92,6 +92,9 @@ fun DownloadScreen(
                         )
                     }
                 },
+                actions = {
+                    DownloadFolderButton(vm = vm)
+                },
             )
         },
     ) { padding ->
@@ -109,36 +112,24 @@ fun DownloadScreen(
                 )
             }
             when (selectedTab) {
-                0 -> {
-                    DownloadFolderRow(vm = vm)
-                    ActiveDownloadsTab(vm = vm)
-                }
-                else -> {
-                    DownloadFolderRow(vm = vm)
-                    DoneDownloadsTab(vm = vm)
-                }
+                0 -> ActiveDownloadsTab(vm = vm)
+                else -> DoneDownloadsTab(vm = vm)
             }
         }
     }
 }
 
 /**
- * "Download location" row: shows the user-chosen folder (SAF tree) or the
- * app default, and opens the system folder picker (which supports creating
- * a new folder). When set, finished downloads are mirrored there.
+ * Top-bar entry for the download location (moved off the former inline card).
+ * Tap: system folder picker (supports creating a new folder); finished
+ * downloads are mirrored there. Long-press: back to the app default.
+ * The icon is tinted primary while a custom folder is active.
  */
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-private fun DownloadFolderRow(vm: DownloadViewModel) {
+private fun DownloadFolderButton(vm: DownloadViewModel) {
     val context = LocalContext.current
     val folderUri by vm.downloadFolderUri.collectAsState()
-    val folderName = remember(folderUri) {
-        folderUri?.let { uri ->
-            runCatching {
-                androidx.documentfile.provider.DocumentFile.fromTreeUri(context, android.net.Uri.parse(uri))?.name
-            }.getOrNull()
-        }
-    }
     val picker = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.OpenDocumentTree(),
     ) { uri ->
@@ -153,50 +144,13 @@ private fun DownloadFolderRow(vm: DownloadViewModel) {
             vm.setDownloadFolder(uri.toString())
         }
     }
-    com.pockethub.ui.components.PhCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        cornerRadius = 14.dp,
-        onClick = { picker.launch(null) },
-    ) {
-        Row(
-            Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                Icons.Outlined.Folder,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(20.dp),
-            )
-            Spacer(Modifier.width(10.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    stringResource(R.string.download_folder_label),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    folderName ?: stringResource(R.string.download_folder_default),
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            if (folderUri != null) {
-                androidx.compose.material3.TextButton(onClick = { vm.setDownloadFolder(null) }) {
-                    Text(stringResource(R.string.download_folder_reset))
-                }
-            } else {
-                Text(
-                    stringResource(R.string.download_folder_pick),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-        }
+    IconButton(onClick = { picker.launch(null) }) {
+        Icon(
+            Icons.Outlined.FolderOpen,
+            contentDescription = stringResource(R.string.download_folder_change),
+            tint = if (folderUri != null) MaterialTheme.colorScheme.primary
+                   else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
