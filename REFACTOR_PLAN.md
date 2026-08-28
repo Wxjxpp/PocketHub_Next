@@ -104,19 +104,20 @@
 | P4 | Errors.kt | userMessage 统一 83 处错误文案 | ✓ 33156644747 |
 | docs | [skip ci] | Phase 4 收尾记录 | 无 CI |
 
-## 当前状态 (2026-08-28 P3 全部完成后)
-- fix 分支 = main + 20+ 个重构 commit，最新 CI ✓ 33152579518；v0.3.14 已从 fix 打包 (run 33153027548)
-- 已完成: P1 死代码 / P2 去重 / P3 五巨石拆分（提交范围全绿）
-- 未完成: 二梯队 11 个 500-780 行文件拆分(可选)、CodeTab 留尾去重、Phase 4 性能/健壮性/体验复查
-- 工具链(可复用): /var/minis/workspace/phase3{a,b,b_fix,b_v2,c,d,e}*.py + fix_imports.py + check_balance.py
-- 本地 APK 缓存: /var/minis/workspace/apk-cache/pockethub-0.3.14.apk（含全部重构，供功能验证）
+## 当前状态 (2026-08-28 全部完成后)
+- fix 分支 = main + 20+ 个重构 commit，全部 CI 绿；v0.3.16 为最终验证包 (run 33156904824)
+- 已完成: P1 死代码 ✓ | P2 去重 ✓ | P3 五巨石拆分 ✓ | P3f 二梯队裁量拆分 ✓ | P4 列表key/错误处理/体验复查 ✓
+- 计划内"刻意不做"决策: FeedSourceService 与 4 个 500-540 行内聚单屏保留；4 组跨包小 helper 保留；GitHubApi DTO 抽顶层留尾；remember/LaunchedEffect 深审缓行 —— 均为避免过度工程的裁量, 非欠账
+- 工具链(可复用): /var/minis/workspace/phase3{a,b,b_fix,b_v2,c,d,e,f}*.py + fix_imports.py + check_balance.py
+- 本地 APK 缓存: /var/minis/workspace/apk-cache/pockethub-fix-v0.3.16.apk（含全部重构，供功能验证）
+- 待用户动作: 功能验证 v0.3.16 → 确认后 fix 合回 main 走 build.yml 正式发版
 - 注意: 每次 workflow_dispatch 会在远端 fix 产生 bump commit，push 前必须 git fetch origin fix + rebase
 
 ## 经验教训 (Phase 2)
 1. phase2.py 首次运行失败后重跑会重复插 import —— 脚本要幂等或失败即回滚
 2. fix_imports.py 加 DENYLIST={getValue,setValue}：`by` 委托不出现这些字样
 3. `\bRow\b` 判定是对的（LazyRow/RepositoryRow 是不同词），ReposScreen 的 14 个死 import 是历史遗留
-4. CodeTab.relativeTime 与 CodeBrowserViewModel.isoParser 仍是日期解析重复，留待 Phase 3 拆 CodeTab 时并入 util/Format.kt
+4. CodeTab.relativeTime 与 CodeBrowserViewModel.isoParser 日期解析重复 → 已在 P3f 处理（relativeTime 入 util，isoParser 为死字段删除）
 
 ## 经验教训 (Phase 1)
 1. audit.py 的 usage 统计有漏检（HistoryEntry/DiffLine/AppStyleDef 实际跨文件在用却报 dead）——死符号结论必须当"嫌疑"对待，动手前单独 grep 核实，最终以 CI 为准
