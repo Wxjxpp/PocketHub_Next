@@ -1180,10 +1180,6 @@ private fun FileDiffItem(
     }
 }
 
-private fun formatDate(s: String): String = try {
-    DateFormat.getDateInstance(DateFormat.MEDIUM).format(java.time.OffsetDateTime.parse(s))
-} catch (_: Exception) { s.take(10) }
-
 /**
  * Single-line CI checks summary shown above labels / reviewers on PR detail.
  *

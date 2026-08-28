@@ -417,12 +417,6 @@ private fun FileViewerContent(
     }
 }
 
-private fun humanReadableSize(bytes: Long): String = when {
-    bytes >= 1_048_576 -> "%.1f MB".format(bytes / 1_048_576.0)
-    bytes >= 1024 -> "%.1f KB".format(bytes / 1024.0)
-    else -> "$bytes B"
-}
-
 /**
  * GitHub-style relative time, e.g. "now", "3 minutes ago", "5 days ago", "2 months ago".
  * Falls back to a short absolute date for anything older than a year.
