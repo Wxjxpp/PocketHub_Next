@@ -1,11 +1,12 @@
 package com.pockethub.ui.main
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.ui.draw.clip
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,20 +14,28 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.RocketLaunch
 import androidx.compose.material3.Button
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -35,6 +44,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.pockethub.R
 import com.pockethub.data.remote.UpdateChecker
+import com.pockethub.ui.theme.LocalStyleTokens
 import com.pockethub.util.humanBytes
 
 /**
@@ -42,11 +52,10 @@ import com.pockethub.util.humanBytes
  * leaving the app. The dialog never opens the browser; the APK is fetched into
  * cache and handed to the system PackageInstaller via a FileProvider URI.
  *
- * The layout uses [Dialog] (not AlertDialog) so the body can grow taller and the
- * buttons wrap on narrow screens via [FlowRow], fixing text-overflow on small
- * devices.
+ * Visual language matches the app's design system: themed surface + hairline
+ * border + accent-gradient hero plate + corner radius scaled by the active
+ * style's [LocalStyleTokens] tokens.
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun UpdateDialog(
     info: UpdateChecker.UpdateInfo,
@@ -58,207 +67,300 @@ fun UpdateDialog(
     onIgnore: () -> Unit,
     onLater: () -> Unit,
 ) {
+    val tokens = LocalStyleTokens.current
+    // Follow the active style's corner language, capped so it stays dialog-like.
+    val dialogRadius = (22f * tokens.cornerScale).coerceIn(2f, 30f).dp
+    val borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
+
     Dialog(
         onDismissRequest = onLater,
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
         Surface(
-            shape = RoundedCornerShape(24.dp),
-            tonalElevation = 6.dp,
+            shape = RoundedCornerShape(dialogRadius),
             color = MaterialTheme.colorScheme.surface,
             modifier = Modifier
                 .padding(horizontal = 24.dp)
                 .widthIn(max = 360.dp)
-                .fillMaxWidth(),
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(dialogRadius))
+                .background(
+                    Brush.verticalGradient(
+                        0f to MaterialTheme.colorScheme.onSurface.copy(alpha = 0.03f),
+                        1f to Color.Transparent,
+                    )
+                )
+                .border(1.dp, Brush.verticalGradient(listOf(borderColor, borderColor.copy(alpha = 0.35f))), RoundedCornerShape(dialogRadius)),
         ) {
             Column(
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    // Update icon plate
-                    androidx.compose.foundation.layout.Box(
-                        modifier = Modifier
-                            .size(44.dp)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
-                            ),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            text = "↑",
-                            style = MaterialTheme.typography.titleLarge,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Column {
-                        Text(
-                            text = stringResource(R.string.update_available_title),
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        Text(
-                            text = stringResource(R.string.update_version_line, info.latestVersionName),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Medium,
-                        )
-                    }
-                }
-
-                info.publishedAt?.let {
-                    Text(
-                        text = stringResource(R.string.update_published, formatPublishedDate(it)),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                UpdateHeader(info, downloadState)
 
                 info.releaseNotes?.takeIf { it.isNotBlank() }?.let { notes ->
-                    val items = parseChangelogItems(
-                        notes,
-                        tags = ChangelogTags(
-                            new = stringResource(R.string.tag_new),
-                            fix = stringResource(R.string.tag_fix),
-                            improved = stringResource(R.string.tag_improved),
-                            faster = stringResource(R.string.tag_faster),
-                            reverted = stringResource(R.string.tag_reverted),
-                            update = stringResource(R.string.tag_update),
-                        ),
-                    ).take(8)
-                    if (items.isNotEmpty()) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(max = 220.dp)
-                                .verticalScroll(rememberScrollState()),
-                            verticalArrangement = Arrangement.spacedBy(6.dp),
-                        ) {
-                            items.forEach { item ->
-                                Row(verticalAlignment = Alignment.Top) {
-                                    Text(
-                                        text = item.tag,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = item.tagColor,
-                                        fontWeight = FontWeight.SemiBold,
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(6.dp))
-                                            .background(item.tagColor.copy(alpha = 0.13f))
-                                            .padding(horizontal = 8.dp, vertical = 3.dp),
-                                    )
-                                    Spacer(Modifier.size(8.dp))
-                                    Text(
-                                        text = item.text,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.padding(top = 2.dp),
-                                    )
-                                }
-                            }
-                        }
-                    }
+                    ChangelogSection(notes)
                 }
 
-                // Download progress / status surface — only rendered when relevant.
                 when (val ds = downloadState) {
-                    is UpdateViewModel.DownloadState.Running -> {
-                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            LinearProgressIndicator(
-                                progress = { ds.progressPct / 100f },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(6.dp)
-                                    .clip(RoundedCornerShape(99.dp)),
-                            )
-                            val status = if (ds.totalBytes > 0) {
-                                "${humanBytes(ds.downloadedBytes)} / ${humanBytes(ds.totalBytes)}  ·  ${ds.progressPct}%"
-                            } else {
-                                "${humanBytes(ds.downloadedBytes)}  ·  ${ds.progressPct}%"
-                            }
-                            Text(
-                                text = status,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                    is UpdateViewModel.DownloadState.Done -> {
-                        Text(
-                            text = stringResource(R.string.update_downloaded_ready),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                    is UpdateViewModel.DownloadState.Failed -> {
-                        Text(
-                            text = stringResource(R.string.update_download_failed, ds.message),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                    }
+                    is UpdateViewModel.DownloadState.Running -> DownloadProgress(ds)
+                    is UpdateViewModel.DownloadState.Done -> ReadyBanner()
+                    is UpdateViewModel.DownloadState.Failed -> FailedBanner(ds.message)
                     else -> Unit
                 }
 
-                Spacer(Modifier.size(2.dp))
+                UpdateActions(
+                    downloadState = downloadState,
+                    onCancel = onCancel,
+                    onInstall = onInstall,
+                    onRetry = onRetry,
+                    onIgnore = onIgnore,
+                    onLater = onLater,
+                    onDownload = onDownload,
+                )
+            }
+        }
+    }
+}
 
-                // Actions — primary CTA full-width, secondary actions as a
-                // compact text row underneath. No cramped wrapping.
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+@Composable
+private fun UpdateHeader(info: UpdateChecker.UpdateInfo, downloadState: UpdateViewModel.DownloadState) {
+    val tokens = LocalStyleTokens.current
+    val busy = downloadState is UpdateViewModel.DownloadState.Running
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        // Accent-gradient hero plate with a rocket glyph.
+        Box(
+            modifier = Modifier
+                .size(46.dp)
+                .clip(RoundedCornerShape((14f * tokens.cornerScale).coerceIn(2f, 22f).dp))
+                .background(
+                    Brush.linearGradient(listOf(tokens.accentA, tokens.accentB))
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Outlined.RocketLaunch,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.surface,
+                modifier = Modifier.size(24.dp),
+            )
+        }
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = stringResource(R.string.update_available_title),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Spacer(Modifier.height(3.dp))
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // Version capsule — the version is the hero metadata here.
+                Surface(
+                    shape = RoundedCornerShape(999.dp),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
                 ) {
-                    when (val ds = downloadState) {
-                        is UpdateViewModel.DownloadState.Running -> {
-                            Button(onClick = onCancel, modifier = Modifier.fillMaxWidth()) {
-                                Text(stringResource(R.string.action_cancel))
-                            }
-                        }
-                        is UpdateViewModel.DownloadState.Done -> {
-                            Button(onClick = { onInstall(ds.path) }, modifier = Modifier.fillMaxWidth()) {
-                                Text(stringResource(R.string.action_install))
-                            }
-                            TextButton(onClick = onLater, modifier = Modifier.align(Alignment.CenterHorizontally)) {
-                                Text(stringResource(R.string.action_remind_later))
-                            }
-                        }
-                        is UpdateViewModel.DownloadState.Failed -> {
-                            Button(onClick = onRetry, modifier = Modifier.fillMaxWidth()) {
-                                Text(stringResource(R.string.action_retry))
-                            }
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                TextButton(onClick = onLater) {
-                                    Text(stringResource(R.string.action_remind_later))
-                                }
-                                TextButton(onClick = onIgnore) {
-                                    Text(stringResource(R.string.action_ignore_version))
-                                }
-                            }
-                        }
-                        else -> {
-                            Button(onClick = onDownload, modifier = Modifier.fillMaxWidth()) {
-                                Text(stringResource(R.string.action_download))
-                            }
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                TextButton(onClick = onLater) {
-                                    Text(stringResource(R.string.action_remind_later))
-                                }
-                                TextButton(onClick = onIgnore) {
-                                    Text(stringResource(R.string.action_ignore_version))
-                                }
-                            }
-                        }
+                    Text(
+                        text = "v" + info.latestVersionName.removePrefix("v"),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
+                    )
+                }
+                if (busy) {
+                    Text(
+                        text = stringResource(R.string.update_downloading),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    info.publishedAt?.let {
+                        Text(
+                            text = formatPublishedDate(it),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChangelogSection(notes: String) {
+    val items = parseChangelogItems(
+        notes,
+        tags = ChangelogTags(
+            new = stringResource(R.string.tag_new),
+            fix = stringResource(R.string.tag_fix),
+            improved = stringResource(R.string.tag_improved),
+            faster = stringResource(R.string.tag_faster),
+            reverted = stringResource(R.string.tag_reverted),
+            update = stringResource(R.string.tag_update),
+        ),
+    ).take(8)
+    if (items.isEmpty()) return
+    Column {
+        Text(
+            text = stringResource(R.string.update_changelog_title),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Spacer(Modifier.height(8.dp))
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 220.dp)
+                .verticalScroll(rememberScrollState())
+                .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            items.forEachIndexed { i, item ->
+                if (i > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f), thickness = 0.5.dp)
+                Row(verticalAlignment = Alignment.Top) {
+                    Text(
+                        text = item.tag,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = item.tagColor,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(item.tagColor.copy(alpha = 0.14f))
+                            .padding(horizontal = 8.dp, vertical = 3.dp),
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        text = item.text,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DownloadProgress(ds: UpdateViewModel.DownloadState.Running) {
+    val animated by animateFloatAsState(
+        targetValue = ds.progressPct / 100f,
+        animationSpec = tween(220),
+        label = "update_progress",
+    )
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(6.dp)
+                .clip(RoundedCornerShape(999.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+        ) {
+            Box(
+                Modifier
+                    .fillMaxWidth(animated)
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(LocalStyleTokens.current.accentA, LocalStyleTokens.current.accentB)
+                        )
+                    ),
+            )
+        }
+        Text(
+            text = if (ds.totalBytes > 0) {
+                "${humanBytes(ds.downloadedBytes)} / ${humanBytes(ds.totalBytes)}  ·  ${ds.progressPct}%"
+            } else {
+                "${humanBytes(ds.downloadedBytes)}  ·  ${ds.progressPct}%"
+            },
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun ReadyBanner() {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Box(
+            Modifier.size(8.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary),
+        )
+        Text(
+            text = stringResource(R.string.update_downloaded_ready),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.primary,
+        )
+    }
+}
+
+@Composable
+private fun FailedBanner(message: String) {
+    Text(
+        text = stringResource(R.string.update_download_failed, message),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.error,
+    )
+}
+
+@Composable
+private fun UpdateActions(
+    downloadState: UpdateViewModel.DownloadState,
+    onDownload: () -> Unit,
+    onCancel: () -> Unit,
+    onInstall: (String) -> Unit,
+    onRetry: () -> Unit,
+    onIgnore: () -> Unit,
+    onLater: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        when (val ds = downloadState) {
+            is UpdateViewModel.DownloadState.Running -> {
+                Button(onClick = onCancel, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            }
+            is UpdateViewModel.DownloadState.Done -> {
+                Button(
+                    onClick = { onInstall(ds.path) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(),
+                ) {
+                    Text(stringResource(R.string.action_install), modifier = Modifier.padding(vertical = 4.dp))
+                }
+                TextButton(onClick = onLater, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+                    Text(stringResource(R.string.action_remind_later))
+                }
+            }
+            is UpdateViewModel.DownloadState.Failed -> {
+                Button(onClick = onRetry, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) {
+                    Text(stringResource(R.string.action_retry), modifier = Modifier.padding(vertical = 4.dp))
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    TextButton(onClick = onLater) { Text(stringResource(R.string.action_remind_later)) }
+                    TextButton(onClick = onIgnore) { Text(stringResource(R.string.action_ignore_version)) }
+                }
+            }
+            else -> {
+                Button(onClick = onDownload, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) {
+                    Text(stringResource(R.string.action_download), modifier = Modifier.padding(vertical = 4.dp))
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    TextButton(onClick = onLater) { Text(stringResource(R.string.action_remind_later)) }
+                    TextButton(onClick = onIgnore) { Text(stringResource(R.string.action_ignore_version)) }
                 }
             }
         }
@@ -274,7 +376,6 @@ private fun formatPublishedDate(iso: String): String = try {
     iso.take(16).replace('T', ' ')
 }
 
-// Helper: display bytes with a single-decimal unit string (e.g. "8.5 MB").
 /** A skimmable changelog line shown in the update dialog. */
 private data class ChangeItem(
     val tag: String,
@@ -296,7 +397,7 @@ private data class ChangelogTags(
  * Parse raw release notes into a flat list of short skimmable items.
  *
  * Recognises the conventional-commit prefix (`feat(scope):` / `fix:` / `chore:` …)
- * and converts each line into a friendly Chinese category tag plus the rest of
+ * and converts each line into a friendly category tag plus the rest of
  * the message. Lines without a recognisable prefix get a "更新" tag.
  *
  * Only bullet / `- ` lines or pure-message lines are kept; HTML or section
