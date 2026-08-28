@@ -503,6 +503,8 @@ interface GitHubApi :
         val id: Long = 0,
         @kotlinx.serialization.SerialName("node_id") val nodeId: String? = null,
         val name: String = "",
+        /** Run display title (defaults to the commit message subject on GitHub). */
+        @kotlinx.serialization.SerialName("display_title") val displayTitle: String? = null,
         @kotlinx.serialization.SerialName("head_branch") val headBranch: String? = null,
         @kotlinx.serialization.SerialName("head_sha") val headSha: String? = null,
         val path: String? = null,

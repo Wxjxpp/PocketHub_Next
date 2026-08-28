@@ -114,35 +114,55 @@ internal fun WorkflowRunRow(
         }
         Spacer(Modifier.width(6.dp))
         Column(Modifier.weight(1f)) {
-            // Line 1 (title): commit summary — the most distinguishing info, like github.com
-            val commitMsg = run.headCommit?.message
-                ?.substringBefore('\n')
-                ?.trim()
-                .orEmpty()
-            if (commitMsg.isNotEmpty()) {
-                Text(
-                    commitMsg,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Spacer(Modifier.height(2.dp))
+            // Overline: workflow name — the task identity (github.com style) —
+            // with the event tag on the right. Standalone line so it never
+            // mixes with sha/event detail again.
+            val wfName = run.name.ifBlank {
+                run.path?.substringAfterLast('/')?.removeSuffix(".yml") ?: (run.event ?: "")
             }
-            // Line 2: workflow name + event — secondary since it repeats across runs
-            val wfName = run.name.ifBlank { run.path?.substringAfterLast('/') ?: (run.event ?: "") }
-            val detail = listOfNotNull(
-                run.headSha?.take(7),
-                run.event?.let { eventLabel(it) },
-            ).joinToString(" · ")
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    if (detail.isNotEmpty()) "$wfName · $detail" else wfName,
+                    wfName,
                     style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
                 )
+                run.event?.let {
+                    Text(
+                        eventLabel(it),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 8.dp),
+                    )
+                }
+            }
+            // Title: run display title = commit message; short SHA trails right.
+            val commitMsg = run.displayTitle?.takeIf { it.isNotBlank() }
+                ?: run.headCommit?.message?.substringBefore('\n')?.trim().orEmpty()
+            if (commitMsg.isNotEmpty() || !run.headSha.isNullOrBlank()) {
+                Spacer(Modifier.height(1.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        commitMsg,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    run.headSha?.take(7)?.let { sha ->
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            sha,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
             }
             Spacer(Modifier.height(3.dp))
             // Line 3: branch chip · actor · date+time · duration
