@@ -74,10 +74,11 @@
 - 所有产物在 fix 分支, CI 全绿; REFACTOR_PLAN.md 已入库
 
 ### 遗留待办 (转入 Phase 4 前置清单)
-- [ ] 二梯队拆分(500-780 行, 11 个): ExploreScreen 781 / SearchScreen 762 / SettingsScreen 752 / FeedSourceService 721 / CommitDetailScreen 684 / ProfileScreen 634 / IssueDetailScreen 611 / UserDetailScreen 538 / CodeTab 510 / CreateIssueScreen 509 / CodeHighlighter 504
-  - 注: 这些多为"单一屏幕内聚文件", 是否拆需逐个判断(参数面过大则不值得), >700 的 4 个优先
-- [ ] 留尾去重: CodeTab.relativeTime、CodeBrowserViewModel.isoParser → util/Format.kt（拆 CodeTab 时做）
-- 审计残留同名私有 helper 5 组(跨包, 非本轮引入): EditCommentDialog ×2 / IssueEventRow ×2 / StatPill ×2 / StatsRow ×2 / formatCount ×2 — 拆对应文件时顺带合并
+- [x] P3f (2026-08-28, 灵活裁量: 只拆有清晰缝的): relativeTime/formatCount/isoparser 去重入 util | SearchScreen 762→224+SearchFilters 560 | ExploreScreen 781→411+ExploreCards 405 | SettingsScreen 752→652+IssueReport 111 | CI ✓ 33154593671
+- [x] FeedSourceService 721 行: 判定为单一内聚 service, 无拆分缝, 明确保留
+- [x] 500-540 行 4 个(UserDetail/CodeTab/CreateIssueScreen/CodeHighlighter): 内聚单屏, 明确保留
+- [x] 留尾去重: CodeTab.relativeTime、CodeBrowserViewModel.isoParser(实为死字段, 直接删) → util/Format.kt ✓
+- 审计残留同名私有 helper 5 组: formatCount ×2 已合并 ✓; 其余 4 组(EditCommentDialog/IssueEventRow/StatPill/StatsRow)为跨包小 UI 片段, 各自内聚, 保留
 
 ## Phase 4 — 架构与健壮性/体验 [ ]
 - [ ] 分页/列表 key 与性能复查
@@ -98,6 +99,8 @@
 | docs | [skip ci] | REFACTOR_PLAN.md 入库 fix 分支 | 无 CI |
 | APK | v0.3.13 | fix 分支 workflow_dispatch 打包（含 P1+P2），已可安装 | ✓ 33127328233 |
 | APK | v0.3.14 | fix 分支 workflow_dispatch 打包（含 P1+P2+P3 全部），供功能验证 | ✓ 33153027548 |
+| P3f | split+1fixup | 去重 relativeTime/formatCount/死 isoParser + Search/Explore/Settings 拆缝 | ✓ 33154593671 |
+| APK | v0.3.15 | fix 分支最终验证包（含全部重构），未合 main | ✓ 33155123661 |
 
 ## 当前状态 (2026-08-28 P3 全部完成后)
 - fix 分支 = main + 20+ 个重构 commit，最新 CI ✓ 33152579518；v0.3.14 已从 fix 打包 (run 33153027548)
