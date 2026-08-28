@@ -40,7 +40,12 @@ data class Issue(
 
     // Only present on /search/issues responses — lets a work-list surface the
     // owning repo without re-fetching. Null on the per-repo issues endpoint.
+    // NOTE: GitHub stopped returning `repository` in search results; owner/repo
+    // must fall back to [repositoryUrl] or [htmlUrl] (see ui.search parsing).
     @SerialName("repository") val repository: com.pockethub.data.model.Repository? = null,
+
+    /** e.g. "https://api.github.com/repos/owner/repo" — present in search results. */
+    @SerialName("repository_url") val repositoryUrl: String? = null,
 ) {
     @Serializable
     data class Label(

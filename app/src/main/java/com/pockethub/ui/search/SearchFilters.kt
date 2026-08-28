@@ -1,6 +1,7 @@
 package com.pockethub.ui.search
 
 import com.pockethub.R
+import com.pockethub.ui.components.PhAsyncImage
 
 import androidx.compose.ui.res.stringResource
 
@@ -47,7 +48,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,30 +67,49 @@ internal fun RepoFilterRow(vm: SearchViewModel) {
                     label = { Text(stringResource(R.string.sort_best_match)) },
                 )
             }
+            // Stars / Forks / Updated: the order lives inside the chip — tap to
+            // select (descending by default), tap again to flip asc/desc.
             item {
-                FilterChip(
+                OrderAwareSortChip(
                     selected = sort == RepoSort.STARS,
-                    onClick = { vm.applyRepoFilters(sort = RepoSort.STARS) },
-                    label = { Text(stringResource(R.string.sort_stars)) },
+                    label = stringResource(R.string.sort_stars),
+                    order = order,
+                    onClick = {
+                        if (sort == RepoSort.STARS) {
+                            vm.applyRepoFilters(order = if (order == SortOrder.ASC) SortOrder.DESC else SortOrder.ASC)
+                        } else {
+                            vm.applyRepoFilters(sort = RepoSort.STARS)
+                        }
+                    },
                 )
             }
             item {
-                FilterChip(
+                OrderAwareSortChip(
                     selected = sort == RepoSort.FORKS,
-                    onClick = { vm.applyRepoFilters(sort = RepoSort.FORKS) },
-                    label = { Text(stringResource(R.string.sort_forks)) },
+                    label = stringResource(R.string.sort_forks),
+                    order = order,
+                    onClick = {
+                        if (sort == RepoSort.FORKS) {
+                            vm.applyRepoFilters(order = if (order == SortOrder.ASC) SortOrder.DESC else SortOrder.ASC)
+                        } else {
+                            vm.applyRepoFilters(sort = RepoSort.FORKS)
+                        }
+                    },
                 )
             }
             item {
-                FilterChip(
+                OrderAwareSortChip(
                     selected = sort == RepoSort.UPDATED,
-                    onClick = { vm.applyRepoFilters(sort = RepoSort.UPDATED) },
-                    label = { Text(stringResource(R.string.sort_updated)) },
+                    label = stringResource(R.string.sort_updated),
+                    order = order,
+                    onClick = {
+                        if (sort == RepoSort.UPDATED) {
+                            vm.applyRepoFilters(order = if (order == SortOrder.ASC) SortOrder.DESC else SortOrder.ASC)
+                        } else {
+                            vm.applyRepoFilters(sort = RepoSort.UPDATED)
+                        }
+                    },
                 )
-            }
-            // Order toggle — only flavorful when a real sort is active.
-            if (sort != RepoSort.BEST_MATCH) {
-                item { OrderToggleChip(order = order, onToggle = { vm.applyRepoFilters(order = it) }) }
             }
         }
         Spacer(Modifier.height(6.dp))
@@ -190,7 +209,7 @@ internal fun LazyListScope.repoItems(
 ) {
     items(repos, key = { it.id }) { repo ->
         Row(Modifier.fillMaxWidth().clickable { onNavigateToRepo(repo.owner.login, repo.name) }.padding(vertical = 8.dp)) {
-            AsyncImage(
+            PhAsyncImage(
                 model = repo.owner.avatarUrl,
                 contentDescription = null,
                 modifier = Modifier.size(16.dp).clip(CircleShape)
@@ -216,7 +235,7 @@ internal fun LazyListScope.userItems(
                 .padding(vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            AsyncImage(model = user.avatarUrl, contentDescription = null, modifier = Modifier.size(24.dp).clip(CircleShape))
+            PhAsyncImage(model = user.avatarUrl, contentDescription = null, modifier = Modifier.size(24.dp).clip(CircleShape))
             Spacer(Modifier.width(8.dp))
             Column {
                 Text(user.name ?: "@${user.login}", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
@@ -231,11 +250,23 @@ internal fun LazyListScope.codeItems(
     onNavigateToRepo: (String, String) -> Unit,
 ) {
     items(code, key = { it.htmlUrl.ifBlank { it.path } }) { item ->
-        Column(Modifier.fillMaxWidth().clickable {
-            item.repository?.let { onNavigateToRepo(it.owner.login, it.name) }
+        // Preferred: the `repository` object. Fallback: parse owner/repo from the
+        // file's html_url (…/owner/repo/blob/branch/path) so the row is still
+        // tappable when the object is missing.
+        val slug = item.repository?.let { it.owner.login to it.name }
+            ?: Regex("github\\.com/([^/]+)/([^/]+)/(?:blob|raw|tree)")
+                .find(item.htmlUrl)
+                ?.groupValues
+                ?.let { g -> if (g.size >= 3) g[1] to g[2] else null }
+        Column(Modifier.fillMaxWidth().clickable(enabled = slug != null) {
+            slug?.let { (o, r) -> onNavigateToRepo(o, r) }
         }.padding(vertical = 8.dp)) {
             Text(item.path, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            item.repository?.let { Text("${it.owner.login}/${it.name}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            Text(
+                slug?.let { (o, r) -> "$o/$r" } ?: item.repository?.fullName.orEmpty().ifBlank { "—" },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -246,15 +277,13 @@ internal fun LazyListScope.issueItems(
     onNavigateToPR: (String, String, Int) -> Unit,
 ) {
     items(issues, key = { it.id }) { issue ->
-        val owner = issue.repository?.owner?.login
-        val repo = issue.repository?.name
         val isPR = issue.pullRequest != null
-        val repoLabel = if (owner != null && repo != null) "$owner/$repo" else "—"
+        val repoSlug = issueOwnerRepo(issue)
+        val repoLabel = repoSlug?.let { (o, r) -> "$o/$r" } ?: "—"
         Row(
             Modifier.fillMaxWidth().clickable {
-                if (owner != null && repo != null) {
-                    if (isPR) onNavigateToPR(owner, repo, issue.number) else onNavigateToIssue(owner, repo, issue.number)
-                }
+                val (owner, repo) = repoSlug ?: return@clickable
+                if (isPR) onNavigateToPR(owner, repo, issue.number) else onNavigateToIssue(owner, repo, issue.number)
             }.padding(vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -270,7 +299,7 @@ internal fun LazyListScope.issueItems(
                     Text("#${issue.number}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.width(6.dp))
                     val stateColor = when {
-                        issue.state == "closed" && isPR && issue.pullRequest?.let { true } == true -> MaterialTheme.colorScheme.secondary
+                        issue.state == "closed" && isPR -> MaterialTheme.colorScheme.secondary
                         issue.state == "closed" -> MaterialTheme.colorScheme.error
                         else -> MaterialTheme.colorScheme.primary
                     }
@@ -281,6 +310,27 @@ internal fun LazyListScope.issueItems(
             }
         }
     }
+}
+
+/**
+ * Resolve the owning "owner/repo" of a search-result issue/PR.
+ *
+ * GitHub stopped returning the full `repository` object in /search/issues, so
+ * fall back through: repository object → `repository_url`
+ * (`…/repos/owner/repo`) → `html_url` (`…/owner/repo/(issues|pull)/n`).
+ * Returns null only when every source is missing.
+ */
+internal fun issueOwnerRepo(issue: com.pockethub.data.model.Issue): Pair<String, String>? {
+    issue.repository?.let { return it.owner.login to it.name }
+    issue.repositoryUrl?.let { url ->
+        val m = Regex("/repos/([^/]+)/([^/?]+)").find(url)
+        if (m != null) return m.groupValues[1] to m.groupValues[2]
+    }
+    issue.htmlUrl?.let { url ->
+        val m = Regex("github\\.com/([^/]+)/([^/]+)/(?:issues|pull)").find(url)
+        if (m != null) return m.groupValues[1] to m.groupValues[2]
+    }
+    return null
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -535,6 +585,35 @@ internal fun OrderToggleChip(order: SortOrder, onToggle: (SortOrder) -> Unit) {
                 )
                 Spacer(Modifier.width(4.dp))
                 Text(if (order == SortOrder.ASC) stringResource(R.string.order_asc) else stringResource(R.string.order_desc))
+            }
+        },
+    )
+}
+
+/**
+ * Sort chip with the asc/desc arrow built into the label: the arrow points the
+ * active direction while the chip is selected; tapping toggles the direction.
+ */
+@Composable
+internal fun OrderAwareSortChip(
+    selected: Boolean,
+    label: String,
+    order: SortOrder,
+    onClick: () -> Unit,
+) {
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(label)
+                Spacer(Modifier.width(2.dp))
+                Icon(
+                    if (order == SortOrder.ASC) Icons.Outlined.ArrowUpward else Icons.Outlined.ArrowDownward,
+                    contentDescription = if (order == SortOrder.ASC) stringResource(R.string.order_asc) else stringResource(R.string.order_desc),
+                    modifier = Modifier.size(13.dp),
+                    tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         },
     )
