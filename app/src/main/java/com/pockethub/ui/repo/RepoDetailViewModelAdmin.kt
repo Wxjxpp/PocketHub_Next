@@ -2,6 +2,7 @@ package com.pockethub.ui.repo
 
 
 import androidx.lifecycle.viewModelScope
+import com.pockethub.util.userMessage
 import com.pockethub.data.model.Repository
 import com.pockethub.data.remote.GitHubApi
 import kotlinx.coroutines.flow.update
@@ -26,7 +27,7 @@ internal fun RepoDetailViewModel.fork(owner: String, repo: String, newName: Stri
             }
         } catch (e: Exception) {
             issueReporter.reportError("RepoDetail", "fork", e)
-            _forkMessage.update { e.localizedMessage ?: "Fork 失败" }
+            _forkMessage.update { e.userMessage("Fork 失败") }
         } finally {
             _isForking.update { false }
         }
@@ -66,7 +67,7 @@ internal fun RepoDetailViewModel.deleteRepository(owner: String, repo: String) {
             }
         } catch (e: Exception) {
             issueReporter.reportError("RepoDetail", "deleteRepository", e)
-            _deleteMessage.update { e.localizedMessage ?: "Delete failed" }
+            _deleteMessage.update { e.userMessage("Delete failed") }
         } finally {
             _isDeleting.update { false }
         }
@@ -149,7 +150,7 @@ internal fun RepoDetailViewModel.toggleVisibility(owner: String, repo: String) {
             }
         } catch (e: Exception) {
             issueReporter.reportError("RepoDetail", "toggleVisibility", e)
-            _visibilityMessage.update { e.localizedMessage ?: "Failed to update visibility" }
+            _visibilityMessage.update { e.userMessage("Failed to update visibility") }
         } finally {
             _isTogglingVisibility.update { false }
         }

@@ -1,6 +1,7 @@
 package com.pockethub.ui.main
 
 import android.content.Context
+import com.pockethub.util.userMessage
 import android.content.Intent
 import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModel
@@ -221,7 +222,7 @@ class UpdateViewModel @Inject constructor(
             } catch (e: Throwable) {
                 issueReporter.reportError("Update", "startDownload", e)
                 tmp.delete()
-                _download.value = DownloadState.Failed(e.localizedMessage ?: e.javaClass.simpleName)
+                _download.value = DownloadState.Failed(e.userMessage(e.javaClass.simpleName))
             }
         }
     }

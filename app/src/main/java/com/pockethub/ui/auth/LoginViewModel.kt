@@ -1,6 +1,7 @@
 package com.pockethub.ui.auth
 
 import androidx.lifecycle.ViewModel
+import com.pockethub.util.userMessage
 import androidx.lifecycle.viewModelScope
 import com.pockethub.BuildConfig
 import com.pockethub.data.remote.AccountRepository
@@ -74,7 +75,7 @@ class LoginViewModel @Inject constructor(
                 _ui.update {
                     it.copy(
                         isLoading = false,
-                        error = e.localizedMessage ?: "Token validation failed."
+                        error = e.userMessage("Token validation failed.")
                     )
                 }
             }
@@ -167,7 +168,7 @@ class LoginViewModel @Inject constructor(
             } catch (e: Exception) {
                 issueReporter.reportError("Login", "exchangeOAuthCode", e)
                 _ui.update {
-                    it.copy(isLoading = false, error = e.localizedMessage ?: "OAuth exchange failed.")
+                    it.copy(isLoading = false, error = e.userMessage("OAuth exchange failed."))
                 }
             }
         }

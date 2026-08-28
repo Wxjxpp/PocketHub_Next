@@ -1,6 +1,7 @@
 package com.pockethub.ui.user
 
 import androidx.lifecycle.ViewModel
+import com.pockethub.util.userMessage
 import androidx.lifecycle.viewModelScope
 import com.pockethub.data.model.FeedEvent
 import com.pockethub.data.model.Repository
@@ -112,7 +113,7 @@ class UserDetailViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 issueReporter.reportError("UserDetail", "loadUser", e)
-                _error.update { e.localizedMessage ?: "Failed to load user" }
+                _error.update { e.userMessage("Failed to load user") }
             } finally {
                 _isLoading.update { false }
             }

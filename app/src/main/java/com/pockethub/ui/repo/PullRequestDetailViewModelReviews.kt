@@ -2,6 +2,7 @@ package com.pockethub.ui.repo
 
 
 import androidx.lifecycle.viewModelScope
+import com.pockethub.util.userMessage
 import com.pockethub.data.remote.GitHubApi
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -25,7 +26,7 @@ internal fun PullRequestDetailViewModel.merge(owner: String, repo: String, numbe
             }
         } catch (e: Exception) {
             issueReporter.reportError("PullRequestDetail", "merge", e)
-            _mergeResult.update { e.localizedMessage ?: "Merge failed" }
+            _mergeResult.update { e.userMessage("Merge failed") }
         } finally {
             _isMerging.update { false }
         }
@@ -56,7 +57,7 @@ internal fun PullRequestDetailViewModel.togglePrState(owner: String, repo: Strin
         } catch (e: Exception) {
             issueReporter.reportError("PullRequestDetail", "togglePrState", e)
             if (e is kotlinx.coroutines.CancellationException) throw e
-            _actionMessage.update { e.localizedMessage ?: "Failed to update PR state" }
+            _actionMessage.update { e.userMessage("Failed to update PR state") }
         } finally {
             _isTogglingState.update { false }
         }
@@ -88,7 +89,7 @@ internal fun PullRequestDetailViewModel.submitReview(owner: String, repo: String
             loadPullRequest(owner, repo, number)
         } catch (e: Exception) {
             issueReporter.reportError("PullRequestDetail", "submitReview", e)
-            _reviewResult.update { e.localizedMessage ?: "Review 提交失败" }
+            _reviewResult.update { e.userMessage("Review 提交失败") }
         } finally {
             _isSendingReview.update { false }
         }
@@ -106,7 +107,7 @@ internal fun PullRequestDetailViewModel.requestReviewers(owner: String, repo: St
             _actionMessage.update { "Requested ${reviewers.size} reviewer(s)" }
         } catch (e: Exception) {
             issueReporter.reportError("PullRequestDetail", "requestReviewers", e)
-            _reviewerError.update { e.localizedMessage ?: "Failed to request reviewer" }
+            _reviewerError.update { e.userMessage("Failed to request reviewer") }
         } finally {
             _reviewerWorking.update { false }
         }
@@ -126,7 +127,7 @@ internal fun PullRequestDetailViewModel.removeReviewer(owner: String, repo: Stri
             _actionMessage.update { "Removed reviewer @${reviewer}" }
         } catch (e: Exception) {
             issueReporter.reportError("PullRequestDetail", "removeReviewer", e)
-            _reviewerError.update { e.localizedMessage ?: "Failed to remove reviewer" }
+            _reviewerError.update { e.userMessage("Failed to remove reviewer") }
         } finally {
             _reviewerWorking.update { false }
         }

@@ -1,6 +1,7 @@
 package com.pockethub.ui.repos
 
 import androidx.lifecycle.ViewModel
+import com.pockethub.util.userMessage
 import androidx.lifecycle.viewModelScope
 import com.pockethub.data.model.Repository
 import com.pockethub.data.remote.AccountRepository
@@ -116,7 +117,7 @@ class ReposViewModel @Inject constructor(
             } catch (e: Exception) {
                 issueReporter.reportError("Repos", "load", e)
                 if (requestId != loadRequestId) return@launch
-                _error.update { e.localizedMessage ?: "Failed to load" }
+                _error.update { e.userMessage("Failed to load") }
                 // Roll back the page counter so the next loadMore retries this page.
                 if (append && currentPage == page) currentPage--
             } finally {

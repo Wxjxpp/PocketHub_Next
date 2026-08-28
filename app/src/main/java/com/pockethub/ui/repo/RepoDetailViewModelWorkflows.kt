@@ -2,6 +2,7 @@ package com.pockethub.ui.repo
 
 
 import androidx.lifecycle.viewModelScope
+import com.pockethub.util.userMessage
 import com.pockethub.data.remote.GitHubApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.first
@@ -16,7 +17,7 @@ internal fun RepoDetailViewModel.loadWorkflowRuns(owner: String, repo: String, b
         } catch (e: Exception) {
             issueReporter.reportError("RepoDetail", "loadWorkflowRuns", e)
             _workflowRuns.update { emptyList() }
-            _error.update { e.localizedMessage ?: "Failed to load workflows" }
+            _error.update { e.userMessage("Failed to load workflows") }
         } finally {
             _isLoadingWorkflowRuns.update { false }
         }
@@ -36,7 +37,7 @@ internal fun RepoDetailViewModel.loadWorkflows(owner: String, repo: String, bran
         } catch (e: Exception) {
             issueReporter.reportError("RepoDetail", "loadWorkflows", e)
             _workflows.update { emptyList() }
-            _dispatchMessage.update { e.localizedMessage ?: "Failed to load workflow" }
+            _dispatchMessage.update { e.userMessage("Failed to load workflow") }
         } finally {
             _isLoadingWorkflows.update { false }
         }
@@ -72,7 +73,7 @@ internal fun RepoDetailViewModel.dispatchWorkflow(owner: String, repo: String, w
             }
         } catch (e: Exception) {
             issueReporter.reportError("RepoDetail", "dispatchWorkflow", e)
-            _dispatchMessage.update { e.localizedMessage ?: "Failed to trigger workflow" }
+            _dispatchMessage.update { e.userMessage("Failed to trigger workflow") }
         } finally {
             _isDispatching.update { false }
         }

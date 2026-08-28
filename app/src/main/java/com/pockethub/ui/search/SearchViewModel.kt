@@ -1,6 +1,7 @@
 package com.pockethub.ui.search
 
 import androidx.lifecycle.ViewModel
+import com.pockethub.util.userMessage
 import androidx.lifecycle.viewModelScope
 import com.pockethub.data.model.Issue
 import com.pockethub.data.model.Repository
@@ -186,7 +187,7 @@ class SearchViewModel @Inject constructor(
             } catch (e: Exception) {
                 issueReporter.reportError("Search", "search", e)
                 if (e is kotlinx.coroutines.CancellationException) throw e
-                _error.update { e.localizedMessage ?: "Search failed" }
+                _error.update { e.userMessage("Search failed") }
                 // Keep previous results visible — the error state only shows when there's
                 // nothing to display.
             } finally {

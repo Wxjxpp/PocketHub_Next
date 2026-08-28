@@ -1,6 +1,7 @@
 package com.pockethub.ui.repo
 
 import android.util.Base64
+import com.pockethub.util.userMessage
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.pockethub.data.remote.GitHubApi
@@ -138,11 +139,11 @@ class CodeBrowserViewModel @Inject constructor(
                         )
                     }
                 } else {
-                    _state.update { it.copy(isLoading = false, error = e.localizedMessage ?: "Failed to list contents") }
+                    _state.update { it.copy(isLoading = false, error = e.userMessage("Failed to list contents")) }
                 }
             } catch (e: Exception) {
                 issueReporter.reportError("Code", "loadDir", e)
-                _state.update { it.copy(isLoading = false, error = e.localizedMessage ?: "Failed to list contents") }
+                _state.update { it.copy(isLoading = false, error = e.userMessage("Failed to list contents")) }
             }
         }
     }
@@ -183,7 +184,7 @@ class CodeBrowserViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 issueReporter.reportError("Code", "loadFile", e)
-                _state.update { it.copy(isLoading = false, error = e.localizedMessage ?: "Failed to load file") }
+                _state.update { it.copy(isLoading = false, error = e.userMessage("Failed to load file")) }
             }
         }
     }

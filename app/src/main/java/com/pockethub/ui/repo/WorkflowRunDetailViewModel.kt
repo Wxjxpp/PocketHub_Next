@@ -1,6 +1,7 @@
 package com.pockethub.ui.repo
 
 import androidx.lifecycle.ViewModel
+import com.pockethub.util.userMessage
 import androidx.lifecycle.viewModelScope
 import com.pockethub.data.download.ArtifactExtractor
 import com.pockethub.data.download.DownloadManager
@@ -127,7 +128,7 @@ class WorkflowRunDetailViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 issueReporter.reportError("WorkflowRunDetail", "loadRun", e)
-                _error.update { e.localizedMessage ?: "Failed to load workflow run" }
+                _error.update { e.userMessage("Failed to load workflow run") }
             } finally {
                 _isLoading.update { false }
             }
@@ -138,7 +139,7 @@ class WorkflowRunDetailViewModel @Inject constructor(
                         _jobs.update { resp.jobs }
                         if (resp.jobs.isEmpty()) _error.update { "No jobs" }
                     }
-                    .onFailure { e -> _error.update { e.localizedMessage ?: "Failed to load jobs" } }
+                    .onFailure { e -> _error.update { e.userMessage("Failed to load jobs") } }
             }
         }
     }
@@ -163,7 +164,7 @@ class WorkflowRunDetailViewModel @Inject constructor(
                 _artifacts.update { all.map { ArtifactUi(artifact = it) } }
             } catch (e: Exception) {
                 issueReporter.reportError("WorkflowRunDetail", "loadArtifacts", e)
-                _artifactsError.update { e.localizedMessage ?: "Failed to load artifacts" }
+                _artifactsError.update { e.userMessage("Failed to load artifacts") }
             } finally {
                 _artifactsLoading.update { false }
             }
@@ -214,7 +215,7 @@ class WorkflowRunDetailViewModel @Inject constructor(
                     }
                     if (resp.isSuccessful) loadRunForced(owner, repo, runId)
                 }
-                .onFailure { e -> _actionMessage.update { e.localizedMessage ?: "Cancellation failed" } }
+                .onFailure { e -> _actionMessage.update { e.userMessage("Cancellation failed") } }
         }
     }
 
@@ -232,7 +233,7 @@ class WorkflowRunDetailViewModel @Inject constructor(
                     }
                     if (resp.isSuccessful) loadRunForced(owner, repo, runId)
                 }
-                .onFailure { e -> _actionMessage.update { e.localizedMessage ?: "Re-run failed" } }
+                .onFailure { e -> _actionMessage.update { e.userMessage("Re-run failed") } }
         }
     }
 
@@ -276,7 +277,7 @@ class WorkflowRunDetailViewModel @Inject constructor(
                 issueReporter.reportError("WorkflowRunDetail", "extractArtifact", e)
                 _artifacts.update { list ->
                     list.map {
-                        if (it.artifact.id == ui.artifact.id) it.copy(extracting = false, extractError = e.localizedMessage ?: "Extraction failed")
+                        if (it.artifact.id == ui.artifact.id) it.copy(extracting = false, extractError = e.userMessage("Extraction failed"))
                         else it
                     }
                 }

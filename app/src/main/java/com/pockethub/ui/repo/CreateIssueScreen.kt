@@ -1,6 +1,7 @@
 package com.pockethub.ui.repo
 
 import com.pockethub.R
+import com.pockethub.util.userMessage
 import com.pockethub.ui.components.ChipListEditor
 
 import androidx.compose.foundation.background
@@ -291,7 +292,7 @@ private fun FormIssueEditor(
             vm.clearResult()
             onIssueCreated(issue.number)
         }?.onFailure { e ->
-            snackbarHostState.showSnackbar(e.localizedMessage ?: genericError)
+            snackbarHostState.showSnackbar(e.userMessage(genericError))
             vm.clearResult()
         }
     }
@@ -434,7 +435,7 @@ private fun IssueEditor(
             vm.clearResult()
             onIssueCreated(issue.number)
         }?.onFailure { e ->
-            snackbarHostState.showSnackbar(e.localizedMessage ?: genericError)
+            snackbarHostState.showSnackbar(e.userMessage(genericError))
             vm.clearResult()
         }
     }

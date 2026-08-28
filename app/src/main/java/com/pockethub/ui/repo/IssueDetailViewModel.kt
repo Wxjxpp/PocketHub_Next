@@ -1,6 +1,7 @@
 package com.pockethub.ui.repo
 
 import androidx.lifecycle.ViewModel
+import com.pockethub.util.userMessage
 import androidx.lifecycle.viewModelScope
 import com.pockethub.data.model.Issue
 import com.pockethub.data.remote.AccountRepository
@@ -87,7 +88,7 @@ class IssueDetailViewModel @Inject constructor(
         viewModelScope.launch {
             _isLoading.value = true; _error.value = null
             try { _issue.value = api.getIssue(owner, repo, number) }
-            catch (e: Exception) { _error.value = e.localizedMessage ?: "Failed to load issue" }
+            catch (e: Exception) { _error.value = e.userMessage("Failed to load issue") }
             finally { _isLoading.value = false }
         }
         // Load comments via the paginated helper (covers page-1 fresh fetch).
@@ -109,7 +110,7 @@ class IssueDetailViewModel @Inject constructor(
             } catch (e: Exception) {
                 issueReporter.reportError("IssueDetail", "loadTimelineEvents", e)
                 if (e is kotlinx.coroutines.CancellationException) throw e
-                _eventsError.value = e.localizedMessage ?: "Failed to load events"
+                _eventsError.value = e.userMessage("Failed to load events")
             }
         }
     }
@@ -147,7 +148,7 @@ class IssueDetailViewModel @Inject constructor(
             } catch (e: Exception) {
                 issueReporter.reportError("IssueDetail", "loadComments", e)
                 if (e is kotlinx.coroutines.CancellationException) throw e
-                _commentsError.value = e.localizedMessage ?: "Failed to load comments"
+                _commentsError.value = e.userMessage("Failed to load comments")
             } finally {
                 _isLoadingMoreComments.value = false
             }
@@ -192,7 +193,7 @@ class IssueDetailViewModel @Inject constructor(
             try {
                 val comment = api.createIssueComment(owner, repo, number, GitHubApi.CommentRequest(body))
                 _comments.update { it + comment }; _issue.update { it?.copy(comments = it.comments + 1) }; onSuccess()
-            } catch (e: Exception) { _actionMessage.value = e.localizedMessage ?: "Failed to post comment" }
+            } catch (e: Exception) { _actionMessage.value = e.userMessage("Failed to post comment") }
             finally { _isSendingComment.value = false }
         }
     }
@@ -206,7 +207,7 @@ class IssueDetailViewModel @Inject constructor(
                 val updated = api.editIssueComment(owner, repo, commentId, GitHubApi.CommentRequest(newBody))
                 _comments.update { list -> list.map { if (it.id == commentId) updated else it } }
                 _actionMessage.value = "Comment updated"
-            } catch (e: Exception) { _actionMessage.value = e.localizedMessage ?: "Failed to update comment" }
+            } catch (e: Exception) { _actionMessage.value = e.userMessage("Failed to update comment") }
             finally { _busyComments.update { it - commentId } }
         }
     }
@@ -221,7 +222,7 @@ class IssueDetailViewModel @Inject constructor(
                 _comments.update { list -> list.filter { it.id != commentId } }
                 _issue.update { it?.copy(comments = (it.comments - 1).coerceAtLeast(0)) }
                 _viewerReactions.update { it - commentId }
-            } catch (e: Exception) { _actionMessage.value = e.localizedMessage ?: "Failed to delete comment" }
+            } catch (e: Exception) { _actionMessage.value = e.userMessage("Failed to delete comment") }
             finally { _busyComments.update { it - commentId } }
         }
     }
@@ -254,7 +255,7 @@ class IssueDetailViewModel @Inject constructor(
             }
         } catch (e: Exception) {
             issueReporter.reportError("IssueDetail", "toggleReactionInternal", e)
-            _actionMessage.value = e.localizedMessage ?: "Failed to toggle reaction"
+            _actionMessage.value = e.userMessage("Failed to toggle reaction")
         } finally {
             _busyComments.update { it - commentId }
         }
@@ -309,7 +310,7 @@ class IssueDetailViewModel @Inject constructor(
             try {
                 _issue.value = api.updateIssue(owner, repo, number, GitHubApi.IssueUpdateRequest(change.title, change.body, change.state, change.labels, change.assignees, change.milestone))
                 _actionMessage.value = success
-            } catch (e: Exception) { _actionMessage.value = e.localizedMessage ?: "Issue 更新失败" }
+            } catch (e: Exception) { _actionMessage.value = e.userMessage("Issue 更新失败") }
             finally { _isSaving.value = false; _isTogglingState.value = false }
         }
     }
@@ -344,7 +345,7 @@ class IssueDetailViewModel @Inject constructor(
                 issueReporter.reportError("IssueDetail", "toggleLock", e)
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 _issue.value = before
-                _actionMessage.value = e.localizedMessage ?: "Failed to toggle lock"
+                _actionMessage.value = e.userMessage("Failed to toggle lock")
             } finally {
                 _isLocking.value = false
             }

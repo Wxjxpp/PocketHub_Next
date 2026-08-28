@@ -1,6 +1,7 @@
 package com.pockethub.ui.repo
 
 import androidx.lifecycle.ViewModel
+import com.pockethub.util.userMessage
 import androidx.lifecycle.viewModelScope
 import com.pockethub.data.model.Issue
 import com.pockethub.data.remote.GitHubApi
@@ -326,7 +327,7 @@ class CreateIssueViewModel @Inject constructor(
             } catch (e: Exception) {
                 issueReporter.reportError("CreateIssue", "createIssue", e)
                 if (e is kotlinx.coroutines.CancellationException) throw e
-                _actionError.value = e.localizedMessage ?: "Failed to create"
+                _actionError.value = e.userMessage("Failed to create")
             } finally {
                 _isSending.value = false
             }

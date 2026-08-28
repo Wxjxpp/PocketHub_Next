@@ -1,6 +1,7 @@
 package com.pockethub.ui.notifications
 
 import androidx.lifecycle.ViewModel
+import com.pockethub.util.userMessage
 import androidx.lifecycle.viewModelScope
 import com.pockethub.data.model.GitHubNotification
 import com.pockethub.data.remote.CachedRepository
@@ -90,7 +91,7 @@ class NotificationsViewModel @Inject constructor(
                 issueReporter.reportError("Notifications", "load", e)
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 if (requestId != loadRequestId) return@launch
-                _error.update { e.localizedMessage ?: "Failed to load notifications" }
+                _error.update { e.userMessage("Failed to load notifications") }
             } finally {
                 if (requestId == loadRequestId) _isLoading.update { false }
             }
@@ -125,7 +126,7 @@ class NotificationsViewModel @Inject constructor(
             } catch (e: Exception) {
                 issueReporter.reportError("Notifications", "markRead", e)
                 _notifications.value = before
-                _error.update { e.localizedMessage ?: "Failed to mark read" }
+                _error.update { e.userMessage("Failed to mark read") }
             }
         }
     }
@@ -143,7 +144,7 @@ class NotificationsViewModel @Inject constructor(
                 issueReporter.reportError("Notifications", "unsubscribe", e)
                 // Unsubscribe failed — restore the thread so the user can retry.
                 _notifications.value = before
-                _actionMessage.update { e.localizedMessage ?: "Failed to unsubscribe" }
+                _actionMessage.update { e.userMessage("Failed to unsubscribe") }
             }
         }
     }
@@ -158,7 +159,7 @@ class NotificationsViewModel @Inject constructor(
                 issueReporter.reportError("Notifications", "markAllRead", e)
                 // Server still says some are unread; reload rather than pretend it worked.
                 load(all = currentTab.value == NotifTab.ALL)
-                _error.update { e.localizedMessage ?: "Failed to mark all as read" }
+                _error.update { e.userMessage("Failed to mark all as read") }
             }
         }
     }

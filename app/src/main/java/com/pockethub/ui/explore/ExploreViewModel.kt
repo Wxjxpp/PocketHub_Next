@@ -1,6 +1,7 @@
 package com.pockethub.ui.explore
 
 import androidx.lifecycle.ViewModel
+import com.pockethub.util.userMessage
 import androidx.lifecycle.viewModelScope
 import com.pockethub.data.model.FeedEvent
 import com.pockethub.data.remote.AccountRepository
@@ -121,7 +122,7 @@ class ExploreViewModel @Inject constructor(
             } catch (e: Exception) {
                 issueReporter.reportError("Explore", "launchLoad", e)
                 if (e is kotlinx.coroutines.CancellationException) throw e
-                _error.value = e.localizedMessage ?: "Failed to load feed."
+                _error.value = e.userMessage("Failed to load feed.")
             } finally {
                 if (requestId == loadRequestId) _isLoading.value = false
             }

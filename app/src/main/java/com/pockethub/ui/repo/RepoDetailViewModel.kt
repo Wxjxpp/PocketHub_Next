@@ -1,6 +1,7 @@
 package com.pockethub.ui.repo
 
 import androidx.lifecycle.ViewModel
+import com.pockethub.util.userMessage
 import androidx.lifecycle.viewModelScope
 import com.pockethub.data.model.Issue
 import com.pockethub.data.model.Repository
@@ -250,7 +251,7 @@ class RepoDetailViewModel @Inject constructor(
                 checkWatch(owner, repo)
             } catch (e: Exception) {
                 issueReporter.reportError("RepoDetail", "loadRepo", e)
-                _error.update { e.localizedMessage ?: "Failed to load repo" }
+                _error.update { e.userMessage("Failed to load repo") }
             } finally {
                 _isLoading.update { false }
             }
@@ -386,7 +387,7 @@ class RepoDetailViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 issueReporter.reportError("RepoDetail", "toggleWatch", e)
-                _error.update { e.localizedMessage ?: "Failed to toggle subscription" }
+                _error.update { e.userMessage("Failed to toggle subscription") }
             } finally {
                 _isWatchToggling = false
             }
@@ -403,7 +404,7 @@ class RepoDetailViewModel @Inject constructor(
                 _watchState.update { WatchState.MUTED }
             } catch (e: Exception) {
                 issueReporter.reportError("RepoDetail", "muteRepo", e)
-                _error.update { e.localizedMessage ?: "Failed to mute" }
+                _error.update { e.userMessage("Failed to mute") }
             } finally {
                 _isWatchToggling = false
             }
@@ -425,7 +426,7 @@ class RepoDetailViewModel @Inject constructor(
                 cache.invalidateRepo(owner, repo)
             } catch (e: Exception) {
                 issueReporter.reportError("RepoDetail", "toggleStar", e)
-                _error.update { e.localizedMessage ?: "Operation failed" }
+                _error.update { e.userMessage("Operation failed") }
             }
         }
     }

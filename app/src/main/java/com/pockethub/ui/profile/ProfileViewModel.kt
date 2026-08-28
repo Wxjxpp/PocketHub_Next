@@ -1,6 +1,7 @@
 package com.pockethub.ui.profile
 
 import androidx.lifecycle.ViewModel
+import com.pockethub.util.userMessage
 import androidx.lifecycle.viewModelScope
 import com.pockethub.data.local.AccountEntity
 import com.pockethub.data.model.Repository
@@ -126,7 +127,7 @@ class ProfileViewModel @Inject constructor(
                 loadWorkList(_workTab.value, force = false)
             } catch (e: Exception) {
                 issueReporter.reportError("Profile", "loadProfile", e)
-                _error.update { e.localizedMessage ?: "Failed to load profile" }
+                _error.update { e.userMessage("Failed to load profile") }
             } finally {
                 forceRefreshInFlight = false
                 _isLoading.update { false }
@@ -196,7 +197,7 @@ class ProfileViewModel @Inject constructor(
                 _workItems.value = result.items
             } catch (e: Exception) {
                 issueReporter.reportError("Profile", "loadWorkList", e)
-                _workError.value = e.localizedMessage ?: "Failed to load work list"
+                _workError.value = e.userMessage("Failed to load work list")
                 _workItems.value = emptyList()
             } finally {
                 _isLoadingWork.update { false }

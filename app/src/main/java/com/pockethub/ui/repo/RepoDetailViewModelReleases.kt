@@ -2,6 +2,7 @@ package com.pockethub.ui.repo
 
 
 import androidx.lifecycle.viewModelScope
+import com.pockethub.util.userMessage
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -14,7 +15,7 @@ internal fun RepoDetailViewModel.loadReleases(owner: String, repo: String): Job 
         } catch (e: Exception) {
             issueReporter.reportError("RepoDetail", "loadReleases", e)
             _releases.update { emptyList() }
-            _error.update { e.localizedMessage ?: "Failed to load releases" }
+            _error.update { e.userMessage("Failed to load releases") }
         } finally {
             _isLoadingReleases.update { false }
         }
@@ -49,7 +50,7 @@ internal fun RepoDetailViewModel.deleteRelease(owner: String, repo: String, rele
             }
         } catch (e: Exception) {
             issueReporter.reportError("RepoDetail", "deleteRelease", e)
-            _releaseDeleteMessage.update { e.localizedMessage ?: "Delete failed" }
+            _releaseDeleteMessage.update { e.userMessage("Delete failed") }
         } finally {
             _isDeletingRelease.update { false }
         }

@@ -1,6 +1,7 @@
 package com.pockethub.ui.repo
 
 import androidx.lifecycle.viewModelScope
+import com.pockethub.util.userMessage
 import com.pockethub.data.remote.GitHubApi
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -73,7 +74,7 @@ internal fun PullRequestDetailViewModel.postLineComment(path: String, line: Int,
             _pr.update { pr -> pr?.copy(reviewComments = pr.reviewComments + 1) }
         } catch (e: Exception) {
             issueReporter.reportError("PullRequestDetail", "postLineComment", e)
-            _commentError.update { e.localizedMessage ?: "Failed to post inline comment" }
+            _commentError.update { e.userMessage("Failed to post inline comment") }
         } finally {
             _isSendingLineComment.update { false }
         }
@@ -104,7 +105,7 @@ internal fun PullRequestDetailViewModel.replyInlineComment(rootCommentId: Long, 
             _reviewComments.update { it + created }
         } catch (e: Exception) {
             issueReporter.reportError("PullRequestDetail", "replyInlineComment", e)
-            _inlineCommentError.update { e.localizedMessage ?: "Failed to reply" }
+            _inlineCommentError.update { e.userMessage("Failed to reply") }
         } finally {
             _busyReviewComments.update { it - rootCommentId }
         }
@@ -131,7 +132,7 @@ internal fun PullRequestDetailViewModel.editInlineComment(commentId: Long, newBo
         } catch (e: Exception) {
             issueReporter.reportError("PullRequestDetail", "editInlineComment", e)
             _reviewComments.update { snapshot }
-            _inlineCommentError.update { e.localizedMessage ?: "Failed to update comment" }
+            _inlineCommentError.update { e.userMessage("Failed to update comment") }
         } finally {
             _busyReviewComments.update { it - commentId }
         }
@@ -168,7 +169,7 @@ internal fun PullRequestDetailViewModel.deleteInlineComment(commentId: Long) {
         } catch (e: Exception) {
             issueReporter.reportError("PullRequestDetail", "deleteInlineComment", e)
             _reviewComments.update { snapshot }
-            _inlineCommentError.update { e.localizedMessage ?: "Failed to delete comment" }
+            _inlineCommentError.update { e.userMessage("Failed to delete comment") }
         } finally {
             _busyReviewComments.update { it - commentId }
         }
@@ -201,7 +202,7 @@ internal fun PullRequestDetailViewModel.resolveRoot(rootCommentId: Long, threadI
             _threadState.update { map -> map[rootCommentId]?.let { info -> map + (rootCommentId to info.copy(isResolved = true)) } ?: map }
         } catch (e: Exception) {
             issueReporter.reportError("PullRequestDetail", "resolveRoot", e)
-            _inlineCommentError.update { e.localizedMessage ?: "Failed to mark as resolved" }
+            _inlineCommentError.update { e.userMessage("Failed to mark as resolved") }
         } finally {
             _busyReviewComments.update { it - rootCommentId }
         }
@@ -231,7 +232,7 @@ internal fun PullRequestDetailViewModel.unresolveRoot(rootCommentId: Long, threa
             _threadState.update { map -> map[rootCommentId]?.let { info -> map + (rootCommentId to info.copy(isResolved = false)) } ?: map }
         } catch (e: Exception) {
             issueReporter.reportError("PullRequestDetail", "unresolveRoot", e)
-            _inlineCommentError.update { e.localizedMessage ?: "Failed to unmark resolved" }
+            _inlineCommentError.update { e.userMessage("Failed to unmark resolved") }
         } finally {
             _busyReviewComments.update { it - rootCommentId }
         }

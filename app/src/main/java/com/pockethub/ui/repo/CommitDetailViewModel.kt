@@ -1,6 +1,7 @@
 package com.pockethub.ui.repo
 
 import androidx.lifecycle.ViewModel
+import com.pockethub.util.userMessage
 import androidx.lifecycle.viewModelScope
 import com.pockethub.data.remote.GitHubApi
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -67,7 +68,7 @@ class CommitDetailViewModel @Inject constructor(
             } catch (e: Exception) {
                 issueReporter.reportError("CommitDetail", "load", e)
                 if (e is kotlinx.coroutines.CancellationException) throw e
-                _error.update { e.localizedMessage ?: "Failed to load commit" }
+                _error.update { e.userMessage("Failed to load commit") }
             } finally {
                 _isLoading.update { false }
             }
@@ -99,7 +100,7 @@ class CommitDetailViewModel @Inject constructor(
             } catch (e: Exception) {
                 issueReporter.reportError("CommitDetail", "loadComments", e)
                 if (e is kotlinx.coroutines.CancellationException) throw e
-                _commentsError.update { e.localizedMessage ?: "Failed to load commit comments" }
+                _commentsError.update { e.userMessage("Failed to load commit comments") }
             }
         }
     }
@@ -121,7 +122,7 @@ class CommitDetailViewModel @Inject constructor(
             } catch (e: Exception) {
                 issueReporter.reportError("CommitDetail", "postComment", e)
                 if (e is kotlinx.coroutines.CancellationException) throw e
-                _commentError.update { e.localizedMessage ?: "Failed to post comment" }
+                _commentError.update { e.userMessage("Failed to post comment") }
             } finally {
                 _isSendingComment.update { false }
             }
@@ -143,7 +144,7 @@ class CommitDetailViewModel @Inject constructor(
             } catch (e: Exception) {
                 issueReporter.reportError("CommitDetail", "postLineComment", e)
                 if (e is kotlinx.coroutines.CancellationException) throw e
-                _commentError.update { e.localizedMessage ?: "Failed to post line comment" }
+                _commentError.update { e.userMessage("Failed to post line comment") }
             } finally {
                 _isSendingComment.update { false }
             }
@@ -182,7 +183,7 @@ class CommitDetailViewModel @Inject constructor(
         } catch (e: Exception) {
             issueReporter.reportError("CommitDetail", "revert", e)
             if (e is kotlinx.coroutines.CancellationException) throw e
-            return e.localizedMessage ?: "Revert failed"
+            return e.userMessage("Revert failed")
         } finally {
             _isReverting.update { false }
         }

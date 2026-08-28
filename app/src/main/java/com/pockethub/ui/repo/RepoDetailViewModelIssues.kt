@@ -2,6 +2,7 @@ package com.pockethub.ui.repo
 
 
 import androidx.lifecycle.viewModelScope
+import com.pockethub.util.userMessage
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
@@ -54,7 +55,7 @@ internal fun RepoDetailViewModel.fetchIssuesPage(owner: String, repo: String, st
                 _issues.update { emptyList() }
                 _pulls.update { emptyList() }
             }
-            _error.update { e.localizedMessage ?: "Failed to load issues" }
+            _error.update { e.userMessage("Failed to load issues") }
         } finally {
             if (append) _isLoadingMoreIssues.update { false } else _isLoadingIssues.update { false }
         }

@@ -1,6 +1,7 @@
 package com.pockethub.data.download
 
 import android.content.Context
+import com.pockethub.util.userMessage
 import android.os.Environment
 import com.pockethub.data.local.DownloadDao
 import com.pockethub.data.local.DownloadEntity
@@ -253,7 +254,7 @@ class DownloadManager @Inject constructor(
             } catch (e: Throwable) {
                 destFile.delete()
                 if (!cancelledUrls.remove(url)) {
-                    val message = e.localizedMessage ?: e.javaClass.simpleName
+                    val message = e.userMessage(e.javaClass.simpleName)
                     dao.upsert(entity.copy(status = "FAILED", errorMsg = message, updatedAt = System.currentTimeMillis()))
                 }
             }

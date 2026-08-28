@@ -1,6 +1,7 @@
 package com.pockethub.ui.repo
 
 import androidx.lifecycle.ViewModel
+import com.pockethub.util.userMessage
 import androidx.lifecycle.viewModelScope
 import com.pockethub.data.remote.GitHubApi
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -70,7 +71,7 @@ class CommitsViewModel @Inject constructor(
             } catch (e: Exception) {
                 issueReporter.reportError("Commits", "fetchCommits", e)
                 if (requestId != loadRequestId) return@launch
-                _error.update { e.localizedMessage ?: "Failed to load commits" }
+                _error.update { e.userMessage("Failed to load commits") }
                 if (!append) _commits.update { emptyList() }
             } finally {
                 if (requestId == loadRequestId) _isLoading.update { false }

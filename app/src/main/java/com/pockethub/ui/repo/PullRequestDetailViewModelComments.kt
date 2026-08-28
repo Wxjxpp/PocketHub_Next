@@ -2,6 +2,7 @@ package com.pockethub.ui.repo
 
 
 import androidx.lifecycle.viewModelScope
+import com.pockethub.util.userMessage
 import com.pockethub.data.remote.GitHubApi
 import com.pockethub.ui.components.CommentUiState
 import kotlinx.coroutines.flow.update
@@ -22,7 +23,7 @@ internal fun PullRequestDetailViewModel.postComment(body: String, onSuccess: () 
             onSuccess()
         } catch (e: Exception) {
             issueReporter.reportError("PullRequestDetail", "postComment", e)
-            _commentError.update { e.localizedMessage ?: "Failed to post comment" }
+            _commentError.update { e.userMessage("Failed to post comment") }
         } finally {
             _isSendingComment.update { false }
         }
@@ -41,7 +42,7 @@ internal fun PullRequestDetailViewModel.editComment(commentId: Long, newBody: St
             _comments.update { list -> list.map { if (it.id == commentId) updated else it } }
         } catch (e: Exception) {
             issueReporter.reportError("PullRequestDetail", "editComment", e)
-            _commentError.update { e.localizedMessage ?: "Failed to update comment" }
+            _commentError.update { e.userMessage("Failed to update comment") }
         } finally {
             _busyComments.update { it - commentId }
         }
@@ -62,7 +63,7 @@ internal fun PullRequestDetailViewModel.deleteComment(commentId: Long) {
             _viewerReactions.update { it - commentId }
         } catch (e: Exception) {
             issueReporter.reportError("PullRequestDetail", "deleteComment", e)
-            _commentError.update { e.localizedMessage ?: "Failed to delete comment" }
+            _commentError.update { e.userMessage("Failed to delete comment") }
         } finally {
             _busyComments.update { it - commentId }
         }
@@ -88,7 +89,7 @@ internal fun PullRequestDetailViewModel.toggleReaction(commentId: Long, content:
             }
         } catch (e: Exception) {
             issueReporter.reportError("PullRequestDetail", "toggleReaction", e)
-            _commentError.update { e.localizedMessage ?: "Failed to toggle reaction" }
+            _commentError.update { e.userMessage("Failed to toggle reaction") }
         } finally {
             _busyComments.update { it - commentId }
         }

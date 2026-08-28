@@ -1,6 +1,7 @@
 package com.pockethub.ui.repo
 
 import androidx.lifecycle.ViewModel
+import com.pockethub.util.userMessage
 import androidx.lifecycle.viewModelScope
 import com.pockethub.data.remote.AccountRepository
 import com.pockethub.data.remote.GitHubApi
@@ -148,7 +149,7 @@ class PullRequestDetailViewModel @Inject constructor(
                 _pr.update { api.getPullRequest(owner, repo, number) }
             } catch (e: Exception) {
                 issueReporter.reportError("PullRequestDetail", "loadPullRequest", e)
-                _error.update { e.localizedMessage ?: "Failed to load PR" }
+                _error.update { e.userMessage("Failed to load PR") }
             } finally {
                 _isLoading.update { false }
             }
@@ -160,7 +161,7 @@ class PullRequestDetailViewModel @Inject constructor(
                 } catch (e: Exception) {
                     issueReporter.reportError("PullRequestDetail", "loadFiles", e)
                     if (e is kotlinx.coroutines.CancellationException) throw e
-                    _filesError.update { e.localizedMessage ?: "Failed to load files" }
+                    _filesError.update { e.userMessage("Failed to load files") }
                 }
             }
             viewModelScope.launch {
@@ -170,7 +171,7 @@ class PullRequestDetailViewModel @Inject constructor(
                 } catch (e: Exception) {
                     issueReporter.reportError("PullRequestDetail", "loadReviews", e)
                     if (e is kotlinx.coroutines.CancellationException) throw e
-                    _reviewsError.update { e.localizedMessage ?: "Failed to load reviews" }
+                    _reviewsError.update { e.userMessage("Failed to load reviews") }
                 }
             }
             viewModelScope.launch {
@@ -180,7 +181,7 @@ class PullRequestDetailViewModel @Inject constructor(
                 } catch (e: Exception) {
                     issueReporter.reportError("PullRequestDetail", "loadReviewComments", e)
                     if (e is kotlinx.coroutines.CancellationException) throw e
-                    _reviewCommentsError.update { e.localizedMessage ?: "Failed to load review comments" }
+                    _reviewCommentsError.update { e.userMessage("Failed to load review comments") }
                 }
             }
             viewModelScope.launch {
@@ -195,7 +196,7 @@ class PullRequestDetailViewModel @Inject constructor(
                 } catch (e: Exception) {
                     issueReporter.reportError("PullRequestDetail", "loadComments", e)
                     if (e is kotlinx.coroutines.CancellationException) throw e
-                    _commentsError.update { e.localizedMessage ?: "Failed to load comments" }
+                    _commentsError.update { e.userMessage("Failed to load comments") }
                 }
             }
             viewModelScope.launch {
@@ -206,7 +207,7 @@ class PullRequestDetailViewModel @Inject constructor(
                 } catch (e: Exception) {
                     issueReporter.reportError("PullRequestDetail", "loadEvents", e)
                     if (e is kotlinx.coroutines.CancellationException) throw e
-                    _eventsError.update { e.localizedMessage ?: "Failed to load events" }
+                    _eventsError.update { e.userMessage("Failed to load events") }
                 }
             }
             // Load CI checks for the PR head SHA so users see whether the PR is
@@ -244,7 +245,7 @@ class PullRequestDetailViewModel @Inject constructor(
                     try { _files.update { api.getPullRequestFiles(owner, repo, number) } }
                     catch (e: Exception) {
                         if (e is kotlinx.coroutines.CancellationException) throw e
-                        _filesError.update { e.localizedMessage ?: "Failed to load files" }
+                        _filesError.update { e.userMessage("Failed to load files") }
                     }
                 }
                 "reviews" -> {
@@ -252,7 +253,7 @@ class PullRequestDetailViewModel @Inject constructor(
                     try { _reviews.update { api.getPullRequestReviews(owner, repo, number) } }
                     catch (e: Exception) {
                         if (e is kotlinx.coroutines.CancellationException) throw e
-                        _reviewsError.update { e.localizedMessage ?: "Failed to load reviews" }
+                        _reviewsError.update { e.userMessage("Failed to load reviews") }
                     }
                 }
                 "reviewComments" -> {
@@ -260,7 +261,7 @@ class PullRequestDetailViewModel @Inject constructor(
                     try { _reviewComments.update { api.listPullRequestReviewComments(owner, repo, number) } }
                     catch (e: Exception) {
                         if (e is kotlinx.coroutines.CancellationException) throw e
-                        _reviewCommentsError.update { e.localizedMessage ?: "Failed to load review comments" }
+                        _reviewCommentsError.update { e.userMessage("Failed to load review comments") }
                     }
                 }
                 "comments" -> {
@@ -272,7 +273,7 @@ class PullRequestDetailViewModel @Inject constructor(
                     } catch (e: Exception) {
                         issueReporter.reportError("PullRequestDetail", "reloadSection", e)
                         if (e is kotlinx.coroutines.CancellationException) throw e
-                        _commentsError.update { e.localizedMessage ?: "Failed to load comments" }
+                        _commentsError.update { e.userMessage("Failed to load comments") }
                     }
                 }
             }
