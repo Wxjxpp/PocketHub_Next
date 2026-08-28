@@ -340,18 +340,7 @@ class PullRequestDetailViewModel @Inject constructor(
 
 
 
-    companion object {
-        /** Meta state for one review thread, used by R3 resolve/unresolve. */
-        data class ThreadInfo(val threadId: String, val isResolved: Boolean)
-
-        /**
-         * GraphQL query listing PR review threads so we can map the REST root comment
-         * id (databaseId) → GraphQL thread node id, plus the resolved flag which REST
-         * doesn't surface.
-         */
-
-        /** Mark a review comment thread resolved. */
-
-        /** Mark a previously-resolved review thread unresolved. */
-    }
 }
+
+/** Meta state for one review thread, used by R3 resolve/unresolve. */
+data class ThreadInfo(val threadId: String, val isResolved: Boolean)
