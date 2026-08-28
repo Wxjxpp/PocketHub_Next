@@ -13,7 +13,9 @@ internal fun RepoDetailViewModel.loadIssues(owner: String, repo: String, state: 
     issuePage = 1
     issuesCanLoadMore = true
     return fetchIssuesPage(owner, repo, effectiveState, append = false, forceFresh = force)
-}    fun loadPulls(owner: String, repo: String, state: String? = null, force: Boolean = false): Job? {
+}
+
+internal fun RepoDetailViewModel.loadPulls(owner: String, repo: String, state: String? = null, force: Boolean = false): Job? {
     // Shares the issues fetch (PRs come from the same endpoint); just ensure loaded.
     return loadIssues(owner, repo, state, force)
 }

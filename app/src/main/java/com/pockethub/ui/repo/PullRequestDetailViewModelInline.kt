@@ -5,6 +5,7 @@ import com.pockethub.data.remote.GitHubApi
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 
@@ -283,14 +284,14 @@ internal suspend fun PullRequestDetailViewModel.fetchThreadState(owner: String, 
         ?.get("reviewThreads")?.jsonObject
         ?.get("nodes")?.jsonArray
         ?: return
-    val map = mutableMapOf<Long, ThreadInfo>()
+    val map = mutableMapOf<Long, PullRequestDetailViewModel.ThreadInfo>()
     for (thread in threads) {
         val threadObj = thread.jsonObject
         val threadId = threadObj["id"]?.jsonPrimitive?.content ?: continue
         val isResolved = threadObj["isResolved"]?.jsonPrimitive?.content?.toBooleanStrictOrNull() ?: continue
         val firstComment = threadObj["comments"]?.jsonObject?.get("nodes")?.jsonArray?.firstOrNull()?.jsonObject
         val dbId = firstComment?.get("databaseId")?.jsonPrimitive?.content?.toLongOrNull() ?: continue
-        map[dbId] = ThreadInfo(threadId = threadId, isResolved = isResolved)
+        map[dbId] = PullRequestDetailViewModel.ThreadInfo(threadId = threadId, isResolved = isResolved)
     }
     _threadState.update { map }
 }
