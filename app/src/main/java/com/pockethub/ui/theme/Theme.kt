@@ -161,7 +161,16 @@ private fun forestShapes() = Shapes(
 
 // ── Style registry ───────────────────────────────────────────────────────────
 
-fun styleDef(style: AppStyle): AppStyleDef = when (style) {
+/**
+ * Public entry point. Wraps the raw palette with derived surface-container
+ * colors so every themed surface (dialogs, sheets, menus) matches the style.
+ */
+fun styleDef(style: AppStyle): AppStyleDef {
+    val def = baseStyleDef(style)
+    return def.copy(colors = deriveSurfaceContainers(def.colors, def.isDark))
+}
+
+private fun baseStyleDef(style: AppStyle): AppStyleDef = when (style) {
     AppStyle.LinearDark -> AppStyleDef(
         style, isDark = true, colors = LinearDarkColors, typography = linearTypography(),
         shapes = linearShapes(),
@@ -204,6 +213,29 @@ private fun resolveStyle(styleOverride: AppStyle?, mode: ThemeMode, systemDark: 
 
 /** Color used for the status / navigation bars. Default dark — matches Linear dark theme. */
 private val LocalSystemBarsDark = compositionLocalOf { true }
+
+/**
+ * Derive the M3 "surface container" family from the palette's own surface /
+ * surfaceVariant colors. The custom palettes only define the base roles, which
+ * left surfaceContainer* at the static M3 defaults (neutral gray) — that's why
+ * AlertDialogs / bottom sheets / menus looked jarring against every style.
+ * Blending from the palette's own tones keeps every themed surface consistent.
+ */
+private fun deriveSurfaceContainers(s: ColorScheme, isDark: Boolean): ColorScheme {
+    fun blend(a: Color, b: Color, f: Float) = androidx.compose.ui.graphics.lerp(a, b, f)
+    val surface = s.surface
+    val variant = s.surfaceVariant
+    val onSurface = s.onSurface
+    return s.copy(
+        surfaceContainerLowest = blend(surface, if (isDark) Color.Black else Color.White, 0.04f),
+        surfaceContainerLow = blend(surface, variant, 0.45f),
+        surfaceContainer = blend(surface, variant, 0.75f),
+        surfaceContainerHigh = variant,
+        surfaceContainerHighest = blend(variant, onSurface, 0.08f),
+        surfaceDim = blend(surface, Color.Black, if (isDark) 0.08f else 0.10f),
+        surfaceBright = blend(surface, Color.White, if (isDark) 0.06f else 0.05f),
+    )
+}
 
 @Composable
 fun PocketHubTheme(
