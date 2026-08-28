@@ -1,8 +1,9 @@
 package com.pockethub.data.remote
 
 // Repository metadata, star / watch / fork endpoints.
-// Split out of GitHubApi.kt; inherited by GitHubApi so Retrofit and
-// call sites keep resolving everything through GitHubApi.X.
+// Split out of GitHubApi.kt; the endpoint methods are inherited by
+// GitHubApi, so Retrofit and call sites are unchanged. All DTOs stay
+// in GitHubApi.kt and are referenced as GitHubApi.X.
 
 import com.pockethub.data.model.Repository
 import retrofit2.Response
@@ -45,14 +46,14 @@ interface RepoEndpoints {
         @Path("repo") repo: String,
     ): Repository
 
-        /** README — returns base64 content + download_url. Parsed into [ReadmeResponse].
+        /** README — returns base64 content + download_url. Parsed into [GitHubApi.ReadmeResponse].
      *  [ref] selects the branch (defaults to the repo's default branch). */
     @GET("repos/{owner}/{repo}/readme")
     suspend fun getReadme(
         @Path("owner") owner: String,
         @Path("repo") repo: String,
         @Query("ref") ref: String? = null,
-    ): ReadmeResponse
+    ): GitHubApi.ReadmeResponse
 
     /** Toggle star — PUT with no body stars the repo. */
     @PUT("user/starred/{owner}/{repo}")
@@ -84,15 +85,15 @@ interface RepoEndpoints {
     suspend fun watch(
         @Path("owner") owner: String,
         @Path("repo") repo: String,
-        @Body payload: WatchSubscriptionRequest = WatchSubscriptionRequest(),
-    ): Response<WatchSubscription>
+        @Body payload: GitHubApi.WatchSubscriptionRequest = GitHubApi.WatchSubscriptionRequest(),
+    ): Response<GitHubApi.WatchSubscription>
 
     /** Check if currently watched — 200 + subscription JSON or 404 when not subscribed. */
     @GET("repos/{owner}/{repo}/subscription")
     suspend fun getSubscription(
         @Path("owner") owner: String,
         @Path("repo") repo: String,
-    ): Response<WatchSubscription>
+    ): Response<GitHubApi.WatchSubscription>
 
     /** Unwatch — DELETE the subscription. */
     @DELETE("repos/{owner}/{repo}/subscription")
@@ -107,7 +108,7 @@ interface RepoEndpoints {
     suspend fun forkRepository(
         @Path("owner") owner: String,
         @Path("repo") repo: String,
-        @Body body: ForkRequest = ForkRequest(),
+        @Body body: GitHubApi.ForkRequest = GitHubApi.ForkRequest(),
     ): Response<Repository>
 
     /**
@@ -131,58 +132,6 @@ interface RepoEndpoints {
     suspend fun updateRepository(
         @Path("owner") owner: String,
         @Path("repo") repo: String,
-        @Body body: RepoUpdateRequest,
+        @Body body: GitHubApi.RepoUpdateRequest,
     ): Response<Repository>
-
-    @kotlinx.serialization.Serializable
-    data class ReadmeResponse(
-        val name: String = "",
-        val path: String = "",
-        val content: String = "",          // base64 encoded markdown body
-        val encoding: String = "base64",
-        @kotlinx.serialization.SerialName("download_url") val downloadUrl: String? = null,
-        @kotlinx.serialization.SerialName("html_url") val htmlUrl: String? = null,
-        val size: Long = 0,
-    )
-
-    @kotlinx.serialization.Serializable
-    data class WatchSubscription(
-        val subscribed: Boolean = false,
-        val ignored: Boolean = false,
-        val reason: String? = null,
-        @kotlinx.serialization.SerialName("created_at") val createdAt: String? = null,
-        val url: String? = null,
-        @kotlinx.serialization.SerialName("repository_url") val repositoryUrl: String? = null,
-        @kotlinx.serialization.SerialName("thread_url") val threadUrl: String? = null,
-    )
-
-    @kotlinx.serialization.Serializable
-    data class WatchSubscriptionRequest(
-        val subscribed: Boolean = true,
-        val ignored: Boolean = false,
-    )
-
-    /** GitHub accepts `name` (and optional `default_branch_only`) on fork creation. */
-    @kotlinx.serialization.Serializable
-    data class ForkRequest(
-        val name: String? = null,
-        @kotlinx.serialization.SerialName("default_branch_only") val defaultBranchOnly: Boolean = false,
-    )
-
-    @kotlinx.serialization.Serializable
-    data class RepoUpdateRequest(
-        /**
-         * `visibility: "public" | "private"` — GitHub's authoritative visibility
-         * field. The legacy boolean `private` field still works but is deprecated
-         * by GitHub; reaching for `visibility` avoids ambiguity (see
-         * https://docs.github.com/en/rest/repos/repos#update-a-repository).
-         */
-        val visibility: String? = null,
-        /** `private: true` makes the repo private; GitHub treats this field as authoritative for pub/priv toggle. */
-        val `private`: Boolean? = null,
-        /** Optional name update — pass-through only, left null for visibility changes. */
-        val name: String? = null,
-        /** Optional description update — left null for visibility changes. */
-        val description: String? = null,
-    )
 }

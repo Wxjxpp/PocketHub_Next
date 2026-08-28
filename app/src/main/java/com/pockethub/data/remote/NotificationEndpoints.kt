@@ -1,8 +1,9 @@
 package com.pockethub.data.remote
 
 // Notification endpoints.
-// Split out of GitHubApi.kt; inherited by GitHubApi so Retrofit and
-// call sites keep resolving everything through GitHubApi.X.
+// Split out of GitHubApi.kt; the endpoint methods are inherited by
+// GitHubApi, so Retrofit and call sites are unchanged. All DTOs stay
+// in GitHubApi.kt and are referenced as GitHubApi.X.
 
 import com.pockethub.data.model.GitHubNotification
 import retrofit2.Response
@@ -40,5 +41,7 @@ interface NotificationEndpoints {
     @PUT("notifications")
     suspend fun markAllNotificationsRead(): Response<Unit>
 
+    // ──────────────────────────────────────────────
     //  Activity feed (received_events — for the "Following" feed section)
+    // ──────────────────────────────────────────────
 }

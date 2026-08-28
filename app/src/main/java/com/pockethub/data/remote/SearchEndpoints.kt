@@ -1,12 +1,10 @@
 package com.pockethub.data.remote
 
 // Search endpoints.
-// Split out of GitHubApi.kt; inherited by GitHubApi so Retrofit and
-// call sites keep resolving everything through GitHubApi.X.
+// Split out of GitHubApi.kt; the endpoint methods are inherited by
+// GitHubApi, so Retrofit and call sites are unchanged. All DTOs stay
+// in GitHubApi.kt and are referenced as GitHubApi.X.
 
-import com.pockethub.data.model.Issue
-import com.pockethub.data.model.Repository
-import com.pockethub.data.model.User
 import retrofit2.http.GET
 import retrofit2.http.Query
 
@@ -27,7 +25,7 @@ interface SearchEndpoints {
         @Query("order") order: String = "desc",
         @Query("per_page") perPage: Int = 20,
         @Query("page") page: Int = 1,
-    ): SearchRepoResult
+    ): GitHubApi.SearchRepoResult
 
     /** Global search — repositories. */
     @GET("search/repositories")
@@ -37,7 +35,7 @@ interface SearchEndpoints {
         @Query("per_page") perPage: Int = 20,
         @Query("sort") sort: String? = null,
         @Query("order") order: String? = null,
-    ): SearchRepoResult
+    ): GitHubApi.SearchRepoResult
 
     /** Global search — users. */
     @GET("search/users")
@@ -47,7 +45,7 @@ interface SearchEndpoints {
         @Query("per_page") perPage: Int = 20,
         @Query("sort") sort: String? = null,
         @Query("order") order: String? = null,
-    ): SearchUserResult
+    ): GitHubApi.SearchUserResult
 
     /** Global search — code. */
     @GET("search/code")
@@ -55,7 +53,7 @@ interface SearchEndpoints {
         @Query("q") query: String,
         @Query("page") page: Int = 1,
         @Query("per_page") perPage: Int = 20,
-    ): SearchCodeResult
+    ): GitHubApi.SearchCodeResult
 
     /**
      * Global search — issues & pull requests (GitHub's /search/issues endpoint
@@ -70,44 +68,9 @@ interface SearchEndpoints {
         @Query("order") order: String = "desc",
         @Query("per_page") perPage: Int = 30,
         @Query("page") page: Int = 1,
-    ): SearchIssueResult
+    ): GitHubApi.SearchIssueResult
 
+    // ──────────────────────────────────────────────
     //  Generic / raw endpoint for OAuth token exchange
-
-    @kotlinx.serialization.Serializable
-    data class SearchRepoResult(
-        val total_count: Int = 0,
-        val incomplete_results: Boolean = false,
-        val items: List<Repository> = emptyList(),
-    )
-
-    @kotlinx.serialization.Serializable
-    data class SearchUserResult(
-        val total_count: Int = 0,
-        val incomplete_results: Boolean = false,
-        val items: List<User> = emptyList(),
-    )
-
-    @kotlinx.serialization.Serializable
-    data class SearchCodeResult(
-        val total_count: Int = 0,
-        val incomplete_results: Boolean = false,
-        val items: List<CodeSearchItem> = emptyList(),
-    )
-
-    @kotlinx.serialization.Serializable
-    data class CodeSearchItem(
-        val name: String = "",
-        val path: String = "",
-        @kotlinx.serialization.SerialName("html_url") val htmlUrl: String = "",
-        val repository: Repository? = null,
-    )
-
-    /** Wrapper returned by /search/issues (issues + PRs share this shape). */
-    @kotlinx.serialization.Serializable
-    data class SearchIssueResult(
-        val total_count: Int = 0,
-        val incomplete_results: Boolean = false,
-        val items: List<com.pockethub.data.model.Issue> = emptyList(),
-    )
+    // ──────────────────────────────────────────────
 }

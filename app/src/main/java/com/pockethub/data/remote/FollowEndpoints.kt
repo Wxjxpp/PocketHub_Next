@@ -1,8 +1,9 @@
 package com.pockethub.data.remote
 
 // Follow / followers endpoints.
-// Split out of GitHubApi.kt; inherited by GitHubApi so Retrofit and
-// call sites keep resolving everything through GitHubApi.X.
+// Split out of GitHubApi.kt; the endpoint methods are inherited by
+// GitHubApi, so Retrofit and call sites are unchanged. All DTOs stay
+// in GitHubApi.kt and are referenced as GitHubApi.X.
 
 import com.pockethub.data.model.User
 import retrofit2.Response
@@ -42,5 +43,7 @@ interface FollowEndpoints {
         @Query("per_page") perPage: Int = 50,
     ): List<User>
 
+    // ──────────────────────────────────────────────
     //  Repositories
+    // ──────────────────────────────────────────────
 }

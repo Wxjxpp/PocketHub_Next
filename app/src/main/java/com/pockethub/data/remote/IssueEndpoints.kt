@@ -1,11 +1,11 @@
 package com.pockethub.data.remote
 
 // Issue CRUD, comments, labels, milestones endpoints.
-// Split out of GitHubApi.kt; inherited by GitHubApi so Retrofit and
-// call sites keep resolving everything through GitHubApi.X.
+// Split out of GitHubApi.kt; the endpoint methods are inherited by
+// GitHubApi, so Retrofit and call sites are unchanged. All DTOs stay
+// in GitHubApi.kt and are referenced as GitHubApi.X.
 
 import com.pockethub.data.model.Issue
-import com.pockethub.data.model.User
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
@@ -36,7 +36,7 @@ interface IssueEndpoints {
     suspend fun createIssue(
         @Path("owner") owner: String,
         @Path("repo") repo: String,
-        @Body body: IssueCreateRequest,
+        @Body body: GitHubApi.IssueCreateRequest,
     ): Issue
 
     /** Single issue detail. */
@@ -75,7 +75,7 @@ interface IssueEndpoints {
         @Path("number") number: Int,
         @Query("per_page") perPage: Int = 50,
         @Query("page") page: Int = 1,
-    ): Response<List<IssueComment>>
+    ): Response<List<GitHubApi.IssueComment>>
 
     /**
      * Timeline events for an issue / PR — labeled, assigned, closed, reopened,
@@ -89,15 +89,15 @@ interface IssueEndpoints {
         @Path("number") number: Int,
         @Query("per_page") perPage: Int = 100,
         @Query("page") page: Int = 1,
-    ): Response<List<IssueEvent>>
+    ): Response<List<GitHubApi.IssueEvent>>
 
     @POST("repos/{owner}/{repo}/issues/{number}/comments")
     suspend fun createIssueComment(
         @Path("owner") owner: String,
         @Path("repo") repo: String,
         @Path("number") number: Int,
-        @Body body: CommentRequest,
-    ): IssueComment
+        @Body body: GitHubApi.CommentRequest,
+    ): GitHubApi.IssueComment
 
     /** Update an issue's editable fields. Null fields are left unchanged by GitHub. */
     @PATCH("repos/{owner}/{repo}/issues/{number}")
@@ -105,7 +105,7 @@ interface IssueEndpoints {
         @Path("owner") owner: String,
         @Path("repo") repo: String,
         @Path("number") number: Int,
-        @Body body: IssueUpdateRequest,
+        @Body body: GitHubApi.IssueUpdateRequest,
     ): Issue
 
     /** Labels configured for a repository. */
@@ -130,8 +130,8 @@ interface IssueEndpoints {
         @Path("owner") owner: String,
         @Path("repo") repo: String,
         @Path("comment_id") commentId: Long,
-        @Body body: CommentRequest,
-    ): IssueComment
+        @Body body: GitHubApi.CommentRequest,
+    ): GitHubApi.IssueComment
 
     /** Delete a comment. */
     @DELETE("repos/{owner}/{repo}/issues/comments/{comment_id}")
@@ -141,52 +141,5 @@ interface IssueEndpoints {
         @Path("comment_id") commentId: Long,
     ): Response<Unit>
 
-
-    @kotlinx.serialization.Serializable
-    data class IssueCreateRequest(
-        val title: String,
-        val body: String? = null,
-        val labels: List<String> = emptyList(),
-        val assignees: List<String> = emptyList(),
-        val milestone: Int? = null,
-    )
-
-    @kotlinx.serialization.Serializable
-    data class IssueEvent(
-        val id: Long = 0,
-        val event: String = "",
-        @kotlinx.serialization.SerialName("commit_id") val commitId: String? = null,
-        @kotlinx.serialization.SerialName("commit_url") val commitUrl: String? = null,
-        val actor: User? = null,
-        val label: Issue.Label? = null,
-        val assignee: User? = null,
-        val assigner: User? = null,
-        val milestone: Issue.Milestone? = null,
-        @kotlinx.serialization.SerialName("created_at") val createdAt: String? = null,
-    )
-
-    @kotlinx.serialization.Serializable
-    data class IssueComment(
-        val id: Long = 0,
-        val body: String = "",
-        val user: User? = null,
-        @kotlinx.serialization.SerialName("author_association") val authorAssociation: String? = null,
-        @kotlinx.serialization.SerialName("created_at") val createdAt: String? = null,
-        @kotlinx.serialization.SerialName("updated_at") val updatedAt: String? = null,
-        @kotlinx.serialization.SerialName("html_url") val htmlUrl: String? = null,
-        val reactions: com.pockethub.data.model.Reactions? = null,
-    )
-
-    @kotlinx.serialization.Serializable
-    data class CommentRequest(val body: String)
-
-    @kotlinx.serialization.Serializable
-    data class IssueUpdateRequest(
-        val title: String? = null,
-        val body: String? = null,
-        val state: String? = null,
-        val labels: List<String>? = null,
-        val assignees: List<String>? = null,
-        val milestone: Int? = null,
-    )
+    // ── Commits ──────────────────────────────────────────
 }

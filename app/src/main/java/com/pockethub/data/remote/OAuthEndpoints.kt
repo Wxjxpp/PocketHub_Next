@@ -1,8 +1,9 @@
 package com.pockethub.data.remote
 
 // OAuth token exchange endpoint.
-// Split out of GitHubApi.kt; inherited by GitHubApi so Retrofit and
-// call sites keep resolving everything through GitHubApi.X.
+// Split out of GitHubApi.kt; the endpoint methods are inherited by
+// GitHubApi, so Retrofit and call sites are unchanged. All DTOs stay
+// in GitHubApi.kt and are referenced as GitHubApi.X.
 
 import retrofit2.http.Field
 import retrofit2.http.FormUrlEncoded
@@ -18,19 +19,9 @@ interface OAuthEndpoints {
         @Field("client_secret") clientSecret: String,
         @Field("code") code: String,
         @Field("redirect_uri") redirectUri: String,
-    ): OAuthTokenResponse
+    ): GitHubApi.OAuthTokenResponse
 
+    // ──────────────────────────────────────────────
     //  Search result wrappers
-
-    @kotlinx.serialization.Serializable
-    data class OAuthTokenResponse(
-        val access_token: String = "",
-        val token_type: String = "",
-        val scope: String = "",
-        @kotlinx.serialization.SerialName("error") val error: String? = null,
-        @kotlinx.serialization.SerialName("error_description") val errorDescription: String? = null,
-    )
-
-    //  PR inline review comment edit / delete
-    //  (https://docs.github.com/en/rest/pulls/comments)
+    // ──────────────────────────────────────────────
 }

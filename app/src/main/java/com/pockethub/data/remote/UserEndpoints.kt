@@ -1,8 +1,9 @@
 package com.pockethub.data.remote
 
 // User profile endpoints.
-// Split out of GitHubApi.kt; inherited by GitHubApi so Retrofit and
-// call sites keep resolving everything through GitHubApi.X.
+// Split out of GitHubApi.kt; the endpoint methods are inherited by
+// GitHubApi, so Retrofit and call sites are unchanged. All DTOs stay
+// in GitHubApi.kt and are referenced as GitHubApi.X.
 
 import com.pockethub.data.model.Repository
 import com.pockethub.data.model.User
@@ -20,7 +21,9 @@ interface UserEndpoints {
     @GET("users/{login}")
     suspend fun getUser(@Path("login") login: String): User
 
+    // ──────────────────────────────────────────────
     //  User following
+    // ──────────────────────────────────────────────
 
     /** Repositories owned/owned by a specific user. */
     @GET("users/{login}/repos")
@@ -32,5 +35,7 @@ interface UserEndpoints {
         @Query("type") type: String? = null, // owner | member | all
     ): List<Repository>
 
+    // ──────────────────────────────────────────────
     //  Trending (unofficial — scraped or search-based)
+    // ──────────────────────────────────────────────
 }

@@ -1,8 +1,9 @@
 package com.pockethub.data.remote
 
 // Branch listing endpoints.
-// Split out of GitHubApi.kt; inherited by GitHubApi so Retrofit and
-// call sites keep resolving everything through GitHubApi.X.
+// Split out of GitHubApi.kt; the endpoint methods are inherited by
+// GitHubApi, so Retrofit and call sites are unchanged. All DTOs stay
+// in GitHubApi.kt and are referenced as GitHubApi.X.
 
 import retrofit2.http.GET
 import retrofit2.http.Path
@@ -17,18 +18,5 @@ interface BranchEndpoints {
         @Path("repo") repo: String,
         @Query("page") page: Int = 1,
         @Query("per_page") perPage: Int = 30,
-    ): List<Branch>
-
-    @kotlinx.serialization.Serializable
-    data class Branch(
-        val name: String = "",
-        val commit: BranchCommit? = null,
-        val `protected`: Boolean = false,
-    ) {
-        @kotlinx.serialization.Serializable
-        data class BranchCommit(
-            val sha: String = "",
-            @kotlinx.serialization.SerialName("url") val url: String? = null,
-        )
-    }
+    ): List<GitHubApi.Branch>
 }
