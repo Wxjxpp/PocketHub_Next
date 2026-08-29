@@ -150,57 +150,120 @@ private fun splitAltHint(alt: String): Triple<String, Int?, Int?> {
 /** Badge/small-image threshold: web badges are ~20 CSS px tall. */
 private val SMALL_IMAGE_MAX_DP = 48.dp
 
+/**
+ * Resolve a URL's intrinsic pixel size through the app image loader. The
+ * decode hits the memory cache, so the follow-up render is free.
+ */
+@Composable
+private fun rememberIntrinsicImageSize(src: String): androidx.compose.ui.unit.IntSize? {
+    val loader = LocalAppImageLoader.current
+    val context = androidx.compose.ui.platform.LocalContext.current
+    return androidx.compose.runtime.produceState<androidx.compose.ui.unit.IntSize?>(
+        initialValue = null,
+        key1 = src,
+    ) {
+        val request = coil.request.ImageRequest.Builder(context)
+            .data(src)
+            // NOTE: keep the default hardware setting — the render pass below
+            // issues the identical request and must hit the memory cache.
+            .build()
+        val drawable = (loader.execute(request) as? coil.request.SuccessResult)?.drawable
+        val w = drawable?.intrinsicWidth ?: 0
+        val h = drawable?.intrinsicHeight ?: 0
+        if (w > 0 && h > 0) value = androidx.compose.ui.unit.IntSize(w, h)
+    }.value
+}
+
 @Composable
 private fun AdaptiveImage(img: InlineToken.Image, onTap: (String, LinkKind) -> Unit) {
     val density = androidx.compose.ui.platform.LocalDensity.current
     val clickTarget = img.wrapUrl ?: img.src
     val kind = if (img.wrapUrl != null) classifyLink(img.wrapUrl) else LinkKind.IMAGE_URL
+    val intrinsic = rememberIntrinsicImageSize(img.src)
 
-    // HTML <img width height> hints are authoritative — render at the size the
-    // author asked for (CSS px ≈ dp), no async resize jump.
-    if (img.hintW != null && img.hintH != null && img.hintW > 0 && img.hintH > 0) {
-        val maxW = 320.dp
-        val wDp = img.hintW.dp.coerceAtMost(maxW)
-        val hDp = img.hintH.dp.coerceAtMost(360.dp)
-        SubcomposeAsyncImage(
-            model = img.src,
-            imageLoader = LocalAppImageLoader.current,
-            contentDescription = img.alt.takeIf { it.isNotBlank() },
-            contentScale = ContentScale.Fit,
-            modifier = Modifier
-                .width(wDp)
-                .height(hDp)
-                .clip(RoundedCornerShape(4.dp))
-                .clickable { onTap(clickTarget, kind) },
-            loading = {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 1.5.dp)
-                }
-            },
-            error = {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Outlined.BrokenImage, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
-                }
-            },
-        )
-        return
+    when {
+        // HTML <img width height> hints are authoritative — render at the size
+        // the author asked for (CSS px ≈ dp), no async resize jump.
+        img.hintW != null && img.hintH != null && img.hintW > 0 && img.hintH > 0 -> {
+            val wDp = img.hintW.dp.coerceAtMost(320.dp)
+            val hDp = img.hintH.dp.coerceAtMost(360.dp)
+            RenderSizedImage(img, wDp, hDp, clickTarget, kind)
+        }
+        // Small image (badge / shield, ~20dp on the web) → natural size, inline.
+        intrinsic != null && with(density) { intrinsic.height.toDp() } <= SMALL_IMAGE_MAX_DP -> {
+            val hDp = with(density) { intrinsic.height.toDp() }.coerceAtLeast(12.dp)
+            val wDp = with(density) { intrinsic.width.toDp() }.coerceAtMost(280.dp).coerceAtLeast(12.dp)
+            RenderSizedImage(img, wDp, hDp, clickTarget, kind)
+        }
+        // Content image (banner / screenshot) → full-width, readable.
+        intrinsic != null -> RenderContentImage(img, clickTarget, kind)
+        // Size unknown yet → compact placeholder (most badges resolve in a frame).
+        else -> Box(
+            Modifier
+                .fillMaxWidth()
+                .height(24.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            CircularProgressIndicator(Modifier.size(12.dp), strokeWidth = 1.5.dp)
+        }
     }
+}
 
+@Composable
+private fun RenderSizedImage(
+    img: InlineToken.Image,
+    width: androidx.compose.ui.unit.Dp,
+    height: androidx.compose.ui.unit.Dp,
+    clickTarget: String,
+    kind: LinkKind,
+) {
     SubcomposeAsyncImage(
         model = img.src,
         imageLoader = LocalAppImageLoader.current,
         contentDescription = img.alt.takeIf { it.isNotBlank() },
         contentScale = ContentScale.Fit,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .width(width)
+            .height(height)
+            .clip(RoundedCornerShape(3.dp))
+            .clickable { onTap(clickTarget, kind) },
         loading = {
-            // Compact placeholder — most small images resolve within a frame or two.
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .height(24.dp),
-                contentAlignment = Alignment.Center,
-            ) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(Modifier.size(12.dp), strokeWidth = 1.5.dp)
+            }
+        },
+        error = {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Icon(
+                    Icons.Outlined.BrokenImage, null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(14.dp),
+                )
+            }
+        },
+    )
+}
+
+@Composable
+private fun RenderContentImage(
+    img: InlineToken.Image,
+    clickTarget: String,
+    kind: LinkKind,
+) {
+    SubcomposeAsyncImage(
+        model = img.src,
+        imageLoader = LocalAppImageLoader.current,
+        contentDescription = img.alt.takeIf { it.isNotBlank() },
+        contentScale = ContentScale.Fit,
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 96.dp, max = 360.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .clickable { onTap(clickTarget, kind) },
+        loading = {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
             }
         },
         error = {
@@ -211,7 +274,11 @@ private fun AdaptiveImage(img: InlineToken.Image, onTap: (String, LinkKind) -> U
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
-                Icon(Icons.Outlined.BrokenImage, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                Icon(
+                    Icons.Outlined.BrokenImage, null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp),
+                )
                 if (img.alt.isNotBlank()) {
                     Text(
                         img.alt,
@@ -219,46 +286,6 @@ private fun AdaptiveImage(img: InlineToken.Image, onTap: (String, LinkKind) -> U
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-        },
-        success = { state ->
-            val ins = state.result.painter.intrinsicSize
-            val valid = ins != androidx.compose.ui.geometry.Size.Unspecified &&
-                ins.width > 0f && ins.height > 0f
-            val intrinsicHDp = if (valid) with(density) { ins.height.toDp() } else null
-
-            when {
-                // Small image (badge / shield) → render at natural size, inline.
-                valid && intrinsicHDp != null && intrinsicHDp <= SMALL_IMAGE_MAX_DP -> {
-                    val hDp = intrinsicHDp.coerceAtLeast(12.dp)
-                    val wDp = with(density) { ins.width.toDp() }.coerceAtMost(280.dp)
-                    Box(
-                        Modifier
-                            .height(hDp)
-                            .width(wDp)
-                            .clip(RoundedCornerShape(3.dp))
-                            .clickable { onTap(clickTarget, kind) },
-                    ) {
-                        SubcomposeAsyncImageContent(
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Fit,
-                        )
-                    }
-                }
-                // Content image (banner / screenshot) → full-width, readable.
-                else -> Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 96.dp, max = 360.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .clickable { onTap(clickTarget, kind) },
-                ) {
-                    SubcomposeAsyncImageContent(
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Fit,
                     )
                 }
             }
