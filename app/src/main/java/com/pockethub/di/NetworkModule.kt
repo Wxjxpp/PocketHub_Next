@@ -53,7 +53,6 @@ object NetworkModule {
             .build()
         val doh = okhttp3.dnsoverhttps.DnsOverHttps.Builder()
             .client(bootstrapClient)
-            .resolver(okhttp3.Dns.SYSTEM)
             .url("https://dns.alidns.com/dns-query".toHttpUrl())
             .bootstrapDnsHosts(
                 java.net.InetAddress.getByName("223.5.5.5"),
@@ -61,12 +60,13 @@ object NetworkModule {
             )
             .includeIPv6(false)
             .build()
-        return okhttp3.Dns { hostname ->
-            try {
-                doh.lookup(hostname)
-            } catch (_: Throwable) {
-                okhttp3.Dns.SYSTEM.lookup(hostname)
-            }
+        return object : okhttp3.Dns {
+            override fun lookup(hostname: String): List<java.net.InetAddress> =
+                try {
+                    doh.lookup(hostname)
+                } catch (_: Throwable) {
+                    okhttp3.Dns.SYSTEM.lookup(hostname)
+                }
         }
     }
 

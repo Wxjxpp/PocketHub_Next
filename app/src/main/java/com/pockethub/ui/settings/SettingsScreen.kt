@@ -30,6 +30,7 @@ import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.outlined.CleaningServices
 import androidx.compose.material.icons.outlined.GTranslate
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.RocketLaunch
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Logout
 import androidx.compose.material.icons.outlined.ManageAccounts
@@ -453,12 +454,6 @@ fun SettingsScreen(
 }
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
-/**
- * Accelerator-prefix editor (net branch experiment): a "gh-proxy"-style base
- * URL prepended to GitHub FILE downloads. Blank = direct connection.
- */
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
-@Composable
 private fun MirrorPrefixSheet(
     initial: String,
     onDismiss: () -> Unit,
@@ -499,6 +494,8 @@ private fun MirrorPrefixSheet(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
 private fun OAuthClientSheet(
     initialId: String,
     initialSecret: String,
