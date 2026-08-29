@@ -2,8 +2,6 @@ package com.pockethub.ui.settings
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -104,7 +102,6 @@ fun FeedSourcesScreen(
                 options = FeedSourceOption.optionsFor(FeedTab.TRENDING),
                 onSelect = { src -> vm.selectSource(FeedTab.TRENDING, src, "") },
                 onGithubOptionsChange = { sort, min, max, archived -> vm.setGithubOptions(FeedTab.TRENDING, sort, min, max, archived) },
-                onKomiOptionsChange = { cat, plat -> vm.setKomiOptions(FeedTab.TRENDING, cat, plat) },
                 onReset = { vm.resetTab(FeedTab.TRENDING) },
             )
 
@@ -116,7 +113,6 @@ fun FeedSourcesScreen(
                 options = FeedSourceOption.optionsFor(FeedTab.FEATURED),
                 onSelect = { src -> vm.selectSource(FeedTab.FEATURED, src, "") },
                 onGithubOptionsChange = { sort, min, max, archived -> vm.setGithubOptions(FeedTab.FEATURED, sort, min, max, archived) },
-                onKomiOptionsChange = { cat, plat -> vm.setKomiOptions(FeedTab.FEATURED, cat, plat) },
                 onReset = { vm.resetTab(FeedTab.FEATURED) },
             )
 
@@ -134,7 +130,6 @@ private fun SourceGroup(
     options: List<FeedSourceOption>,
     onSelect: (FeedSourceOption) -> Unit,
     onGithubOptionsChange: (String, Int, Int, Boolean) -> Unit,
-    onKomiOptionsChange: (String, String) -> Unit,
     onReset: () -> Unit,
 ) {
     val selected = FeedSourceOption.fromId(config.sourceId)
@@ -200,12 +195,6 @@ private fun SourceGroup(
                     GithubSourceOptions(
                         config = config,
                         onChange = onGithubOptionsChange,
-                    )
-                }
-                if (option == FeedSourceOption.KOMI_TOP_CHARTS && isCurrent) {
-                    KomiSourceOptions(
-                        config = config,
-                        onChange = onKomiOptionsChange,
                     )
                 }
             }
@@ -326,76 +315,6 @@ private fun GithubSourceOptions(
                 enabled = canApply,
             ) {
                 Text(stringResource(R.string.action_apply))
-            }
-        }
-    }
-}
-
-/**
- * Komi top charts filters — category + platform, one FilterChip row each.
- * Styled identically to [GithubSourceOptions]'s sort chips; a tap persists
- * immediately (no Apply step — switching filters is the primary interaction).
- */
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun KomiSourceOptions(
-    config: FeedSourceConfig,
-    onChange: (String, String) -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 12.dp, end = 12.dp, bottom = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text(
-            stringResource(R.string.komi_source_options),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary,
-        )
-        Text(
-            stringResource(R.string.komi_category_label),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf(
-                "trending" to R.string.komi_cat_trending,
-                "new-releases" to R.string.komi_cat_new,
-                "most-popular" to R.string.komi_cat_popular,
-            ).forEach { (value, label) ->
-                FilterChip(
-                    selected = config.komiCategory == value,
-                    onClick = { onChange(value, config.komiPlatform) },
-                    label = { Text(stringResource(label), style = MaterialTheme.typography.labelSmall) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    ),
-                )
-            }
-        }
-        Text(
-            stringResource(R.string.komi_platform_label),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf(
-                "android" to R.string.komi_platform_android,
-                "windows" to R.string.komi_platform_windows,
-                "macos" to R.string.komi_platform_macos,
-                "linux" to R.string.komi_platform_linux,
-            ).forEach { (value, label) ->
-                FilterChip(
-                    selected = config.komiPlatform == value,
-                    onClick = { onChange(config.komiCategory, value) },
-                    label = { Text(stringResource(label), style = MaterialTheme.typography.labelSmall) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    ),
-                )
             }
         }
     }

@@ -54,6 +54,25 @@ import com.pockethub.ui.components.LoadingFooter
 internal val LANGUAGES = listOf("All", "Kotlin", "TypeScript", "Python", "Rust", "Go", "Swift", "Java", "C++")
 internal val TIME_RANGES = listOf("Daily", "Weekly", "Monthly")
 
+/** Komi top charts filter values — kept in sync with FeedSourceConfig. */
+internal val KOMI_CATEGORIES = listOf("trending", "new-releases", "most-popular")
+internal val KOMI_PLATFORMS = listOf("android", "windows", "macos", "linux")
+
+@Composable
+internal fun komiCategoryLabel(category: String): String = when (category) {
+    "new-releases" -> stringResource(R.string.komi_cat_new)
+    "most-popular" -> stringResource(R.string.komi_cat_popular)
+    else -> stringResource(R.string.komi_cat_trending)
+}
+
+@Composable
+internal fun komiPlatformLabel(platform: String): String = when (platform) {
+    "windows" -> stringResource(R.string.komi_platform_windows)
+    "macos" -> stringResource(R.string.komi_platform_macos)
+    "linux" -> stringResource(R.string.komi_platform_linux)
+    else -> stringResource(R.string.komi_platform_android)
+}
+
 @Composable
 private fun rangeLabel(range: String): String = when (range) {
     "Weekly"  -> stringResource(R.string.time_range_weekly)
@@ -85,6 +104,8 @@ fun ExploreScreen(
     val feedAvailable by vm.feedAvailable.collectAsState()
     val selectedLang by vm.trendingLang.collectAsState()
     val selectedRange by vm.trendingRange.collectAsState()
+    val komiCategory by vm.komiCategory.collectAsState()
+    val komiPlatform by vm.komiPlatform.collectAsState()
     val trendingSource by vm.trendingSourceOption.collectAsState()
     val featuredSource by vm.featuredSourceOption.collectAsState()
     val followingSource by vm.followingSourceOption.collectAsState()
@@ -226,14 +247,53 @@ fun ExploreScreen(
 
             when (section) {
                 ExploreSection.TRENDING -> {
-                    // Language + time-range filter chips are conditionally
-                    // rendered based on the Trending tab's configured source:
-                    // only sources that actually respond to language / time
-                    // window params expose this surface (see
-                    // FeedSourceOption.supportsTrendingFilters). For sources that
-                    // don't, the chips would be decorative waste — so we drop
-                    // them entirely rather than misleading the user.
-                    if (trendingSource.supportsTrendingFilters) {
+                    // Filter chips are conditionally rendered based on the
+                    // Trending tab's configured source: the official GitHub
+                    // source gets language + time-range chips; Komi top charts
+                    // gets category + platform chips (same visual language).
+                    // Sources that respond to neither drop the surface entirely
+                    // rather than misleading the user.
+                    if (trendingSource == FeedSourceOption.KOMI_TOP_CHARTS) {
+                        // Category chips
+                        item {
+                            LazyRow(
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                items(KOMI_CATEGORIES) { category ->
+                                    FilterChip(
+                                        selected = komiCategory == category,
+                                        onClick = { vm.setKomiFilters(category, komiPlatform) },
+                                        label = { Text(komiCategoryLabel(category), style = MaterialTheme.typography.labelMedium) },
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        ),
+                                    )
+                                }
+                            }
+                        }
+                        // Platform chips
+                        item {
+                            LazyRow(
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                items(KOMI_PLATFORMS) { platform ->
+                                    FilterChip(
+                                        selected = komiPlatform == platform,
+                                        onClick = { vm.setKomiFilters(komiCategory, platform) },
+                                        label = { Text(komiPlatformLabel(platform), style = MaterialTheme.typography.labelMedium) },
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                            selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        ),
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(4.dp))
+                    } else if (trendingSource.supportsTrendingFilters) {
                         // Language filter chips
                         item {
                             LazyRow(

@@ -64,9 +64,6 @@
     <string name="file_viewer_pick_hint">Pick a file from the tree to view it here</string>
     <string name="source_name_komi">Komi Top Charts</string>
     <string name="source_desc_komi">Aggregated top charts from github-store.org — trending, new-release and most-popular open source, per platform.</string>
-    <string name="komi_source_options">Top chart filters</string>
-    <string name="komi_category_label">Category</string>
-    <string name="komi_platform_label">Platform</string>
     <string name="komi_cat_trending">Trending</string>
     <string name="komi_cat_new">New releases</string>
     <string name="komi_cat_popular">Most popular</string>

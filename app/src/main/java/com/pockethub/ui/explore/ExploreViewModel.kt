@@ -89,6 +89,15 @@ class ExploreViewModel @Inject constructor(
         .map { it.trendingRange }
         .stateIn(viewModelScope, SharingStarted.Eagerly, "Daily")
 
+    /** Komi top charts filters — same pattern as the language/range chips. */
+    val komiCategory: StateFlow<String> = sourceRepo.configFlow(FeedTab.TRENDING)
+        .map { it.komiCategory }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, "trending")
+
+    val komiPlatform: StateFlow<String> = sourceRepo.configFlow(FeedTab.TRENDING)
+        .map { it.komiPlatform }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, "android")
+
     private var loadJob: Job? = null
     private var loadRequestId = 0
 
@@ -102,6 +111,14 @@ class ExploreViewModel @Inject constructor(
     fun setTrendingFilters(language: String, range: String) {
         viewModelScope.launch {
             sourceRepo.setTrendingFilters(language, range)
+            if (_section.value == ExploreSection.TRENDING) load()
+        }
+    }
+
+    /** Called by the Komi top charts category / platform chips. */
+    fun setKomiFilters(category: String, platform: String) {
+        viewModelScope.launch {
+            sourceRepo.setKomiOptions(FeedTab.TRENDING, category, platform)
             if (_section.value == ExploreSection.TRENDING) load()
         }
     }

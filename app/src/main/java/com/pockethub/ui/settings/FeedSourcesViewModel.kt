@@ -65,11 +65,4 @@ class FeedSourcesViewModel @Inject constructor(
             repo.setSource(tab, FeedSourceOption.defaultsFor(tab), "")
         }
     }
-
-    /** Persist Komi top charts category/platform for [tab]. */
-    fun setKomiOptions(tab: FeedTab, category: String, platform: String) {
-        viewModelScope.launch {
-            repo.setKomiOptions(tab, category, platform)
-        }
-    }
 }
