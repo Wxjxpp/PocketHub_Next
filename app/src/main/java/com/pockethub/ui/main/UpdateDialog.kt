@@ -33,6 +33,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -211,7 +212,7 @@ private fun ChangelogSection(notes: String) {
     )
 
     val items: List<ChangeItem> = when {
-        structured != null -> structured.mapNotNull { entry ->
+        structured.isNotEmpty() -> structured.mapNotNull { entry ->
             val text = if (isZh) entry.optString("zh", "") else entry.optString("en", "")
             val text2 = text.ifBlank { entry.optString("en", entry.optString("zh", "")) }
             if (text2.isBlank()) return@mapNotNull null
@@ -459,16 +460,18 @@ private fun changelogTagColor(type: String): Color = when (type) {
  * <!--pockethub-changelog {"items":[{"type":"feat","zh":"…","en":"…"}]}-->
  * Returns the items array, or null when the block is absent/corrupt.
  */
-private fun parseStructuredChangelog(notes: String): org.json.JSONArray? {
+private fun parseStructuredChangelog(notes: String): List<org.json.JSONObject> {
     val marker = "<!--pockethub-changelog"
     val start = notes.indexOf(marker)
-    if (start == -1) return null
+    if (start == -1) return emptyList()
     val jsonStart = notes.indexOf('{', start)
     val end = notes.indexOf("-->", jsonStart)
-    if (jsonStart == -1 || end == -1) return null
+    if (jsonStart == -1 || end == -1) return emptyList()
     return runCatching {
-        org.json.JSONObject(notes.substring(jsonStart, end).trim()).optJSONArray("items")
-    }.getOrNull()
+        val arr = org.json.JSONObject(notes.substring(jsonStart, end).trim()).optJSONArray("items")
+            ?: return emptyList()
+        List(arr.length()) { i -> arr.optJSONObject(i) }.filterNotNull()
+    }.getOrDefault(emptyList())
 }
 
 /** Localized changelog category tags (resolved from string resources). */
