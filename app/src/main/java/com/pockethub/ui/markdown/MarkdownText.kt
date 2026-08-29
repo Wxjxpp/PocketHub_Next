@@ -34,7 +34,7 @@ import androidx.compose.ui.unit.sp
 /**
  * A lightweight, dependency-free Markdown renderer (enhanced).
  *
- * Supports: H1-H6, bold (**/__), italic (*/_), bold-italic (***), strikethrough (~~), inline code, fenced code blocks
+ * Supports: H1-H6, bold (** and __), italic (* and _), bold-italic (***), strikethrough (~~), inline code, fenced code blocks
  * (``` and ~~~, nested long fences), ordered / unordered lists (with nesting and continuation lines),
  * GitHub task lists (- [ ] / - [x]), blockquotes, GFM alerts (> [!NOTE] etc), horizontal rules, paragraphs
  * with hard line breaks, GitHub-style pipe tables (alignment + escaped pipes), reference-style links
