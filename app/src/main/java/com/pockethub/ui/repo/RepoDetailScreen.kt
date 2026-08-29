@@ -418,7 +418,7 @@ fun RepoDetailScreen(
                     onToggleTranslation = { vm.toggleTranslation() },
                     onTopicClick = { topic -> onNavigateToSearch(topic) },
                     onNavigateToRepo = onNavigateToRepo,
-                    onLinkClick = rememberMarkdownLinkHandler(owner, repo, onNavigateToRepo, onNavigateToUser, onNavigateToIssue, onNavigateToIssueFull, onNavigateToPRFull, downloadVm = downloadVm, onNavigateToDownloads = onNavigateToDownloads),
+                    onLinkClick = rememberMarkdownLinkHandler(owner, repo, onNavigateToRepo, onNavigateToUser, onNavigateToIssue, onNavigateToIssueFull, onNavigateToPRFull, onNavigateToCommit, onNavigateToWorkflowRun, onNavigateToCreateIssue, downloadVm = downloadVm, onNavigateToDownloads = onNavigateToDownloads),
                 )
                 RepoTab.CODE -> CodeTab(
                     owner = owner,
@@ -459,7 +459,7 @@ fun RepoDetailScreen(
                     canDelete = canManageReleases,
                     isDeletingRelease = isDeletingRelease,
                     isLoading = isLoadingReleases,
-                    onLinkClick = rememberMarkdownLinkHandler(owner, repo, onNavigateToRepo, onNavigateToUser, onNavigateToIssue, onNavigateToIssueFull, onNavigateToPRFull, downloadVm = downloadVm, onNavigateToDownloads = onNavigateToDownloads),
+                    onLinkClick = rememberMarkdownLinkHandler(owner, repo, onNavigateToRepo, onNavigateToUser, onNavigateToIssue, onNavigateToIssueFull, onNavigateToPRFull, onNavigateToCommit, onNavigateToWorkflowRun, onNavigateToCreateIssue, downloadVm = downloadVm, onNavigateToDownloads = onNavigateToDownloads),
                     onNavigateToUser = onNavigateToUser,
                     onDownloadAsset = { asset ->
                         downloadVm.enqueue(
@@ -652,6 +652,9 @@ private fun rememberMarkdownLinkHandler(
     onNavigateToIssue: (Int) -> Unit,
     onNavigateToIssueFull: (String, String, Int) -> Unit,
     onNavigateToPRFull: (String, String, Int) -> Unit,
+    onNavigateToCommit: (String) -> Unit,
+    onNavigateToWorkflowRun: (Long) -> Unit,
+    onNavigateToCreateIssue: (String, String) -> Unit,
     downloadVm: com.pockethub.ui.download.DownloadViewModel,
     onNavigateToDownloads: (tab: String) -> Unit,
 ): (String, com.pockethub.ui.markdown.LinkKind) -> Unit {
