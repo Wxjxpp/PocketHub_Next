@@ -44,7 +44,8 @@ jobs:
         run: |
           mapfile -t LOG_LINES < <(
             git log --pretty=format:'%s' -n 40 \
-              --grep='chore: release' --invert-grep
+              --grep='chore: release' --invert-grep \
+              --grep='\[skip ci\]' --invert-grep
           )
           printf '%s\n' "${LOG_LINES[@]}" > /tmp/commits.txt
           python3 scripts/gen_changelog.py /tmp/commits.txt > /tmp/changelog.json \
@@ -85,59 +86,8 @@ jobs:
           # in-app update dialog reads directly (locale-matched, no runtime
           # translation). JSON is emitted on ONE line by design.
           CHANGELOG_JSON=$(cat /tmp/changelog.json 2>/dev/null || echo '{"items":[]}')
-
           NOTES_FILE=$(mktemp)
-          {
-            echo "## PocketHub v${VERSION_NAME}"
-            echo
-            python3 - "$CHANGELOG_JSON" <<'PYEOF'
-import json, sys
-try:
-    data = json.loads(sys.argv[1])
-    items = data.get("items", [])
-except Exception:
-    items = []
-if items:
-    print("### 更新说明")
-    for it in items:
-        print(f"- {it.get('zh','')}")
-    print()
-    print("### What's new")
-    for it in items:
-        print(f"- {it.get('en','')}")
-PYEOF
-            # Single-line machine block for the app (HTML comment = invisible on the web page).
-            echo "<!--pockethub-changelog ${CHANGELOG_JSON}-->"
-          } > "$NOTES_FILE"
-
-          # Build changelog from recent commits —
-          # Exclude the version-bump commit itself and any other chore:[skip ci] noise
-          # so the release notes surface feature / fix commits since the last release.
-          mapfile -t LOG_LINES < <(
-            git log --pretty=format:'%s' -n 60 \
-              --grep='chore: release' --invert-grep
-          )
-          CHANGELOG=""
-          for line in "${LOG_LINES[@]}"; do
-            # Skip merge commits and blank lines
-            [[ "$line" =~ ^Merge\  ]] && continue
-            [[ -z "$line" ]] && continue
-            CHANGELOG+="- $line
-          "
-          done
-          # Cap the changelog to keep release notes skimmable on the in-app update dialog.
-          CHANGELOG=$(printf '%s' "$CHANGELOG" | head -c 1800)
-
-          NOTES_FILE=$(mktemp)
-          {
-            echo "## PocketHub v${VERSION_NAME}"
-            echo
-            if [ -n "$CHANGELOG" ]; then
-              echo "$CHANGELOG" | head -40
-            else
-              echo "Auto-built release APK for PocketHub v${VERSION_NAME}."
-            fi
-          } > "$NOTES_FILE"
+          python3 scripts/format_notes.py "${VERSION_NAME}" /tmp/changelog.json > "$NOTES_FILE"
 
           # Replace existing release/tag if re-running on the same version.
           gh release delete "v${VERSION_NAME}" --yes --cleanup-tag 2>/dev/null || true
