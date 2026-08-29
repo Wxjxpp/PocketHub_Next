@@ -149,6 +149,7 @@ private fun splitAltHint(alt: String): Triple<String, Int?, Int?> {
 
 /** Badge/small-image threshold: web badges are ~20 CSS px tall. */
 private val SMALL_IMAGE_MAX_DP = 48.dp
+private val MEDIUM_IMAGE_MAX_DP = 160.dp
 
 /**
  * Resolve a URL's intrinsic pixel size through the app image loader. The
@@ -174,41 +175,103 @@ private fun rememberIntrinsicImageSize(src: String): androidx.compose.ui.unit.In
     }.value
 }
 
+/**
+ * Display policy for README images, tuned against a 3.4k-image corpus of real
+ * READMEs. Web rule of thumb: 1 image pixel == 1 CSS px == 1 dp, so intrinsic
+ * sizes are applied 1:1 in dp (NOT px.toDp() — dividing by density shrank every
+ * 1x asset and mis-sized 2x ones, which is what made badges go haywire).
+ *
+ * Buckets:
+ *  1. Badge hosts (shields.io, badgen, CI…) → 20dp-tall inline strip.
+ *  2. HTML width/height hints (contributors grids, resized screenshots).
+ *  3. Small images (intrinsic height ≤ 48dp) → natural size, inline, no card.
+ *  4. Medium images (≤ 160dp, logos/icons) → natural size capped, no card.
+ *  5. Everything else (banners/screenshots) → full-width, rounded.
+ */
 @Composable
 private fun AdaptiveImage(img: InlineToken.Image, onTap: (String, LinkKind) -> Unit) {
-    val density = androidx.compose.ui.platform.LocalDensity.current
     val clickTarget = img.wrapUrl ?: img.src
     val kind = if (img.wrapUrl != null) classifyLink(img.wrapUrl) else LinkKind.IMAGE_URL
     val intrinsic = rememberIntrinsicImageSize(img.src)
 
     when {
-        // HTML <img width height> hints are authoritative — render at the size
-        // the author asked for (CSS px ≈ dp), no async resize jump.
+        isBadgeUrl(img.src) -> {
+            val aspect = intrinsic?.let { it.width.toFloat() / it.height.coerceAtLeast(1) } ?: 0f
+            val h = 20.dp
+            val w = if (aspect > 0f) (h * aspect).coerceIn(24.dp, 300.dp) else 96.dp
+            RenderStripImage(img, w, h, clickTarget, kind, onTap)
+        }
         img.hintW != null && img.hintH != null && img.hintW > 0 && img.hintH > 0 -> {
             val wDp = img.hintW.dp.coerceAtMost(320.dp)
             val hDp = img.hintH.dp.coerceAtMost(360.dp)
             RenderSizedImage(img, wDp, hDp, clickTarget, kind, onTap)
         }
-        // Small image (badge / shield, ~20dp on the web) → natural size, inline.
-        intrinsic != null && with(density) { intrinsic.height.toDp() } <= SMALL_IMAGE_MAX_DP -> {
-            val hDp = with(density) { intrinsic.height.toDp() }.coerceAtLeast(12.dp)
-            val wDp = with(density) { intrinsic.width.toDp() }.coerceAtMost(280.dp).coerceAtLeast(12.dp)
-            RenderSizedImage(img, wDp, hDp, clickTarget, kind, onTap)
-        }
-        // Content image (banner / screenshot) → full-width, readable.
-        intrinsic != null -> RenderContentImage(img, clickTarget, kind, onTap)
-        // Size unknown yet → compact placeholder (most badges resolve in a frame).
-        else -> Box(
-            Modifier
-                .fillMaxWidth()
-                .height(24.dp),
+        intrinsic == null -> Box(
+            Modifier.fillMaxWidth().height(24.dp),
             contentAlignment = Alignment.Center,
         ) {
             CircularProgressIndicator(Modifier.size(12.dp), strokeWidth = 1.5.dp)
         }
+        else -> {
+            // 1 image px == 1 dp, mirroring how a phone browser lays these out.
+            val hDp = intrinsic.height.dp
+            val wDp = intrinsic.width.dp
+            when {
+                hDp <= SMALL_IMAGE_MAX_DP -> RenderStripImage(
+                    img,
+                    wDp.coerceIn(12.dp, 300.dp),
+                    hDp.coerceAtLeast(12.dp),
+                    clickTarget, kind, onTap,
+                )
+                hDp <= MEDIUM_IMAGE_MAX_DP -> RenderStripImage(
+                    img,
+                    wDp.coerceIn(24.dp, 320.dp),
+                    hDp.coerceAtMost(MEDIUM_IMAGE_MAX_DP),
+                    clickTarget, kind, onTap,
+                )
+                else -> RenderContentImage(img, clickTarget, kind, onTap)
+            }
+        }
     }
 }
 
+/** Badge / small logo: bare inline image, no background card, no rounded clip. */
+@Composable
+private fun RenderStripImage(
+    img: InlineToken.Image,
+    width: androidx.compose.ui.unit.Dp,
+    height: androidx.compose.ui.unit.Dp,
+    clickTarget: String,
+    kind: LinkKind,
+    onTap: (String, LinkKind) -> Unit,
+) {
+    SubcomposeAsyncImage(
+        model = img.src,
+        imageLoader = LocalAppImageLoader.current,
+        contentDescription = img.alt.takeIf { it.isNotBlank() },
+        contentScale = ContentScale.Fit,
+        modifier = Modifier
+            .width(width)
+            .height(height)
+            .clickable { onTap(clickTarget, kind) },
+        loading = {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(Modifier.size(10.dp), strokeWidth = 1.dp)
+            }
+        },
+        error = {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Icon(
+                    Icons.Outlined.BrokenImage, null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(12.dp),
+                )
+            }
+        },
+    )
+}
+
+/** Author-specified size (<img width height> / alt|WxH): respect it, lightly capped. */
 @Composable
 private fun RenderSizedImage(
     img: InlineToken.Image,
@@ -226,7 +289,7 @@ private fun RenderSizedImage(
         modifier = Modifier
             .width(width)
             .height(height)
-            .clip(RoundedCornerShape(3.dp))
+            .clip(RoundedCornerShape(4.dp))
             .clickable { onTap(clickTarget, kind) },
         loading = {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -245,6 +308,7 @@ private fun RenderSizedImage(
     )
 }
 
+/** Big banner / screenshot: full-width, rounded, tappable. */
 @Composable
 private fun RenderContentImage(
     img: InlineToken.Image,
@@ -256,40 +320,40 @@ private fun RenderContentImage(
         model = img.src,
         imageLoader = LocalAppImageLoader.current,
         contentDescription = img.alt.takeIf { it.isNotBlank() },
-        contentScale = ContentScale.Fit,
+        contentScale = ContentScale.FillWidth,
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 96.dp, max = 360.dp)
+            .heightIn(min = 120.dp, max = 360.dp)
             .clip(RoundedCornerShape(8.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
             .clickable { onTap(clickTarget, kind) },
         loading = {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Box(
+                Modifier.fillMaxWidth().height(160.dp),
+                contentAlignment = Alignment.Center,
+            ) {
                 CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
             }
         },
         error = {
-            Column(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(10.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
             ) {
                 Icon(
                     Icons.Outlined.BrokenImage, null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp),
+                    modifier = Modifier.size(16.dp),
                 )
-                if (img.alt.isNotBlank()) {
-                    Text(
-                        img.alt,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    img.alt.ifBlank { "image" },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         },
     )
