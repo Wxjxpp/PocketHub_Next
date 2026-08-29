@@ -621,7 +621,7 @@ fun PullRequestDetailScreen(
                     }
                 } else {
                     reviews.forEach { review ->
-                        ReviewItem(review, onNavigateToUser = onNavigateToUser, dateFmt = dateFmt)
+                        ReviewItem(review, onNavigateToUser = onNavigateToUser, dateFmt = dateFmt, onLinkClick = onLinkClick)
                     }
                     if (reviewsError != null) {
                         SectionError(message = reviewsError!!, onRetry = { vm.retryReviews() })

@@ -85,8 +85,14 @@ fun CommitDetailScreen(
     repo: String,
     sha: String,
     onNavigateToUser: (String) -> Unit = {},
+    /** GitHub 站内链接跳转(commit message 引用 issue/PR/其他仓库)。 */
+    onNavigateToRepo: (String, String) -> Unit = { _, _ -> },
+    onNavigateToIssue: (String, String, Int) -> Unit = { _, _, _ -> },
+    onNavigateToPR: (String, String, Int) -> Unit = { _, _, _ -> },
+    onNavigateToCommit: (String, String, String) -> Unit = { _, _, _ -> },
     onBack: () -> Unit,
     vm: CommitDetailViewModel = hiltViewModel(),
+    downloadVm: com.pockethub.ui.download.DownloadViewModel = hiltViewModel(),
 ) {
     val commit by vm.commit.collectAsState()
     val isLoading by vm.isLoading.collectAsState()
@@ -376,7 +382,30 @@ fun CommitDetailScreen(
                 }
             } else {
                 items(comments, key = { it.id }) { comment ->
-                    CommitCommentItem(comment, dateFmt, owner, repo, onNavigateToUser)
+                    val commentLinkHandler = com.pockethub.ui.markdown.rememberGitHubLinkHandler(
+                com.pockethub.ui.markdown.GitHubLinkNav(
+                    owner = owner,
+                    repo = repo,
+                    onRepo = onNavigateToRepo,
+                    onIssue = onNavigateToIssue,
+                    onPull = onNavigateToPR,
+                    onCommit = onNavigateToCommit,
+                    onUser = onNavigateToUser,
+                    onDownload = { url, fileName ->
+                        downloadVm.enqueue(
+                            com.pockethub.data.download.DownloadManager.EnqueueRequest(
+                                url = url,
+                                fileName = fileName,
+                                contentType = guessAssetMime(fileName),
+                                sizeBytes = 0L,
+                                repoKey = "$owner/$repo",
+                                releaseTag = "",
+                            )
+                        )
+                    },
+                ),
+            )
+            CommitCommentItem(comment, dateFmt, owner, repo, onNavigateToUser, onLinkClick = commentLinkHandler)
                 }
             }
 
@@ -585,6 +614,7 @@ private fun CommitCommentItem(
     owner: String,
     repo: String,
     onNavigateToUser: (String) -> Unit,
+    onLinkClick: (String, com.pockethub.ui.markdown.LinkKind) -> Unit,
 ) {
     Column(
         Modifier
@@ -626,6 +656,7 @@ private fun CommitCommentItem(
         markdown = comment.body,
         modifier = Modifier.fillMaxWidth(),
         repoContext = "$owner/$repo",
+        onLinkClick = onLinkClick,
     )
 }
 }

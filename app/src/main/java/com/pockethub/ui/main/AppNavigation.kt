@@ -413,6 +413,10 @@ fun PocketHubApp(
                         repo = repo,
                         sha = sha,
                         onNavigateToUser = { login -> navController.navigate(Routes.userDetail(login)) },
+                        onNavigateToRepo = { o, r -> navController.navigate(Routes.repoDetail(o, r)) },
+                        onNavigateToIssue = { o, r, n -> navController.navigate(Routes.issueDetail(o, r, n)) },
+                        onNavigateToPR = { o, r, n -> navController.navigate(Routes.prDetail(o, r, n)) },
+                        onNavigateToCommit = { o, r, s -> navController.navigate(Routes.commitDetail(o, r, s)) },
                         onBack = { navController.popBackStack() },
                     )
                 }
