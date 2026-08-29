@@ -58,6 +58,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import coil.compose.SubcomposeAsyncImage
+import coil.compose.SubcomposeAsyncImageContent
 import com.pockethub.R
 import com.pockethub.ui.LocalAppImageLoader
 import com.pockethub.ui.components.PhAsyncImage
@@ -120,59 +121,97 @@ internal fun RichParagraph(parts: List<InlineToken>, onTap: (String, LinkKind) -
 }
 
 /**
- * Render a run of adjacent images. Badge-style images (shields.io, CI status, etc.) are grouped
- * into a compact [BadgesRow]; everything else is shown as a full-width [ContentImage] so README
- * screenshots and banners are legible on a phone instead of squished to a strip.
+ * Render a run of adjacent images the way a phone-sized web page would:
+ * every image adapts to its intrinsic (or HTML-hinted) size — small badges
+ * sit inline next to each other, banners/screenshots take the full width.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun RenderImageRun(images: List<InlineToken.Image>, onTap: (String, LinkKind) -> Unit) {
-    var j = 0
-    while (j < images.size) {
-        if (isBadgeUrl(images[j].src)) {
-            val badges = mutableListOf<InlineToken.Image>()
-            while (j < images.size && isBadgeUrl(images[j].src)) {
-                badges.add(images[j])
-                j++
-            }
-            BadgesRow(badges, onTap)
-        } else {
-            ContentImage(images[j], onTap)
-            j++
-        }
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        images.forEach { img -> AdaptiveImage(img, onTap) }
     }
 }
 
-/** A content image shown at a readable size with loading / error states and tap-to-open.
- *  Uses SubcomposeAsyncImage so Coil resolves the request against the component's bounded
- *  layout size (never Size.ORIGINAL) — large README screenshots decode downsampled, no OOM. */
+/** Alt-suffix parser for the "alt|WxH" hint written by cleanSegment's <img> conversion. */
+private fun splitAltHint(alt: String): Triple<String, Int?, Int?> {
+    val marker = alt.indexOf('\u0001')
+    if (marker == -1) return Triple(alt, null, null)
+    val display = alt.substring(0, marker)
+    val m = Regex("(\\d+)x(\\d+)").find(alt.substring(marker + 1))
+        ?: return Triple(display, null, null)
+    return Triple(display, m.groupValues[1].toIntOrNull(), m.groupValues[2].toIntOrNull())
+}
+
+/** Badge/small-image threshold: web badges are ~20 CSS px tall. */
+private val SMALL_IMAGE_MAX_DP = 48.dp
+
 @Composable
-internal fun ContentImage(img: InlineToken.Image, onTap: (String, LinkKind) -> Unit) {
+private fun AdaptiveImage(img: InlineToken.Image, onTap: (String, LinkKind) -> Unit) {
+    val density = androidx.compose.ui.platform.LocalDensity.current
     val clickTarget = img.wrapUrl ?: img.src
     val kind = if (img.wrapUrl != null) classifyLink(img.wrapUrl) else LinkKind.IMAGE_URL
+
+    // HTML <img width height> hints are authoritative — render at the size the
+    // author asked for (CSS px ≈ dp), no async resize jump.
+    if (img.hintW != null && img.hintH != null && img.hintW > 0 && img.hintH > 0) {
+        val maxW = 320.dp
+        val wDp = img.hintW.dp.coerceAtMost(maxW)
+        val hDp = img.hintH.dp.coerceAtMost(360.dp)
+        SubcomposeAsyncImage(
+            model = img.src,
+            imageLoader = LocalAppImageLoader.current,
+            contentDescription = img.alt.takeIf { it.isNotBlank() },
+            contentScale = ContentScale.Fit,
+            modifier = Modifier
+                .width(wDp)
+                .height(hDp)
+                .clip(RoundedCornerShape(4.dp))
+                .clickable { onTap(clickTarget, kind) },
+            loading = {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 1.5.dp)
+                }
+            },
+            error = {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Outlined.BrokenImage, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
+                }
+            },
+        )
+        return
+    }
+
     SubcomposeAsyncImage(
         model = img.src,
         imageLoader = LocalAppImageLoader.current,
         contentDescription = img.alt.takeIf { it.isNotBlank() },
         contentScale = ContentScale.Fit,
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 96.dp, max = 360.dp)
-            .padding(vertical = 4.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .clickable { onTap(clickTarget, kind) },
+        modifier = Modifier.fillMaxWidth(),
         loading = {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
+            // Compact placeholder — most small images resolve within a frame or two.
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(24.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(Modifier.size(12.dp), strokeWidth = 1.5.dp)
             }
         },
         error = {
             Column(
-                modifier = Modifier.fillMaxSize().padding(10.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(10.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
-                Icon(Icons.Outlined.BrokenImage, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(Icons.Outlined.BrokenImage, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
                 if (img.alt.isNotBlank()) {
                     Text(
                         img.alt,
@@ -182,171 +221,49 @@ internal fun ContentImage(img: InlineToken.Image, onTap: (String, LinkKind) -> U
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                Text(
-                    img.src,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
             }
         },
-    )
-}
+        success = { state ->
+            val ins = state.result.painter.intrinsicSize
+            val valid = ins != androidx.compose.ui.geometry.Size.Unspecified &&
+                ins.width > 0f && ins.height > 0f
+            val intrinsicHDp = if (valid) with(density) { ins.height.toDp() } else null
 
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-internal fun BadgesRow(images: List<InlineToken.Image>, onTap: (String, LinkKind) -> Unit) {
-    FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        images.forEach { img ->
-            val clickableModifier = if (img.wrapUrl != null) {
-                Modifier.clip(RoundedCornerShape(4.dp)).clickable { onTap(img.wrapUrl, classifyLink(img.wrapUrl)) }
-            } else {
-                Modifier.clip(RoundedCornerShape(4.dp)).clickable { onTap(img.src, LinkKind.IMAGE_URL) }
-            }
-            Box(modifier = clickableModifier) {
-                PhAsyncImage(
-                    model = img.src,
-                    imageLoader = LocalAppImageLoader.current,
-                    contentDescription = img.alt.takeIf { it.isNotBlank() },
-                    modifier = Modifier
-                        .heightIn(min = 16.dp, max = 40.dp)
-                        .clip(RoundedCornerShape(4.dp)),
-                )
-            }
-        }
-    }
-}
-
-/** GFM alert block (`> [!NOTE]` …) — themed card with icon + label + rich body. */
-@Composable
-internal fun AlertBlock(
-    alert: MdBlock.Alert,
-    resolver: LinkResolver,
-    imageResolver: ImageResolver,
-    codeBackgroundColor: Color,
-    linkColor: Color,
-    downloadColor: Color,
-    imageLinkColor: Color,
-    externalColor: Color,
-    onTap: (String, LinkKind) -> Unit,
-) {
-    val dark = isSystemInDarkTheme()
-    val (accent, icon) = when (alert.kind) {
-        "TIP" -> (if (dark) Color(0xFF3FB950) else Color(0xFF1A7F37)) to Icons.Outlined.Lightbulb
-        "IMPORTANT" -> MaterialTheme.colorScheme.secondary to Icons.Outlined.PriorityHigh
-        "WARNING" -> (if (dark) Color(0xFFD29922) else Color(0xFF9A6700)) to Icons.Outlined.WarningAmber
-        "CAUTION" -> MaterialTheme.colorScheme.error to Icons.Outlined.Report
-        else -> MaterialTheme.colorScheme.primary to Icons.Outlined.Info // NOTE
-    }
-    val label = stringResource(
-        when (alert.kind) {
-            "TIP" -> R.string.md_alert_tip
-            "IMPORTANT" -> R.string.md_alert_important
-            "WARNING" -> R.string.md_alert_warning
-            "CAUTION" -> R.string.md_alert_caution
-            else -> R.string.md_alert_note
-        },
-    )
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .border(1.dp, accent.copy(alpha = 0.45f), RoundedCornerShape(8.dp))
-            .background(accent.copy(alpha = 0.08f))
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, null, tint = accent, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(6.dp))
-            Text(label, style = MaterialTheme.typography.labelLarge, color = accent)
-        }
-        if (alert.text.isNotBlank()) {
-            Spacer(Modifier.height(2.dp))
-            val parts = renderRichInline(
-                alert.text, resolver, imageResolver,
-                codeBackgroundColor, linkColor, downloadColor, imageLinkColor, externalColor,
-            )
-            RichParagraph(parts, onTap, paragraphSpacing = 0.dp)
-        }
-    }
-}
-
-@Composable
-internal fun RichBlockquote(
-    parts: List<InlineToken>,
-    accentColor: Color,
-    mutedColor: Color,
-    onTap: (String, LinkKind) -> Unit,
-) {    val hasOnlyText = parts.all { it is InlineToken.Text }
-    if (hasOnlyText) {
-        // fast path — render whole as one ClickableText
-        val span = buildAnnotatedString {
-            parts.forEach { append((it as InlineToken.Text).span) }
-        }
-        ClickableText(
-            text = span,
-            style = MaterialTheme.typography.bodyMedium.copy(
-                fontStyle = FontStyle.Italic,
-                color = mutedColor,
-            ),
-            modifier = Modifier
-                .padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp)
-                .drawBehind {
-                    drawLine(
-                        color = accentColor,
-                        start = Offset(0f, 0f),
-                        end = Offset(0f, size.height),
-                        strokeWidth = 3.dp.toPx(),
-                    )
-                },
-            onClick = { offset ->
-                span.getStringAnnotations(LINK_TAG, offset, offset).firstOrNull()?.let { annotation ->
-                    val kind = span.getStringAnnotations(LINK_KIND_TAG, offset, offset)
-                        .firstOrNull()?.item?.let { runCatching { LinkKind.valueOf(it) }.getOrNull() }
-                        ?: LinkKind.EXTERNAL
-                    onTap(annotation.item, kind)
+            when {
+                // Small image (badge / shield) → render at natural size, inline.
+                valid && intrinsicHDp != null && intrinsicHDp <= SMALL_IMAGE_MAX_DP -> {
+                    val hDp = intrinsicHDp.coerceAtLeast(12.dp)
+                    val wDp = with(density) { ins.width.toDp() }.coerceAtMost(280.dp)
+                    Box(
+                        Modifier
+                            .height(hDp)
+                            .width(wDp)
+                            .clip(RoundedCornerShape(3.dp))
+                            .clickable { onTap(clickTarget, kind) },
+                    ) {
+                        SubcomposeAsyncImageContent(
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Fit,
+                        )
+                    }
                 }
-            },
-        )
-        Spacer(Modifier.height(4.dp))
-        return
-    }
-    // has images too — render paragraph-like
-    Column(
-        Modifier
-            .padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp)
-            .drawBehind {
-                drawLine(
-                    color = accentColor,
-                    start = Offset(0f, 0f),
-                    end = Offset(0f, size.height),
-                    strokeWidth = 3.dp.toPx(),
-                )
+                // Content image (banner / screenshot) → full-width, readable.
+                else -> Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 96.dp, max = 360.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .clickable { onTap(clickTarget, kind) },
+                ) {
+                    SubcomposeAsyncImageContent(
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit,
+                    )
+                }
             }
-    ) { RichParagraph(parts, onTap) }
-}
-
-@Composable
-internal fun RichListItem(
-    bullet: String,
-    parts: List<InlineToken>,
-    indent: Int,
-    mutedColor: Color,
-    onTap: (String, LinkKind) -> Unit,
-) {
-    Column(Modifier.padding(start = (4 + indent).dp, end = 8.dp, top = 2.dp, bottom = 2.dp)) {
-        Row(verticalAlignment = Alignment.Top) {
-            Text(bullet, color = mutedColor, style = MaterialTheme.typography.bodyMedium)
-            Spacer(Modifier.width(2.dp))
-            Column(Modifier.weight(1f)) { RichParagraph(parts, onTap) }
-        }
-    }
+        },
+    )
 }
 
 // ── Tables ───────────────────────────────────────────────────────────
@@ -460,7 +377,7 @@ internal fun renderRichInline(
     /**
      * Flush before an image — except drop pure-whitespace buffers that sit
      * between two images, so a wall of badges stays one adjacent run and
-     * renders in a single [BadgesRow] FlowRow instead of one row per badge.
+     * renders as a single FlowRow of inline-sized images.
      */
     fun flushImageGap() {
         if (textBuffer.isNotBlank()) {
@@ -480,11 +397,11 @@ internal fun renderRichInline(
         val wrappedMatch = WRAPPED_IMG_PATTERN.find(rest)
         if (wrappedMatch != null) {
             flushImageGap()
-            val alt = wrappedMatch.groupValues[1]
+            val (alt, hw, hh) = splitAltHint(wrappedMatch.groupValues[1])
             val src = imageResolver(wrappedMatch.groupValues[2].trim())
             val href = wrappedMatch.groupValues[3].trim()
             val resolvedHref = resolver(href) ?: href
-            out.add(InlineToken.Image(src = src, alt = alt, wrapUrl = resolvedHref))
+            out.add(InlineToken.Image(src = src, alt = alt, wrapUrl = resolvedHref, hintW = hw, hintH = hh))
             i += wrappedMatch.value.length
             continue
         }
@@ -492,9 +409,9 @@ internal fun renderRichInline(
         val imgMatch = STANDALONE_IMG_PATTERN.find(rest)
         if (imgMatch != null) {
             flushImageGap()
-            val alt = imgMatch.groupValues[1]
+            val (alt, hw, hh) = splitAltHint(imgMatch.groupValues[1])
             val src = imageResolver(imgMatch.groupValues[2].trim())
-            out.add(InlineToken.Image(src = src, alt = alt, wrapUrl = null))
+            out.add(InlineToken.Image(src = src, alt = alt, wrapUrl = null, hintW = hw, hintH = hh))
             i += imgMatch.value.length
             continue
         }

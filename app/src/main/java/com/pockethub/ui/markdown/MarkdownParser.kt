@@ -33,9 +33,10 @@ private fun cleanSegment(markdown: String): String {
             // Strip HTML comments (<!-- … -->) — README sections use them to
             // organize badge blocks; they must never surface as literal text.
             .replace(Regex("<!--[\\s\\S]*?-->"), "")
-            // Convert common standalone raw-HTML <img src> into markdown ![](...) so our
-            // image rendering kicks in. (<img> tags inside <a> won't convert cleanly here, but
-            // those are far less common than markdown form below.)
+            // <img src> → markdown, PRESERVING the HTML width/height hints as an
+            // alt-suffix ("alt|WxH") — the renderer uses them to size the image
+            // like the web page did (banners at ~250dp, badges at ~20dp) instead
+            // of blowing every image up to phone-screen width.
             .replace(
                 Regex(
                     "<\\s*img\\s+[^>]*?src\\s*=\\s*[\"']([^\"']+)[\"'][^>]*?(?:alt\\s*=\\s*[\"']([^\"']*)[\"'])?[^>]*?/?>",
@@ -44,7 +45,11 @@ private fun cleanSegment(markdown: String): String {
             ) { m ->
                 val src = m.groupValues[1]
                 val alt = m.groupValues[2]
-                "![${alt}](${src})"
+                val tag = m.value
+                val w = Regex("width\\s*=\\s*[\"']?(\\d+)").find(tag)?.groupValues?.getOrNull(1)
+                val h = Regex("height\\s*=\\s*[\"']?(\\d+)").find(tag)?.groupValues?.getOrNull(1)
+                val altOut = if (w != null && h != null) "$alt\u0001${w}x${h}" else alt
+                "![${altOut}](${src})"
             }
             // Strip common HTML block/inline tags (leave text between pairs) — but keep <a href>
             // as markdown so we don't lose navigation context for legacy README HTML.

@@ -281,5 +281,12 @@ internal sealed class InlineToken {
     /** Flowable annotated text — clickable links live here. */
     data class Text(val span: AnnotatedString) : InlineToken()
     /** Standalone image. `wrapUrl` non-null → image is wrapped in a link (render with hover style). */
-    data class Image(val src: String, val alt: String, val wrapUrl: String?) : InlineToken()
+    data class Image(
+        val src: String,
+        val alt: String,
+        val wrapUrl: String?,
+        /** Display hint from the source HTML <img width height> attrs, in dp. */
+        val hintW: Int? = null,
+        val hintH: Int? = null,
+    ) : InlineToken()
 }
