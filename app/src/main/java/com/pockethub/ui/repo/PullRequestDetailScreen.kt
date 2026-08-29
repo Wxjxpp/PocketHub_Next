@@ -86,8 +86,13 @@ fun PullRequestDetailScreen(
     prNumber: Int,
     onNavigateToRepo: (String, String) -> Unit = { _, _ -> },
     onNavigateToUser: (String) -> Unit = {},
+    /** GitHub 站内链接跨仓库跳转(AppNavigation 传全局路由)。 */
+    onNavigateToIssue: (String, String, Int) -> Unit = { _, _, _ -> },
+    onNavigateToPR: (String, String, Int) -> Unit = { _, _, _ -> },
+    onNavigateToCommit: (String, String, String) -> Unit = { _, _, _ -> },
     onBack: () -> Unit,
     vm: PullRequestDetailViewModel = hiltViewModel(),
+    downloadVm: com.pockethub.ui.download.DownloadViewModel = hiltViewModel(),
 ) {
     val pr by vm.pr.collectAsState()
     val files by vm.files.collectAsState()
@@ -132,7 +137,6 @@ fun PullRequestDetailScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
     var showMergeDialog by remember { mutableStateOf(false) }
     var showMergeWarningDialog by remember { mutableStateOf(false) }
     var showReviewDialog by remember { mutableStateOf(false) }
@@ -147,24 +151,30 @@ fun PullRequestDetailScreen(
     var editingInlineBody by remember { mutableStateOf("") }
     var pendingDeleteInlineId by remember { mutableStateOf<Long?>(null) }
 
-    val onLinkClick: (String, com.pockethub.ui.markdown.LinkKind) -> Unit = link@{ url, kind ->
-        if (kind == com.pockethub.ui.markdown.LinkKind.DOWNLOADABLE ||
-            kind == com.pockethub.ui.markdown.LinkKind.IMAGE_URL ||
-            kind == com.pockethub.ui.markdown.LinkKind.IMAGE
-        ) {
-            runCatching { uriHandler.openUri(url) }
-            return@link
-        }
-        Regex("^https://github\\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)/?.*$").matchEntire(url)?.let {
-            onNavigateToRepo(it.groupValues[1], it.groupValues[2])
-            return@link
-        }
-        Regex("^https://github\\.com/([A-Za-z0-9_.-]+)$").matchEntire(url)?.let {
-            onNavigateToUser(it.groupValues[1])
-            return@link
-        }
-        runCatching { uriHandler.openUri(url) }
-    }
+    val onLinkClick: (String, com.pockethub.ui.markdown.LinkKind) -> Unit =
+        com.pockethub.ui.markdown.rememberGitHubLinkHandler(
+            com.pockethub.ui.markdown.GitHubLinkNav(
+                owner = owner,
+                repo = repo,
+                onRepo = onNavigateToRepo,
+                onIssue = onNavigateToIssue,
+                onPull = onNavigateToPR,
+                onCommit = onNavigateToCommit,
+                onUser = onNavigateToUser,
+                onDownload = { url, fileName ->
+                    downloadVm.enqueue(
+                        com.pockethub.data.download.DownloadManager.EnqueueRequest(
+                            url = url,
+                            fileName = fileName,
+                            contentType = guessAssetMime(fileName),
+                            sizeBytes = 0L,
+                            repoKey = "$owner/$repo",
+                            releaseTag = "",
+                        )
+                    )
+                },
+            ),
+        )
 
     // Add reviewers dialog (multi-input via chip list)
     if (showAddReviewer) {

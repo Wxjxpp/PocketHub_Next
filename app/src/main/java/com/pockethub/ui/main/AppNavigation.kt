@@ -292,6 +292,8 @@ fun PocketHubApp(
                         owner = owner,
                         repo = repo,
                         onNavigateToIssue = { n -> navController.navigate(Routes.issueDetail(owner, repo, n)) },
+                        onNavigateToIssueFull = { o, r, n -> navController.navigate(Routes.issueDetail(o, r, n)) },
+                        onNavigateToPRFull = { o, r, n -> navController.navigate(Routes.prDetail(o, r, n)) },
                         onNavigateToPR = { n -> navController.navigate(Routes.prDetail(owner, repo, n)) },
                         onNavigateToCommit = { sha -> navController.navigate(Routes.commitDetail(owner, repo, sha)) },
                         onNavigateToCreateIssue = { o, r -> navController.navigate(Routes.createIssue(o, r)) },
@@ -322,6 +324,9 @@ fun PocketHubApp(
                         issueNumber = number,
                         onNavigateToRepo = { o, r -> navController.navigate(Routes.repoDetail(o, r)) },
                         onNavigateToUser = { login -> navController.navigate(Routes.userDetail(login)) },
+                        onNavigateToIssue = { o, r, n -> navController.navigate(Routes.issueDetail(o, r, n)) },
+                        onNavigateToPR = { o, r, n -> navController.navigate(Routes.prDetail(o, r, n)) },
+                        onNavigateToCommit = { o, r, sha -> navController.navigate(Routes.commitDetail(o, r, sha)) },
                         onBack = { navController.popBackStack() },
                     )
                 }
@@ -344,6 +349,9 @@ fun PocketHubApp(
                         prNumber = number,
                         onNavigateToRepo = { o, r -> navController.navigate(Routes.repoDetail(o, r)) },
                         onNavigateToUser = { login -> navController.navigate(Routes.userDetail(login)) },
+                        onNavigateToIssue = { o, r, n -> navController.navigate(Routes.issueDetail(o, r, n)) },
+                        onNavigateToPR = { o, r, n -> navController.navigate(Routes.prDetail(o, r, n)) },
+                        onNavigateToCommit = { o, r, sha -> navController.navigate(Routes.commitDetail(o, r, sha)) },
                         onBack = { navController.popBackStack() },
                     )
                 }

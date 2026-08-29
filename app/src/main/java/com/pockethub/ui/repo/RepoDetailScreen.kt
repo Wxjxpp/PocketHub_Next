@@ -75,6 +75,14 @@ fun RepoDetailScreen(
     onNavigateToCreateIssue: (String, String) -> Unit = { _, _ -> },
     onNavigateToRepo: (String, String) -> Unit = { _, _ -> },
     onNavigateToUser: (String) -> Unit = {},
+    // Cross-repo issue/PR links (README 引用其他仓库的 issue 等)。
+    // AppNavigation 必须传全局路由;默认降级为同仓库导航。
+    onNavigateToIssueFull: (String, String, Int) -> Unit = { o, r, n ->
+        if (o == owner && r == repo) onNavigateToIssue(n) else onNavigateToRepo(o, r)
+    },
+    onNavigateToPRFull: (String, String, Int) -> Unit = { o, r, n ->
+        if (o == owner && r == repo) onNavigateToPR(n) else onNavigateToRepo(o, r)
+    },
     onNavigateToSearch: (String) -> Unit = {},
     onNavigateToDownloads: (tab: String) -> Unit = { _ -> },
     onNavigateToWorkflowRun: (Long) -> Unit = {},
@@ -410,7 +418,7 @@ fun RepoDetailScreen(
                     onToggleTranslation = { vm.toggleTranslation() },
                     onTopicClick = { topic -> onNavigateToSearch(topic) },
                     onNavigateToRepo = onNavigateToRepo,
-                    onLinkClick = rememberMarkdownLinkHandler(owner, repo, onNavigateToRepo, onNavigateToUser, onNavigateToIssue, downloadVm = downloadVm, onNavigateToDownloads = onNavigateToDownloads),
+                    onLinkClick = rememberMarkdownLinkHandler(owner, repo, onNavigateToRepo, onNavigateToUser, onNavigateToIssue, onNavigateToIssueFull, onNavigateToPRFull, downloadVm = downloadVm, onNavigateToDownloads = onNavigateToDownloads),
                 )
                 RepoTab.CODE -> CodeTab(
                     owner = owner,
@@ -451,7 +459,7 @@ fun RepoDetailScreen(
                     canDelete = canManageReleases,
                     isDeletingRelease = isDeletingRelease,
                     isLoading = isLoadingReleases,
-                    onLinkClick = rememberMarkdownLinkHandler(owner, repo, onNavigateToRepo, onNavigateToUser, onNavigateToIssue, downloadVm = downloadVm, onNavigateToDownloads = onNavigateToDownloads),
+                    onLinkClick = rememberMarkdownLinkHandler(owner, repo, onNavigateToRepo, onNavigateToUser, onNavigateToIssue, onNavigateToIssueFull, onNavigateToPRFull, downloadVm = downloadVm, onNavigateToDownloads = onNavigateToDownloads),
                     onNavigateToUser = onNavigateToUser,
                     onDownloadAsset = { asset ->
                         downloadVm.enqueue(
@@ -642,55 +650,40 @@ private fun rememberMarkdownLinkHandler(
     onNavigateToRepo: (String, String) -> Unit,
     onNavigateToUser: (String) -> Unit,
     onNavigateToIssue: (Int) -> Unit,
+    onNavigateToIssueFull: (String, String, Int) -> Unit,
+    onNavigateToPRFull: (String, String, Int) -> Unit,
     downloadVm: com.pockethub.ui.download.DownloadViewModel,
     onNavigateToDownloads: (tab: String) -> Unit,
 ): (String, com.pockethub.ui.markdown.LinkKind) -> Unit {
-    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
-    return link@{ url, kind ->
-        // DOWNLOADABLE — enqueue into the in-app download manager (CDN raw / release assets / etc.)
-        if (kind == com.pockethub.ui.markdown.LinkKind.DOWNLOADABLE) {
-            val display = url.substringAfterLast('/').ifBlank { "download.bin" }
-            downloadVm.enqueue(
-                com.pockethub.data.download.DownloadManager.EnqueueRequest(
-                    url = url,
-                    fileName = display,
-                    contentType = guessAssetMime(display),
-                    sizeBytes = 0L,
-                    repoKey = "$owner/$repo",
-                    releaseTag = "",
+    // Unified GitHub in-app router — README / release notes links resolve to
+    // the right screen (issue vs PR vs commit vs workflow run), non-GitHub
+    // URLs and marketing pages fall through to the system browser.
+    return com.pockethub.ui.markdown.rememberGitHubLinkHandler(
+        com.pockethub.ui.markdown.GitHubLinkNav(
+            owner = owner,
+            repo = repo,
+            onRepo = onNavigateToRepo,
+            onIssue = onNavigateToIssueFull,
+            onPull = onNavigateToPRFull,
+            onCommit = { _, _, sha -> onNavigateToCommit(sha) },
+            onUser = onNavigateToUser,
+            onWorkflowRun = { runId -> onNavigateToWorkflowRun(runId) },
+            onCreateIssue = onNavigateToCreateIssue,
+            onDownload = { url, fileName ->
+                downloadVm.enqueue(
+                    com.pockethub.data.download.DownloadManager.EnqueueRequest(
+                        url = url,
+                        fileName = fileName,
+                        contentType = guessAssetMime(fileName),
+                        sizeBytes = 0L,
+                        repoKey = "$owner/$repo",
+                        releaseTag = "",
+                    )
                 )
-            )
-            onNavigateToDownloads("active")
-            return@link
-        }
-        // IMAGE_URL — open in browser so the user can see full-res image
-        if (kind == com.pockethub.ui.markdown.LinkKind.IMAGE_URL) {
-            runCatching { uriHandler.openUri(url) }
-            return@link
-        }
-        // IMAGE (wrapped) — fall through to the wrap target's classification
-        if (kind == com.pockethub.ui.markdown.LinkKind.IMAGE) {
-            runCatching { uriHandler.openUri(url) }
-            return@link
-        }
-        // GitHub issues / PRs
-        Regex("^https://github\\.com/[^/]+/[^/]+/(?:issues|pull)/(\\d+)$").matchEntire(url)?.let {
-            it.groupValues[1].toIntOrNull()?.let { n -> onNavigateToIssue(n) }
-            return@link
-        }
-        // Repo URLs (must come after issue/pull matcher)
-        Regex("^https://github\\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)(?:/.*)?$").matchEntire(url)?.let {
-            onNavigateToRepo(it.groupValues[1], it.groupValues[2])
-            return@link
-        }
-        // User/profile URLs (single segment)
-        Regex("^https://github\\.com/([A-Za-z0-9_.-]+)/?$").matchEntire(url)?.let {
-            onNavigateToUser(it.groupValues[1])
-            return@link
-        }
-        // External links — open in system browser
-        runCatching { uriHandler.openUri(url) }
-    }
+                onNavigateToDownloads("active")
+            },
+        ),
+    )
 }
 
 
