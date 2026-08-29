@@ -216,6 +216,7 @@ private fun RenderSizedImage(
     height: androidx.compose.ui.unit.Dp,
     clickTarget: String,
     kind: LinkKind,
+    onTap: (String, LinkKind) -> Unit,
 ) {
     SubcomposeAsyncImage(
         model = img.src,
@@ -249,6 +250,7 @@ private fun RenderContentImage(
     img: InlineToken.Image,
     clickTarget: String,
     kind: LinkKind,
+    onTap: (String, LinkKind) -> Unit,
 ) {
     SubcomposeAsyncImage(
         model = img.src,
