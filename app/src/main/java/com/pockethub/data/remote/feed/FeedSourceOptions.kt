@@ -52,6 +52,14 @@ enum class FeedSourceOption(
         urlModifiable = true,
         supportsTrendingFilters = true,
     ),
+    KOMI_TOP_CHARTS(
+        id = "KOMI_TOP_CHARTS",
+        // github-store.org aggregated top charts (komi-store backend): curated
+        // trending / new-releases / most-popular lists per platform. Filters
+        // live in the settings screen as chips, so the Trending-tab language /
+        // time-range chips don't apply here.
+        defaultBaseUrl = "https://api.github-store.org/v1/",
+    ),
 
     // Public discovery sources. OSS Insight and Hacker News are intentionally
     // retained as built-in defaults alongside the official GitHub source.
@@ -107,7 +115,7 @@ enum class FeedSourceOption(
         fun optionsFor(tab: FeedTab): List<FeedSourceOption> = when (tab) {
             // Trending keeps only the official GitHub endpoint — stable, token-
             // cached and the obvious zero-configuration choice.
-            FeedTab.TRENDING  -> listOf(GITHUB_SEARCH)
+            FeedTab.TRENDING  -> listOf(GITHUB_SEARCH, KOMI_TOP_CHARTS)
             // Featured keeps its first three sources; the rest were pruned to
             // keep the settings screen focused.
             FeedTab.FEATURED  -> listOf(OSS_INSIGHT, HACKER_NEWS_SHOWHN, NPM_REGISTRY)
@@ -136,4 +144,8 @@ data class FeedSourceConfig(
     val githubMaxStars: Int = 20_000,
     /** Archived repositories are hidden by default to keep discovery useful. */
     val githubIncludeArchived: Boolean = false,
+    /** Komi top charts: trending | new-releases | most-popular. */
+    val komiCategory: String = "trending",
+    /** Komi top charts: android | windows | macos | linux. */
+    val komiPlatform: String = "android",
 )

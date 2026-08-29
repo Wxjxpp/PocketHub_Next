@@ -76,6 +76,7 @@ class FeedSourceService @Inject constructor(
                 else fetchGitHubTrendingApi(cfg, forceFresh)
             }
             FeedSourceOption.OSS_INSIGHT -> fetchOssInsight(cfg, forceFresh)
+            FeedSourceOption.KOMI_TOP_CHARTS -> fetchKomiTopCharts(cfg, forceFresh)
             // The official GitHub REST search path is the stable zero-config
             // fallback for old or malformed saved source ids.
             else -> searchGitHub(cfg, forceFresh)
@@ -96,9 +97,11 @@ class FeedSourceService @Inject constructor(
                 if (!isConfigured(FeedSourceOption.REDDIT_TOP, cfg.customBaseUrl)) emptyList()
                 else fetchRedditTop(cfg, forceFresh)
             // Following-only sources are safely mapped to the official feed if
-            // an old install somehow persisted them under Featured.
+            // an old install somehow persisted them under Featured. Komi charts
+            // are a Trending-source, same treatment on the Featured tab.
             FeedSourceOption.GITHUB_EVENTS,
-            FeedSourceOption.GITHUB_TRENDING_API -> searchGitHub(cfg, forceFresh)
+            FeedSourceOption.GITHUB_TRENDING_API,
+            FeedSourceOption.KOMI_TOP_CHARTS -> searchGitHub(cfg, forceFresh)
         }
     }
 
@@ -439,6 +442,78 @@ class FeedSourceService @Inject constructor(
 
     private fun JsonObject.rowStr(key: String): String =
         (this[key] as? JsonPrimitive)?.contentOrNull.orEmpty()
+
+    // ── Komi Store top charts — github-store.org /v1/categories ────────────
+    //
+    // GET {base}categories/{category}/{platform} → BackendRepoResponse[]
+    // (notes: /var/minis/shared/komi-store/api-notes.md, verified 2026-08-26).
+    // Falls back to the project's offline GitHub-raw mirror
+    // cached-data/{category}/{platform}.json whose envelope is
+    // { category, platform, lastUpdated, totalCount, repositories: [...] }.
+
+    private suspend fun fetchKomiTopCharts(cfg: FeedSourceConfig, forceFresh: Boolean): List<DiscoverItem> {
+        val source = FeedSourceOption.KOMI_TOP_CHARTS
+        val base = baseUrlFor(source, cfg.customBaseUrl)
+        val category = cfg.komiCategory.ifBlank { "trending" }
+        val platform = cfg.komiPlatform.ifBlank { "android" }
+
+        val primary = base.ifEmpty { "https://api.github-store.org/v1/" } + "categories/$category/$platform"
+        val primaryList = runCatching {
+            requestText(primary, forceFresh)?.let { body ->
+                parseKomiItems(body, source)
+            }
+        }.getOrNull().orEmpty()
+        if (primaryList.isNotEmpty()) return primaryList
+
+        // Offline mirror: same items, wrapped in a { repositories: [...] } envelope.
+        val mirror = "https://raw.githubusercontent.com/kurikomi-labs/komi-store-backend-data/main" +
+            "/cached-data/$category/$platform.json"
+        return runCatching {
+            requestText(mirror, forceFresh)?.let { body ->
+                val env = json.parseToJsonElement(body) as? JsonObject
+                val items = (env?.get("repositories") as? JsonArray)?.toString()
+                    ?: body
+                parseKomiItems(items, source)
+            }
+        }.getOrNull().orEmpty()
+    }
+
+    /** Decode a bare JSON array of BackendRepoResponse into [DiscoverItem]s. */
+    private fun parseKomiItems(body: String, source: FeedSourceOption): List<DiscoverItem> {
+        val arr = runCatching {
+            json.parseToJsonElement(body) as? JsonArray
+        }.getOrNull() ?: return emptyList()
+        return arr.mapNotNull { el ->
+            val row = el as? JsonObject ?: return@mapNotNull null
+            val fullName = row.rowStr("fullName").ifBlank { row.rowStr("full_name") }
+            if (!fullName.contains('/')) return@mapNotNull null
+            val owner = fullName.substringBefore('/')
+            val repo = fullName.substringAfter('/')
+            val ownerObj = row["owner"] as? JsonObject
+            val stars = row.rowStr("stargazersCount").extractInt()
+            val forks = row.rowStr("forksCount").extractInt()
+            val daily = row.rowStr("dailyStars").extractInt()
+            val topicsArr = row["topics"] as? JsonArray
+            DiscoverItem(
+                id = DiscoverItem.stableId(owner, repo),
+                source = source,
+                owner = owner,
+                repo = repo,
+                htmlUrl = row.rowStr("htmlUrl").ifBlank { "https://github.com/$owner/$repo" },
+                description = row.rowStr("description").takeIf { it.isNotBlank() },
+                language = row.rowStr("language").takeIf { it.isNotBlank() },
+                stars = stars,
+                forks = forks,
+                topics = topicsArr?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
+                    ?.filter { it.isNotBlank() } ?: emptyList(),
+                ownerAvatarUrl = ownerObj?.rowStr("avatarUrl")?.ifBlank { null }
+                    ?: "https://avatars.githubusercontent.com/$owner",
+                // dailyStars is the chart's momentum metric — surface it the same
+                // way OSS Insight's score is surfaced on the Explore card.
+                starDelta = if (daily > 0) StarDelta(daily, "day") else null,
+            )
+        }
+    }
 
     // ── Hacker News: showstories → filter GitHub links → top N ──────────────
 

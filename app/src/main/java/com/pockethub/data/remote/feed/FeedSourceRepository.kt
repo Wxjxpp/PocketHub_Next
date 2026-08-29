@@ -83,6 +83,12 @@ class FeedSourceRepository @Inject constructor(
         )
     }
 
+    /** Persist category/platform for the Komi top charts source on a tab. */
+    suspend fun setKomiOptions(tab: FeedTab, category: String, platform: String) {
+        val current = getConfig(tab)
+        setConfig(tab, current.copy(komiCategory = category, komiPlatform = platform))
+    }
+
     private fun readConfig(prefs: Preferences, tab: FeedTab): FeedSourceConfig {
         val default = FeedSourceConfig(
             sourceId = FeedSourceOption.defaultsFor(tab).id,
