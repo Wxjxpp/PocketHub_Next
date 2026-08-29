@@ -292,7 +292,7 @@ fun ExploreScreen(
                                 }
                             }
                         }
-                        Spacer(Modifier.height(4.dp))
+                        item { Spacer(Modifier.height(4.dp)) }
                     } else if (trendingSource.supportsTrendingFilters) {
                         // Language filter chips
                         item {
