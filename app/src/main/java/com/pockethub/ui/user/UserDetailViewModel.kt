@@ -104,6 +104,11 @@ class UserDetailViewModel @Inject constructor(
                         val me = api.getAuthenticatedUser()
                         val self = me.login.equals(login, ignoreCase = true)
                         _isSelf.update { self }
+                        if (self) {
+                            // /users/{login} only returns public counts; the
+                            // /user payload carries private repo totals too.
+                            _user.update { me }
+                        }
                         if (!self) {
                             _isFollowing.update { api.checkFollowing(login).isSuccessful }
                         }

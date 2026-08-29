@@ -448,7 +448,7 @@ private fun UserStatsRow(
     ) {
         StatPill(stringResource(R.string.followers), user?.followers ?: 0, onClick = onFollowersClick)
         StatPill(stringResource(R.string.following), user?.following ?: 0, onClick = onFollowingClick)
-        StatPill(stringResource(R.string.repos), user?.publicRepos ?: 0)
+        StatPill(stringResource(R.string.repos), (user?.publicRepos ?: 0) + (user?.totalPrivateRepos ?: 0))
     }
 }
 
