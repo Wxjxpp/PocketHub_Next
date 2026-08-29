@@ -567,6 +567,7 @@
     <string name="update_downloaded_ready">下载完成，点击「安装」启动系统更新。</string>
     <string name="update_download_failed">下载失败：%1$s</string>
     <string name="update_downloading">下载中…</string>
+    <string name="update_changelog_generic">UI 优化、问题修复、更新功能</string>
     <string name="update_changelog_title">更新内容</string>
     <string name="download_folder_label">下载位置</string>
     <string name="download_folder_default">应用目录（默认）</string>

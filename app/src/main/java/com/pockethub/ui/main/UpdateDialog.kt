@@ -32,6 +32,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,9 +44,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.pockethub.R
+import com.pockethub.data.remote.GoogleTranslate
 import com.pockethub.data.remote.UpdateChecker
 import com.pockethub.ui.theme.LocalStyleTokens
 import com.pockethub.util.humanBytes
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import java.util.Locale
 
 /**
  * In-place updater flow: prompt → download (with progress) → install, without
@@ -189,7 +195,8 @@ private fun UpdateHeader(info: UpdateChecker.UpdateInfo, downloadState: UpdateVi
 
 @Composable
 private fun ChangelogSection(notes: String) {
-    val items = parseChangelogItems(
+    val isZh = Locale.getDefault().language == "zh"
+    val parsed = parseChangelogItems(
         notes,
         tags = ChangelogTags(
             new = stringResource(R.string.tag_new),
@@ -200,7 +207,43 @@ private fun ChangelogSection(notes: String) {
             update = stringResource(R.string.tag_update),
         ),
     ).take(8)
-    if (items.isEmpty()) return
+    if (parsed.isEmpty()) return
+
+    // Chinese app locale: translate each item body into Chinese using the
+    // app's free multi-provider translation chain. If translation fails (all
+    // providers down / too jargon-heavy), fall back to a vague localized
+    // summary instead of showing untranslated English.
+    val zhTexts by produceState<List<String>?>(null, parsed, isZh) {
+        if (!isZh) return@produceState
+        value = try {
+            coroutineScope {
+                parsed.map { item ->
+                    async {
+                        if (GoogleTranslate.detectLanguage(item.text) == "zh") {
+                            item.text
+                        } else {
+                            GoogleTranslate.translate(item.text, "zh-CN")
+                        }
+                    }
+                }.awaitAll()
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    val items: List<ChangeItem> = when {
+        zhTexts != null -> parsed.mapIndexed { i, item -> item.copy(text = zhTexts!![i]) }
+        isZh -> listOf(
+            ChangeItem(
+                tag = parsed.first().tag,
+                text = stringResource(R.string.update_changelog_generic),
+                tagColor = parsed.first().tagColor,
+            ),
+        )
+        else -> parsed
+    }
+
     Column {
         Text(
             text = stringResource(R.string.update_changelog_title),

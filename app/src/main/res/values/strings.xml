@@ -55,6 +55,7 @@
     <string name="update_downloaded_ready">Download complete — tapping Install will run the system updater.</string>
     <string name="update_download_failed">Download failed: %1$s</string>
     <string name="update_downloading">Downloading…</string>
+    <string name="update_changelog_generic">UI improvements, bug fixes and feature updates.</string>
     <string name="update_changelog_title">What\'s new</string>
     <string name="download_folder_label">Download location</string>
     <string name="download_folder_default">App directory (default)</string>
