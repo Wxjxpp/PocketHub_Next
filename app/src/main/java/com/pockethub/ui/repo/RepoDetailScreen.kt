@@ -60,6 +60,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.pockethub.ui.markdown.RepoTabTarget
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.animation.togetherWith
 import java.util.Locale
@@ -74,8 +75,21 @@ fun RepoDetailScreen(
     onNavigateToCommit: (String) -> Unit = { _ -> },
     onNavigateToCreateIssue: (String, String) -> Unit = { _, _ -> },
     onNavigateToRepo: (String, String) -> Unit = { _, _ -> },
+    /** 站内链接跳转:仓库指定 tab / 仓库内文件查看。 */
+    onNavigateToRepoTab: (String, String, String?) -> Unit = { o, r, tab -> onNavigateToRepo(o, r) },
+    onNavigateToFile: (String, String, String, String?) -> Unit = { o, r, _, _ -> onNavigateToRepo(o, r) },
     onNavigateToUser: (String) -> Unit = {},
+    // Cross-repo issue/PR links (README 引用其他仓库的 issue 等)。
+    // AppNavigation 必须传全局路由;默认降级为同仓库导航。
+    onNavigateToIssueFull: (String, String, Int) -> Unit = { o, r, n ->
+        if (o == owner && r == repo) onNavigateToIssue(n) else onNavigateToRepo(o, r)
+    },
+    onNavigateToPRFull: (String, String, Int) -> Unit = { o, r, n ->
+        if (o == owner && r == repo) onNavigateToPR(n) else onNavigateToRepo(o, r)
+    },
     onNavigateToSearch: (String) -> Unit = {},
+    /** 站内跳转携带的目标 tab("code"/"issues"/…),由路由参数决定。 */
+    initialTab: String? = null,
     onNavigateToDownloads: (tab: String) -> Unit = { _ -> },
     onNavigateToWorkflowRun: (Long) -> Unit = {},
     onBack: () -> Unit,
@@ -128,6 +142,8 @@ fun RepoDetailScreen(
     val translateTarget by vm.translateTarget.collectAsState()
     val translateMessage by vm.translateMessage.collectAsState()
     val issueStateFilter by vm.issueStateFilter.collectAsState()
+    val isLoadingPulls by vm.isLoadingPulls.collectAsState()
+    val isLoadingMorePulls by vm.isLoadingMorePulls.collectAsState()
     val isLoadingMoreIssues by vm.isLoadingMoreIssues.collectAsState()
     val isLoadingIssues by vm.isLoadingIssues.collectAsState()
     val isLoadingReleases by vm.isLoadingReleases.collectAsState()
@@ -143,6 +159,14 @@ fun RepoDetailScreen(
     LaunchedEffect(owner, repo) {
         vm.loadRepo(owner, repo)
         vm.resetWorkflowBranch()
+        // Deep-link / in-app link routing: open the repo on the tab the URL
+        // asked for (e.g. github.com/o/r/issues → Issues tab).
+        initialTab?.let { requested ->
+            RepoTabTarget.fromWire(requested)?.let { target ->
+                RepoTab.entries.firstOrNull { it.name.equals(target.name, ignoreCase = true) }
+                    ?.let { vm.currentTab.value = it }
+            }
+        }
     }
     // When the Code tab changes branch, mirror it to the workflows tab so the
     // workflow run list & dispatch dialog follow the current branch automatically.
@@ -410,7 +434,9 @@ fun RepoDetailScreen(
                     onToggleTranslation = { vm.toggleTranslation() },
                     onTopicClick = { topic -> onNavigateToSearch(topic) },
                     onNavigateToRepo = onNavigateToRepo,
-                    onLinkClick = rememberMarkdownLinkHandler(owner, repo, onNavigateToRepo, onNavigateToUser, onNavigateToIssue, downloadVm = downloadVm, onNavigateToDownloads = onNavigateToDownloads),
+                    onLinkClick = rememberMarkdownLinkHandler(owner, repo, onNavigateToRepo, onNavigateToRepoTab, onNavigateToFile, onNavigateToUser, onNavigateToIssue, onNavigateToIssueFull, onNavigateToPRFull, onNavigateToCommit, onNavigateToWorkflowRun, onNavigateToCreateIssue, downloadVm = downloadVm, onNavigateToDownloads = onNavigateToDownloads, onSameRepoTab = { target ->
+                        RepoTab.entries.firstOrNull { it.name.equals(target.name, ignoreCase = true) }?.let { vm.currentTab.value = it }
+                    }),
                 )
                 RepoTab.CODE -> CodeTab(
                     owner = owner,
@@ -437,10 +463,10 @@ fun RepoDetailScreen(
                 RepoTab.PRS -> PullsTab(
                     pulls,
                     stateFilter = issueStateFilter,
-                    isLoading = isLoadingIssues,
-                    isLoadingMore = isLoadingMoreIssues,
+                    isLoading = isLoadingPulls,
+                    isLoadingMore = isLoadingMorePulls,
                     onSelectFilter = { filter -> vm.setIssueStateFilter(owner, repo, filter) },
-                    onLoadMore = { vm.loadMoreIssues(owner, repo) },
+                    onLoadMore = { vm.loadMorePulls(owner, repo) },
                     onClick = onNavigateToPR,
                     onNavigateToUser = onNavigateToUser,
                 )
@@ -451,7 +477,9 @@ fun RepoDetailScreen(
                     canDelete = canManageReleases,
                     isDeletingRelease = isDeletingRelease,
                     isLoading = isLoadingReleases,
-                    onLinkClick = rememberMarkdownLinkHandler(owner, repo, onNavigateToRepo, onNavigateToUser, onNavigateToIssue, downloadVm = downloadVm, onNavigateToDownloads = onNavigateToDownloads),
+                    onLinkClick = rememberMarkdownLinkHandler(owner, repo, onNavigateToRepo, onNavigateToRepoTab, onNavigateToFile, onNavigateToUser, onNavigateToIssue, onNavigateToIssueFull, onNavigateToPRFull, onNavigateToCommit, onNavigateToWorkflowRun, onNavigateToCreateIssue, downloadVm = downloadVm, onNavigateToDownloads = onNavigateToDownloads, onSameRepoTab = { target ->
+                        RepoTab.entries.firstOrNull { it.name.equals(target.name, ignoreCase = true) }?.let { vm.currentTab.value = it }
+                    }),
                     onNavigateToUser = onNavigateToUser,
                     onDownloadAsset = { asset ->
                         downloadVm.enqueue(
@@ -640,57 +668,61 @@ private fun rememberMarkdownLinkHandler(
     owner: String,
     repo: String,
     onNavigateToRepo: (String, String) -> Unit,
+    onNavigateToRepoTab: (String, String, String?) -> Unit,
+    onNavigateToFile: (String, String, String, String?) -> Unit,
     onNavigateToUser: (String) -> Unit,
     onNavigateToIssue: (Int) -> Unit,
+    onNavigateToIssueFull: (String, String, Int) -> Unit,
+    onNavigateToPRFull: (String, String, Int) -> Unit,
+    onNavigateToCommit: (String) -> Unit,
+    onNavigateToWorkflowRun: (Long) -> Unit,
+    onNavigateToCreateIssue: (String, String) -> Unit,
     downloadVm: com.pockethub.ui.download.DownloadViewModel,
     onNavigateToDownloads: (tab: String) -> Unit,
+    /** Same-repo tab links switch tabs in place (no nav churn). */
+    onSameRepoTab: (com.pockethub.ui.markdown.RepoTabTarget) -> Unit,
 ): (String, com.pockethub.ui.markdown.LinkKind) -> Unit {
-    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
-    return link@{ url, kind ->
-        // DOWNLOADABLE — enqueue into the in-app download manager (CDN raw / release assets / etc.)
-        if (kind == com.pockethub.ui.markdown.LinkKind.DOWNLOADABLE) {
-            val display = url.substringAfterLast('/').ifBlank { "download.bin" }
-            downloadVm.enqueue(
-                com.pockethub.data.download.DownloadManager.EnqueueRequest(
-                    url = url,
-                    fileName = display,
-                    contentType = guessAssetMime(display),
-                    sizeBytes = 0L,
-                    repoKey = "$owner/$repo",
-                    releaseTag = "",
+    // Unified GitHub in-app router — README / release notes links resolve to
+    // the right screen (issue vs PR vs commit vs workflow run vs repo file),
+    // non-GitHub URLs and marketing pages fall through to the system browser.
+    // Same-repo tab/file targets switch tabs / open the viewer in place.
+    return com.pockethub.ui.markdown.rememberGitHubLinkHandler(
+        com.pockethub.ui.markdown.GitHubLinkNav(
+            owner = owner,
+            repo = repo,
+            onRepo = { o, r, tab ->
+                val target = tab?.let { RepoTabTarget.fromWire(it) }
+                if (o == owner && r == repo && target != null) {
+                    onSameRepoTab(target)
+                } else {
+                    onNavigateToRepoTab(o, r, tab)
+                }
+            },
+            onFile = { o, r, path, ref ->
+                if (o == owner && r == repo) onNavigateToFile(o, r, path, ref)
+                else onNavigateToRepoTab(o, r, null)
+            },
+            onIssue = onNavigateToIssueFull,
+            onPull = onNavigateToPRFull,
+            onCommit = { _, _, sha -> onNavigateToCommit(sha) },
+            onUser = onNavigateToUser,
+            onWorkflowRun = { runId -> onNavigateToWorkflowRun(runId) },
+            onCreateIssue = onNavigateToCreateIssue,
+            onDownload = { url, fileName ->
+                downloadVm.enqueue(
+                    com.pockethub.data.download.DownloadManager.EnqueueRequest(
+                        url = url,
+                        fileName = fileName,
+                        contentType = guessAssetMime(fileName),
+                        sizeBytes = 0L,
+                        repoKey = "$owner/$repo",
+                        releaseTag = "",
+                    )
                 )
-            )
-            onNavigateToDownloads("active")
-            return@link
-        }
-        // IMAGE_URL — open in browser so the user can see full-res image
-        if (kind == com.pockethub.ui.markdown.LinkKind.IMAGE_URL) {
-            runCatching { uriHandler.openUri(url) }
-            return@link
-        }
-        // IMAGE (wrapped) — fall through to the wrap target's classification
-        if (kind == com.pockethub.ui.markdown.LinkKind.IMAGE) {
-            runCatching { uriHandler.openUri(url) }
-            return@link
-        }
-        // GitHub issues / PRs
-        Regex("^https://github\\.com/[^/]+/[^/]+/(?:issues|pull)/(\\d+)$").matchEntire(url)?.let {
-            it.groupValues[1].toIntOrNull()?.let { n -> onNavigateToIssue(n) }
-            return@link
-        }
-        // Repo URLs (must come after issue/pull matcher)
-        Regex("^https://github\\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)(?:/.*)?$").matchEntire(url)?.let {
-            onNavigateToRepo(it.groupValues[1], it.groupValues[2])
-            return@link
-        }
-        // User/profile URLs (single segment)
-        Regex("^https://github\\.com/([A-Za-z0-9_.-]+)/?$").matchEntire(url)?.let {
-            onNavigateToUser(it.groupValues[1])
-            return@link
-        }
-        // External links — open in system browser
-        runCatching { uriHandler.openUri(url) }
-    }
+                onNavigateToDownloads("active")
+            },
+        ),
+    )
 }
 
 

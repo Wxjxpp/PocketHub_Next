@@ -88,8 +88,17 @@ fun IssueDetailScreen(
     issueNumber: Int,
     onNavigateToRepo: (String, String) -> Unit = { _, _ -> },
     onNavigateToUser: (String) -> Unit = {},
+    /** 仓库文件(blob/文档)打开 app 内查看器。 */
+    onNavigateToFile: (String, String, String, String?) -> Unit = { o, r, _, _ -> onNavigateToRepo(o, r) },
+    /** 仓库指定 tab(issues/pulls/releases/…)。 */
+    onNavigateToRepoTab: (String, String, String?) -> Unit = { o, r, _ -> onNavigateToRepo(o, r) },
+    /** GitHub 站内链接跨仓库跳转(AppNavigation 传全局路由)。 */
+    onNavigateToIssue: (String, String, Int) -> Unit = { _, _, _ -> },
+    onNavigateToPR: (String, String, Int) -> Unit = { _, _, _ -> },
+    onNavigateToCommit: (String, String, String) -> Unit = { _, _, _ -> },
     onBack: () -> Unit,
     vm: IssueDetailViewModel = hiltViewModel(),
+    downloadVm: com.pockethub.ui.download.DownloadViewModel = hiltViewModel(),
 ) {
     val issue by vm.issue.collectAsState()
     val comments by vm.comments.collectAsState()
@@ -115,30 +124,33 @@ fun IssueDetailScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
-    val onLinkClick: (String, com.pockethub.ui.markdown.LinkKind) -> Unit = link@{ url, kind ->
-        // DOWNLOADABLE — open in browser (issue view lacks a downloadVm hook; users can download via browser)
-        if (kind == com.pockethub.ui.markdown.LinkKind.DOWNLOADABLE ||
-            kind == com.pockethub.ui.markdown.LinkKind.IMAGE_URL ||
-            kind == com.pockethub.ui.markdown.LinkKind.IMAGE
-        ) {
-            runCatching { uriHandler.openUri(url) }
-            return@link
-        }
-        // Issue / PR links inside the body —
-        // Same repo, same issue-number navigation isn't wired through here, so we let it fall
-        // through to the browser path below (the user sees it opened externally, which is OK
-        // because issue/PR README links in issue bodies are usually cross-repo refs).
-        Regex("^https://github\\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)/?.*$").matchEntire(url)?.let {
-            onNavigateToRepo(it.groupValues[1], it.groupValues[2])
-            return@link
-        }
-        Regex("^https://github\\.com/([A-Za-z0-9_.-]+)$").matchEntire(url)?.let {
-            onNavigateToUser(it.groupValues[1])
-            return@link
-        }
-        runCatching { uriHandler.openUri(url) }
-    }
+    val onLinkClick: (String, com.pockethub.ui.markdown.LinkKind) -> Unit =
+        com.pockethub.ui.markdown.rememberGitHubLinkHandler(
+            com.pockethub.ui.markdown.GitHubLinkNav(
+                owner = owner,
+                repo = repo,
+                onRepo = onNavigateToRepoTab,
+                onFile = onNavigateToFile,
+                onIssue = onNavigateToIssue,
+                onPull = onNavigateToPR,
+                onCommit = onNavigateToCommit,
+                onUser = onNavigateToUser,
+                // Release assets / raw files linked inside an issue body go
+                // straight into the in-app download manager.
+                onDownload = { url, fileName ->
+                    downloadVm.enqueue(
+                        com.pockethub.data.download.DownloadManager.EnqueueRequest(
+                            url = url,
+                            fileName = fileName,
+                            contentType = com.pockethub.ui.repo.guessAssetMime(fileName),
+                            sizeBytes = 0L,
+                            repoKey = "$owner/$repo",
+                            releaseTag = "",
+                        )
+                    )
+                },
+            ),
+        )
 
     var showEditDialog by remember { mutableStateOf(false) }
     var editingCommentId by remember { mutableStateOf<Long?>(null) }

@@ -44,11 +44,13 @@ class FeedSourceService @Inject constructor(
     private val api: GitHubApi, // reserved for direct-search variants; unused on the current path
     private val httpClient: OkHttpClient,
     private val json: Json,
+    dns: okhttp3.Dns,
 ) {
     private val bareClient: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(20, TimeUnit.SECONDS)
         .writeTimeout(15, TimeUnit.SECONDS)
+        .dns(dns)
         .build()
 
     /** Max wait for a third-party "primary" host before switching to mirrors.

@@ -605,6 +605,21 @@ private fun AnnotatedString.Builder.emitInline(
                 i = end; continue
             }
         }
+        // Email autolink (GFM): bare user@host.tld, optionally in <…>.
+        // Requires a dotted domain so @user mentions are unaffected; the
+        // previous-char guard prevents matching mid-word. Checked before the
+        // #123 / @user shortcuts.
+        if (src[i] == '@' || src[i].isLetterOrDigit()) {
+            val preceded = i > 0 && (src[i - 1].isLetterOrDigit() || src[i - 1] == '.' || src[i - 1] == '@')
+            if (!preceded) {
+                val m = Regex("^[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\\.[A-Za-z0-9-]+)*\\.[A-Za-z]{2,}").find(src.substring(i))
+                if (m != null) {
+                    val email = m.value.trimEnd('.')
+                    appendLink("mailto:$email", "mailto:$email", LinkKind.EXTERNAL, linkColor, downloadColor, imageLinkColor, externalColor)
+                    i += email.length; continue
+                }
+            }
+        }
         // GitHub shortcut #123 / @user
         if (src[i] == '#' || src[i] == '@') {
             val m = if (src[i] == '#') Regex("^#(\\d+)").find(src.substring(i))

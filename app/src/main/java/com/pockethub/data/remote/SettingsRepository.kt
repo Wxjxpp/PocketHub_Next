@@ -45,6 +45,7 @@ class SettingsRepository @Inject constructor(
         val LAST_UPDATE_PROMPT_MS = intPreferencesKey("last_update_prompt_epoch_ms")
         val PINNED_REPOS = stringPreferencesKey("pinned_repos_json")
         val DOWNLOAD_FOLDER_URI = stringPreferencesKey("download_folder_tree_uri")
+        val DOWNLOAD_MIRROR_PREFIX = stringPreferencesKey("download_mirror_prefix")
         val ISSUE_REPORT_ENABLED = intPreferencesKey("issue_report_enabled")
         val ISSUE_REPORT_INTERVAL_DAYS = intPreferencesKey("issue_report_interval_days")
         val ISSUE_REPORT_EMAIL = stringPreferencesKey("issue_report_email")
@@ -133,6 +134,21 @@ class SettingsRepository @Inject constructor(
         context.dataStore.edit { prefs ->
             if (uri.isNullOrBlank()) prefs.remove(Keys.DOWNLOAD_FOLDER_URI)
             else prefs[Keys.DOWNLOAD_FOLDER_URI] = uri
+        }
+    }
+
+    // ── Network acceleration (net branch experiment) ──────
+    /**
+     * User-provided accelerator prefix ("gh-proxy"-style), appended in front of
+     * GitHub FILE urls (releases / raw / codeload). Blank = direct connection.
+     */
+    val downloadMirrorPrefix: Flow<String> = context.dataStore.data.map { prefs ->
+        prefs[Keys.DOWNLOAD_MIRROR_PREFIX]?.trim().orEmpty()
+    }
+
+    suspend fun setDownloadMirrorPrefix(prefix: String) {
+        context.dataStore.edit { prefs ->
+            prefs[Keys.DOWNLOAD_MIRROR_PREFIX] = prefix.trim()
         }
     }
 

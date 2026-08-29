@@ -171,7 +171,9 @@ class UpdateViewModel @Inject constructor(
             val tmp = File(dest.parentFile, "${dest.name}.part")
             try {
                 withContext(Dispatchers.IO) {
-                    val request = Request.Builder().url(url).build()
+                    // Route the APK download through the accelerator when configured.
+                    val mirrored = com.pockethub.util.applyMirrorPrefix(url, settings.downloadMirrorPrefix.first())
+                    val request = Request.Builder().url(mirrored).build()
                     // GitHub CDN issues redirects to release-assets; follow them.
                     val dlClient = client.newBuilder().followRedirects(true).build()
                     dlClient.newCall(request).execute().use { resp ->

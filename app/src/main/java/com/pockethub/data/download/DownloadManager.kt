@@ -226,7 +226,9 @@ class DownloadManager @Inject constructor(
     private suspend fun executeDownload(entity: DownloadEntity) {
         val targetFile = File(entity.localPath)
         targetFile.parentFile?.mkdirs()
-        val url = entity.url
+        // Route GitHub file downloads through the user's accelerator when set.
+        val mirrorPrefix = settings.downloadMirrorPrefix.first()
+        val url = com.pockethub.util.applyMirrorPrefix(entity.url, mirrorPrefix)
         val destFile = File(targetFile.parentFile, "${targetFile.name}.part")
         val job = scope.launch(start = CoroutineStart.LAZY) {
             try {

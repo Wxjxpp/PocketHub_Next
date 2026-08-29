@@ -90,6 +90,7 @@ internal fun ReviewItem(
     review: GitHubApi.PullRequestReview,
     onNavigateToUser: (String) -> Unit,
     dateFmt: DateFormat,
+    onLinkClick: (String, com.pockethub.ui.markdown.LinkKind) -> Unit = { _, _ -> },
 ) {
     Column(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -140,6 +141,7 @@ internal fun ReviewItem(
             MarkdownText(
                 markdown = review.body,
                 modifier = Modifier.fillMaxWidth(),
+                onLinkClick = onLinkClick,
             )
         }
     }

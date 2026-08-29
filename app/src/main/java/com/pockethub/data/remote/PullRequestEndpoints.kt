@@ -17,6 +17,23 @@ import retrofit2.http.Query
 
 interface PullRequestEndpoints {
 
+    /**
+     * List pull requests. Unlike the /issues endpoint (which mixes issues and
+     * PRs into shared pagination — PRs drowned out by issues never showed in
+     * the PRs tab), this returns ONLY PRs, with the `merged` flag set.
+     * Deserializes into [com.pockethub.data.model.Issue] (extra fields ignored).
+     */
+    @GET("repos/{owner}/{repo}/pulls")
+    suspend fun getPullRequests(
+        @Path("owner") owner: String,
+        @Path("repo") repo: String,
+        @Query("state") state: String = "open",
+        @Query("page") page: Int = 1,
+        @Query("per_page") perPage: Int = 30,
+        @Query("sort") sort: String = "created",
+        @Query("direction") direction: String = "desc",
+    ): List<com.pockethub.data.model.Issue>
+
     /** Get a single pull request (includes merge info, diff stats, reviewers). */
     @GET("repos/{owner}/{repo}/pulls/{pull_number}")
     suspend fun getPullRequest(

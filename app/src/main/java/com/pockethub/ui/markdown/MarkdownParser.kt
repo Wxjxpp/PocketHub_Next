@@ -120,6 +120,12 @@ private fun cleanSegment(markdown: String): String {
             .replace(
                 Regex("<\\s*summary\\b[^>]*>(.*?)<\\s*/\\s*summary\\s*>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)),
             ) { "\n**${it.groupValues[1].trim()}**\n" }
+            // Any leftover <a> tags (anchors like <a name="readme-top"></a>,
+            // or href links the conversion above couldn't parse) — drop the
+            // tag, keep inner text. Also <picture>/<source> wrappers (the
+            // inner <img> is converted separately).
+            .replace(Regex("<\\s*/?\\s*a\\b[^>]*>", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("<\\s*/?\\s*(?:picture|source)\\b[^>]*/?>", RegexOption.IGNORE_CASE), "")
             // Inline tags with no markdown equivalent — drop the tag, keep inner text.
             .replace(Regex("<\\s*/?(?:u|mark|small|big|font|sub|sup)\\b[^>]*>", RegexOption.IGNORE_CASE), "")
             // Block-level line breaks / rules → markdown forms (before the void-tag strip below).
@@ -483,9 +489,28 @@ internal fun resolveReferenceLinks(src: String): String {
     }
     if (!found) return src
 
-    fun rewrite(line: String): String {
+        fun rewrite(line: String): String {
         if (!line.contains('[')) return line
-        var l = REF_IMAGE_USE.replace(line) { m ->
+        var l = line
+        // Nested reference-wrapped images FIRST, before the flat rewrites can
+        // partially consume their inner brackets:
+        //   [![alt][imgref]][linkref] → [![alt](imgurl)](linkurl)
+        //   [![alt][imgref]](inline-url) → [![alt](imgurl)](inline-url)
+        // This is the ubiquitous README hero-banner / language-shield pattern.
+        l = Regex("\\[!\\[([^\\]]*)\\]\\[([^\\]]*)\\]\\]\\[([^\\]]*)\\]").replace(l) { m ->
+            val alt = m.groupValues[1]
+            val imgKey = m.groupValues[2].ifBlank { alt }.trim().lowercase()
+            val img = defs[imgKey] ?: return@replace m.value
+            val link = defs[m.groupValues[3].trim().lowercase()] ?: return@replace m.value
+            "[![$alt]($img)]($link)"
+        }
+        l = Regex("\\[!\\[([^\\]]*)\\]\\[([^\\]]*)\\]\\]\\(").replace(l) { m ->
+            val alt = m.groupValues[1]
+            val imgKey = m.groupValues[2].ifBlank { alt }.trim().lowercase()
+            val img = defs[imgKey] ?: return@replace m.value
+            "[![$alt]($img)]("
+        }
+        l = REF_IMAGE_USE.replace(l) { m ->
             val key = m.groupValues[2].ifBlank { m.groupValues[1] }.trim().lowercase()
             defs[key]?.let { "![${m.groupValues[1]}]($it)" } ?: m.value
         }

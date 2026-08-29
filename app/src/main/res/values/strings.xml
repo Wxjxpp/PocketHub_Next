@@ -71,6 +71,11 @@
     <string name="komi_platform_windows">Windows</string>
     <string name="komi_platform_macos">macOS</string>
     <string name="komi_platform_linux">Linux</string>
+    <string name="mirror_prefix_title">Download accelerator</string>
+    <string name="mirror_prefix_not_set">Off — direct connection</string>
+    <string name="mirror_prefix_set">%1$s</string>
+    <string name="mirror_prefix_summary">Prepends a gh-proxy-style accelerator in front of GitHub FILE downloads (release assets, raw files, zips). API traffic is untouched. Example: https://gh-proxy.com/ — leave blank to disable.</string>
+    <string name="mirror_prefix_label">Accelerator base URL</string>
     <string name="update_changelog_generic">UI improvements, bug fixes and feature updates.</string>
     <string name="update_changelog_title">What\'s new</string>
     <string name="download_folder_label">Download location</string>

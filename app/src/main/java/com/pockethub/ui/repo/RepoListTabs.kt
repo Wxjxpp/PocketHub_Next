@@ -231,10 +231,10 @@ internal fun PullsTab(
                 Modifier.fillMaxWidth().clickable { onClick(pr.number) }.padding(vertical = 10.dp),
                 verticalAlignment = Alignment.Top,
             ) {
-                // State indicator dot — green=open, purple=closed, violet-red=merged
+                // State indicator dot — green=open, violet-red=merged, red=closed
                 val prColor = when {
                     pr.state == "open" -> Color(0xFF2EA043)
-                    pr.pullRequest != null && pr.stateReason == "completed" -> Color(0xFF8957E5)
+                    pr.merged -> Color(0xFF8957E5)
                     else -> Color(0xFFBD2C00)
                 }
                 Box(
