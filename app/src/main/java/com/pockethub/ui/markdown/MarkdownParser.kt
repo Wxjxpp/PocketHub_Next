@@ -103,7 +103,8 @@ private fun cleanSegment(markdown: String): String {
                 "",
             )
             // Convert raw-HTML inline emphasis/code/keystroke/strikethrough into markdown so it
-            // renders styled instead of leaking raw tags. Must run before the generic tag strip.            .replace(
+            // renders styled instead of leaking raw tags. Must run before the generic tag strip.
+            .replace(
                 Regex("<\\s*(?:strong|b)\\b[^>]*>(.*?)<\\s*/\\s*(?:strong|b)\\s*>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)),
             ) { "**${it.groupValues[1]}**" }
             .replace(
