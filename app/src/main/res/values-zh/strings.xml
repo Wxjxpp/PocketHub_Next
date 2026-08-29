@@ -573,4 +573,10 @@
     <string name="download_folder_pick">选择文件夹</string>
     <string name="download_folder_reset">默认</string>
     <string name="download_folder_change">更改下载路径</string>
+    <!-- Markdown GFM alert labels -->
+    <string name="md_alert_note">注意</string>
+    <string name="md_alert_tip">提示</string>
+    <string name="md_alert_important">重要</string>
+    <string name="md_alert_warning">警告</string>
+    <string name="md_alert_caution">危险</string>
 </resources>

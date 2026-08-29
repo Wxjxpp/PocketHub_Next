@@ -575,4 +575,10 @@
     <string name="work_tab_involved">Involved</string>
     <string name="work_list_empty">Nothing to handle — you\'re all caught up.</string>
     <string name="work_list_more">+ %1$d more</string>
+    <!-- Markdown GFM alert labels -->
+    <string name="md_alert_note">Note</string>
+    <string name="md_alert_tip">Tip</string>
+    <string name="md_alert_important">Important</string>
+    <string name="md_alert_warning">Warning</string>
+    <string name="md_alert_caution">Caution</string>
 </resources>

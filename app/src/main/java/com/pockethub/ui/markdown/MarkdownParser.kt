@@ -13,7 +13,10 @@ internal fun cleanMarkdown(markdown: String): String {
     val normalized = markdown.replace("\r\n", "\n")
     // Protect fenced code blocks — HTML cleaning / entity decoding must not
     // rewrite code samples (a `<!-- -->` or `<b>` inside a fence is content).
-    val fenceRegex = Regex("```[\\s\\S]*?```|~~~[\\s\\S]*?~~~")
+    // Backreference so an opening fence of N+ markers only closes at a run of
+    // the same length — nested triple-backtick fences inside quadruple fences
+    // (common in "how to write markdown" docs) stay protected as content.
+    val fenceRegex = Regex("(`{3,})[\\s\\S]*?\\1|(~{3,})[\\s\\S]*?\\2")
     val parts = mutableListOf<String>()
     var last = 0
     for (m in fenceRegex.findAll(normalized)) {
@@ -211,9 +214,12 @@ internal fun looksLikeTableRow(line: String): Boolean {
 
 internal fun splitTableRow(line: String): List<String> {
     val raw = line.trim()
-    val hasLeading = raw.startsWith("|")
-    val hasTrailing = raw.endsWith("|")
-    var cells = raw.split("|").map { it.trim() }
+    // GFM: a pipe inside a cell must be escaped as \| — hide it before
+    // splitting on |, restore afterwards. (Very common in code-sample tables.)
+    val masked = raw.replace("\\|", "\u0001")
+    val hasLeading = masked.startsWith("|")
+    val hasTrailing = masked.endsWith("|")
+    var cells = masked.split("|").map { it.trim().replace("\u0001", "|") }
     if (hasLeading && cells.isNotEmpty()) cells = cells.drop(1)
     if (hasTrailing && cells.isNotEmpty()) cells = cells.dropLast(1)
     return cells
@@ -238,7 +244,7 @@ internal fun truncateOversized(markdown: String): String {
 
 internal fun parseMarkdown(src: String): List<MdBlock> {
     val blocks = mutableListOf<MdBlock>()
-    val lines = src.lines()
+    val lines = resolveReferenceLinks(src).lines()
     var i = 0
 
     fun listLevel(line: String): Int {
@@ -251,7 +257,7 @@ internal fun parseMarkdown(src: String): List<MdBlock> {
         idx + 1 < lines.size && looksLikeTableRow(lines[idx]) && isTableSeparator(lines[idx + 1])
 
     val isBlockStart: (String) -> Boolean = { l ->
-        l.isBlank() || l.startsWith("#") || l.trim().startsWith("```") ||
+        l.isBlank() || l.startsWith("#") || Regex("^[`~]{3,}").containsMatchIn(l.trim()) ||
             l.trimStart().startsWith(">") ||
             l.matches(Regex("^\\s*[-*+]\\s+.+")) || l.matches(Regex("^\\s*\\d+\\.\\s+.+")) ||
             l.matches(Regex("^-{3,}\\s*$")) || l.matches(Regex("^\\*{3,}\\s*$"))
@@ -269,7 +275,9 @@ internal fun parseMarkdown(src: String): List<MdBlock> {
         val headingMatch = Regex("^(#{1,6})\\s+(.+)").matchEntire(line)
         if (headingMatch != null) {
             val level = headingMatch.groupValues[1].length
-            blocks.add(MdBlock.Heading(level, headingMatch.groupValues[2].trim()))
+            // Closed ATX heading: strip a trailing " ###" sequence (GFM).
+            val text = headingMatch.groupValues[2].trim().replace(Regex("\\s+#+\\s*$"), "")
+            blocks.add(MdBlock.Heading(level, text))
             i++; continue
         }
 
@@ -286,15 +294,26 @@ internal fun parseMarkdown(src: String): List<MdBlock> {
             }
         }
 
-        if (line.trim().startsWith("```")) {
-            val lang = line.trim().removePrefix("```").trim().ifBlank { null }
+        // GFM fenced code block: backtick or tilde fences. The closing fence
+        // must be the same character and at least as long as the opening one,
+        // so a ``` inside a ```` block stays content. Info string params after
+        // the language (e.g. ```js hl_lines=3) are dropped.
+        val fenceMatch = Regex("^\\s*(`{3,}|~{3,})(.*)$").find(line)
+        if (fenceMatch != null) {
+            val marker = fenceMatch.groupValues[1]
+            val fenceChar = marker[0]
+            val lang = fenceMatch.groupValues[2].trim().substringBefore(' ').ifBlank { null }
             val codeLines = mutableListOf<String>()
             i++
-            while (i < lines.size && !lines[i].trim().startsWith("```")) {
+            while (i < lines.size) {
+                val close = Regex("^\\s*(`{3,}|~{3,})\\s*$").find(lines[i])
+                if (close != null && close.groupValues[1][0] == fenceChar &&
+                    close.groupValues[1].length >= marker.length
+                ) break
                 codeLines.add(lines[i])
                 i++
             }
-            i++
+            i++ // skip closing fence (or run past EOF for unterminated blocks)
             blocks.add(MdBlock.CodeBlock(codeLines.joinToString("\n"), lang))
             continue
         }
@@ -304,6 +323,13 @@ internal fun parseMarkdown(src: String): List<MdBlock> {
             while (i < lines.size && lines[i].trimStart().startsWith(">")) {
                 quoteLines.add(lines[i].trimStart().removePrefix(">").trim())
                 i++
+            }
+            // GFM alert: the first quote line is a bare [!KIND] marker → themed card
+            val alert = ALERT_KIND_REGEX.matchEntire(quoteLines.firstOrNull()?.trim() ?: "")
+            if (alert != null) {
+                val body = quoteLines.drop(1).joinToString("\n").trim()
+                blocks.add(MdBlock.Alert(alert.groupValues[1].uppercase(), body))
+                continue
             }
             blocks.add(MdBlock.Blockquote(quoteLines.joinToString("\n")))
             continue
@@ -318,6 +344,7 @@ internal fun parseMarkdown(src: String): List<MdBlock> {
                 blocks.add(MdBlock.ListItem(text, ordered = true, index = orderedIndex, level = listLevel(lines[i])))
                 i++
             }
+            i = absorbContinuation(blocks, lines, i)
             continue
         }
 
@@ -335,19 +362,28 @@ internal fun parseMarkdown(src: String): List<MdBlock> {
                 blocks.add(MdBlock.ListItem(text, ordered = false, index = 0, level = listLevel(lines[i]), task = task))
                 i++
             }
+            i = absorbContinuation(blocks, lines, i)
             continue
         }
 
         // GitHub-style pipe table
         if (isTableHeaderAt(i)) {
             val headers = splitTableRow(lines[i])
+            // GFM column alignment from the separator row: :-- left, :--: center, --: right
+            val alignments = splitTableRow(lines[i + 1]).map { sep ->
+                when {
+                    sep.startsWith(":") && sep.endsWith(":") && sep.length > 2 -> 1
+                    sep.endsWith(":") -> 2
+                    else -> 0
+                }
+            }
             i += 2 // skip header + separator
             val rows = mutableListOf<List<String>>()
             while (i < lines.size && looksLikeTableRow(lines[i]) && !isTableSeparator(lines[i]) && !lines[i].isBlank()) {
                 rows.add(splitTableRow(lines[i]))
                 i++
             }
-            blocks.add(MdBlock.Table(headers, rows))
+            blocks.add(MdBlock.Table(headers, rows, alignments))
             continue
         }
 
@@ -358,10 +394,129 @@ internal fun parseMarkdown(src: String): List<MdBlock> {
             i++
         }
         if (paraLines.isNotEmpty()) {
-            blocks.add(MdBlock.Paragraph(paraLines.joinToString(" ")))
+            blocks.add(MdBlock.Paragraph(joinParagraphLines(paraLines)))
         }
     }
     return blocks
+}
+
+/**
+ * GFM list continuation: indented non-block lines following a list item belong
+ * to that item ("wrapped" list items), not to a new paragraph. Returns the new
+ * line index after absorbing.
+ */
+private fun absorbContinuation(blocks: MutableList<MdBlock>, lines: List<String>, start: Int): Int {
+    var i = start
+    while (i < lines.size && !lines[i].isBlank() && lines[i].startsWith("  ")) {
+        val t = lines[i].trimStart()
+        // Nested items/fences/headings/quotes are their own blocks — stop there.
+        if (LIST_ITEM_START.containsMatchIn(t) || t.startsWith("```") || t.startsWith("~~~") ||
+            t.startsWith("#") || t.startsWith(">")
+        ) break
+        val last = blocks.lastOrNull()
+        if (last is MdBlock.ListItem) {
+            blocks[blocks.size - 1] = last.copy(text = last.text + " " + t.trim())
+        }
+        i++
+    }
+    return i
+}
+
+private val LIST_ITEM_START = Regex("^(?:[-*+]|\\d+\\.)\\s+")
+
+/** GFM hard line breaks: two trailing spaces or a trailing backslash. */
+internal fun joinParagraphLines(paraLines: List<String>): String =
+    paraLines.joinToString("") { raw ->
+        val l = raw.trimEnd()
+        when {
+            raw.endsWith("  ") -> "$l\n"
+            l.endsWith("\\") -> "${l.dropLast(1)}\n"
+            else -> "$l "
+        }
+    }.trim()
+
+/** Bare `[!NOTE]`-style marker on a blockquote's first line (GFM alerts). */
+private val ALERT_KIND_REGEX =
+    Regex("^\\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)]\\s*$", RegexOption.IGNORE_CASE)
+
+private val REF_DEF_REGEX =
+    Regex("^\\s{0,3}\\[([^\\]]+)]:\\s*(?:<([^<>]+)>|(\\S+))[^\\n]*$")
+
+private val REF_IMAGE_USE = Regex("!\\[([^\\]]*)\\]\\[([^\\]]*)\\]")
+private val REF_LINK_USE = Regex("(?<!\\!)\\[([^\\]\\[]+)\\]\\[([^\\]]*)\\]")
+private val REF_SHORT_USE = Regex("(?<!\\!)\\[([^\\]\\[()]+)](?!\\()")
+private val FENCE_OPEN = Regex("^(`{3,}|~{3,})")
+
+/**
+ * GFM reference-style link support: collect `[ref]: url` definitions, then
+ * rewrite `![alt][ref]`, `[text][ref]`, `[text][]` and `[text]` shorthand into
+ * plain inline form so the existing inline tokenizers handle them. Definition
+ * lines are dropped. Fenced code blocks pass through untouched. Returns the
+ * input unchanged when it contains no reference definitions.
+ */
+internal fun resolveReferenceLinks(src: String): String {
+    if (!src.contains('[')) return src
+    val defs = HashMap<String, String>()
+    var found = false
+    var fence: String? = null
+    // First pass: collect definitions (fence-aware), remember whether any exist.
+    for (line in src.lines()) {
+        val t = line.trim()
+        val open = FENCE_OPEN.find(t)
+        if (fence == null) {
+            if (open != null) fence = open.groupValues[1]
+        } else if (open != null && open.groupValues[1][0] == fence[0] &&
+            open.groupValues[1].length >= fence.length
+        ) {
+            fence = null
+        }
+        if (fence != null || open != null) continue
+        val def = REF_DEF_REGEX.matchEntire(line)
+        if (def != null) {
+            val url = (def.groupValues[2].ifEmpty { def.groupValues[3] }).trim()
+            if (url.startsWith("http") || url.startsWith("/") || url.startsWith("#")) {
+                // First definition wins (GFM); label matching is case-insensitive.
+                defs.putIfAbsent(def.groupValues[1].trim().lowercase(), url)
+                found = true
+            }
+        }
+    }
+    if (!found) return src
+
+    fun rewrite(line: String): String {
+        if (!line.contains('[')) return line
+        var l = REF_IMAGE_USE.replace(line) { m ->
+            val key = m.groupValues[2].ifBlank { m.groupValues[1] }.trim().lowercase()
+            defs[key]?.let { "![${m.groupValues[1]}]($it)" } ?: m.value
+        }
+        l = REF_LINK_USE.replace(l) { m ->
+            val key = m.groupValues[2].ifBlank { m.groupValues[1] }.trim().lowercase()
+            defs[key]?.let { "[${m.groupValues[1]}]($it)" } ?: m.value
+        }
+        l = REF_SHORT_USE.replace(l) { m ->
+            defs[m.groupValues[1].trim().lowercase()]?.let { "[${m.groupValues[1]}]($it)" } ?: m.value
+        }
+        return l
+    }
+
+    // Second pass: drop definition lines, rewrite uses — fences pass through raw.
+    val out2 = StringBuilder()
+    fence = null
+    for (line in src.lines()) {
+        val t = line.trim()
+        val open = FENCE_OPEN.find(t)
+        if (fence == null) {
+            if (open != null) fence = open.groupValues[1]
+        } else if (open != null && open.groupValues[1][0] == fence[0] &&
+            open.groupValues[1].length >= fence.length
+        ) {
+            fence = null
+        }
+        if (fence != null || open != null) { out2.append(line).append('\n'); continue }
+        if (REF_DEF_REGEX.matchEntire(line) != null) continue // definition line → dropped
+        out2.append(rewrite(line)).append('\n')
+    }
+    return out2.toString().removeSuffix("\n")
 }
 
 // ── Link resolver ────────────────────────────────────────────────────

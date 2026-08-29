@@ -6,6 +6,7 @@ package com.pockethub.ui.markdown
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,6 +25,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.ClickableText
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.BrokenImage
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Lightbulb
+import androidx.compose.material.icons.outlined.PriorityHigh
+import androidx.compose.material.icons.outlined.Report
+import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -39,17 +45,20 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import coil.compose.SubcomposeAsyncImage
+import com.pockethub.R
 import com.pockethub.ui.LocalAppImageLoader
 import com.pockethub.ui.components.PhAsyncImage
 
@@ -213,14 +222,68 @@ internal fun BadgesRow(images: List<InlineToken.Image>, onTap: (String, LinkKind
     }
 }
 
+/** GFM alert block (`> [!NOTE]` …) — themed card with icon + label + rich body. */
+@Composable
+internal fun AlertBlock(
+    alert: MdBlock.Alert,
+    resolver: LinkResolver,
+    imageResolver: ImageResolver,
+    codeBackgroundColor: Color,
+    linkColor: Color,
+    downloadColor: Color,
+    imageLinkColor: Color,
+    externalColor: Color,
+    onTap: (String, LinkKind) -> Unit,
+) {
+    val dark = isSystemInDarkTheme()
+    val (accent, icon) = when (alert.kind) {
+        "TIP" -> (if (dark) Color(0xFF3FB950) else Color(0xFF1A7F37)) to Icons.Outlined.Lightbulb
+        "IMPORTANT" -> MaterialTheme.colorScheme.secondary to Icons.Outlined.PriorityHigh
+        "WARNING" -> (if (dark) Color(0xFFD29922) else Color(0xFF9A6700)) to Icons.Outlined.WarningAmber
+        "CAUTION" -> MaterialTheme.colorScheme.error to Icons.Outlined.Report
+        else -> MaterialTheme.colorScheme.primary to Icons.Outlined.Info // NOTE
+    }
+    val label = stringResource(
+        when (alert.kind) {
+            "TIP" -> R.string.md_alert_tip
+            "IMPORTANT" -> R.string.md_alert_important
+            "WARNING" -> R.string.md_alert_warning
+            "CAUTION" -> R.string.md_alert_caution
+            else -> R.string.md_alert_note
+        },
+    )
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .border(1.dp, accent.copy(alpha = 0.45f), RoundedCornerShape(8.dp))
+            .background(accent.copy(alpha = 0.08f))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, null, tint = accent, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(label, style = MaterialTheme.typography.labelLarge, color = accent)
+        }
+        if (alert.text.isNotBlank()) {
+            Spacer(Modifier.height(2.dp))
+            val parts = renderRichInline(
+                alert.text, resolver, imageResolver,
+                codeBackgroundColor, linkColor, downloadColor, imageLinkColor, externalColor,
+            )
+            RichParagraph(parts, onTap, paragraphSpacing = 0.dp)
+        }
+    }
+}
+
 @Composable
 internal fun RichBlockquote(
     parts: List<InlineToken>,
     accentColor: Color,
     mutedColor: Color,
     onTap: (String, LinkKind) -> Unit,
-) {
-    val hasOnlyText = parts.all { it is InlineToken.Text }
+) {    val hasOnlyText = parts.all { it is InlineToken.Text }
     if (hasOnlyText) {
         // fast path — render whole as one ClickableText
         val span = buildAnnotatedString {
@@ -311,18 +374,18 @@ internal fun TableBlock(
             .border(1.dp, borderColor, RoundedCornerShape(8.dp)),
     ) {
         Row(Modifier.fillMaxWidth().background(headerBg)) {
-            table.headers.forEach { cell ->
+            table.headers.forEachIndexed { col, cell ->
                 val parts = renderRichInline(cell, resolver, imageResolver, codeBackgroundColor, linkColor, downloadColor, imageLinkColor, externalColor)
-                TableCell(parts, Modifier.width(0.dp).weight(1f), bold = true, onTap = onTap)
+                TableCell(parts, Modifier.width(0.dp).weight(1f), bold = true, align = table.alignments.getOrNull(col) ?: 0, onTap = onTap)
             }
         }
         HorizontalDivider(color = borderColor)
         table.rows.forEach { row ->
             val padded = (row + List((colCount - row.size).coerceAtLeast(0)) { "" }).take(colCount)
             Row(Modifier.fillMaxWidth()) {
-                padded.forEach { cell ->
+                padded.forEachIndexed { col, cell ->
                     val parts = renderRichInline(cell, resolver, imageResolver, codeBackgroundColor, linkColor, downloadColor, imageLinkColor, externalColor)
-                    TableCell(parts, Modifier.width(0.dp).weight(1f), bold = false, onTap = onTap)
+                    TableCell(parts, Modifier.width(0.dp).weight(1f), bold = false, align = table.alignments.getOrNull(col) ?: 0, onTap = onTap)
                 }
             }
         }
@@ -334,6 +397,7 @@ internal fun TableCell(
     parts: List<InlineToken>,
     modifier: Modifier,
     bold: Boolean,
+    align: Int = 0,
     onTap: (String, LinkKind) -> Unit,
 ) {
     val span = buildAnnotatedString {
@@ -344,6 +408,11 @@ internal fun TableCell(
         style = MaterialTheme.typography.bodySmall.copy(
             color = MaterialTheme.colorScheme.onSurface,
             fontWeight = if (bold) FontWeight.SemiBold else FontWeight.Normal,
+            textAlign = when (align) {
+                1 -> TextAlign.Center
+                2 -> TextAlign.End
+                else -> TextAlign.Start
+            },
         ),
         modifier = modifier.padding(horizontal = 6.dp, vertical = 5.dp),
         onClick = { offset ->
@@ -438,6 +507,9 @@ internal fun renderRichInline(
     return out
 }
 
+/** Markdown punctuation that can be backslash-escaped outside code spans. */
+private val ESCAPABLE_CHARS = "\\`*_{}[]()<>#+-.!|~".toSet()
+
 internal fun stringFromSource(
     src: String,
     resolver: LinkResolver,
@@ -447,8 +519,45 @@ internal fun stringFromSource(
     imageLinkColor: Color,
     externalColor: Color,
 ): AnnotatedString = buildAnnotatedString {
+    emitInline(src, resolver, codeBackgroundColor, linkColor, downloadColor, imageLinkColor, externalColor)
+}
+
+/**
+ * Inline tokenizer. Emphasis branches recurse on their inner content so nested
+ * markup (a link inside **bold**, code inside _italic_, bold inside ~~strike~~)
+ * renders properly instead of leaking raw characters.
+ */
+private fun AnnotatedString.Builder.emitInline(
+    src: String,
+    resolver: LinkResolver,
+    codeBackgroundColor: Color,
+    linkColor: Color,
+    downloadColor: Color,
+    imageLinkColor: Color,
+    externalColor: Color,
+) {
+    /** Closing [marker] index at/after [from]; for `_` markers the char after must not be a word char (GFM intraword rule). */
+    fun closeOf(from: Int, marker: String, wordBoundaryAfter: Boolean): Int? {
+        var idx = from
+        while (true) {
+            idx = src.indexOf(marker, idx)
+            if (idx == -1) return null
+            val after = idx + marker.length
+            if (wordBoundaryAfter && after < src.length && src[after].isLetterOrDigit()) { idx = after; continue }
+            return idx
+        }
+    }
+
+    fun emit(inner: String, style: SpanStyle) = withStyle(style) {
+        emitInline(inner, resolver, codeBackgroundColor, linkColor, downloadColor, imageLinkColor, externalColor)
+    }
+
     var i = 0
     while (i < src.length) {
+        // Escaped markdown punctuation: \* \_ \[ … → literal character
+        if (src[i] == '\\' && i + 1 < src.length && src[i + 1] in ESCAPABLE_CHARS) {
+            append(src[i + 1]); i += 2; continue
+        }
         // Autolink <url>
         if (src[i] == '<') {
             val close = src.indexOf('>', i + 1)
@@ -478,12 +587,20 @@ internal fun stringFromSource(
                 }
             }
         }
-        // Bare URL
+        // Bare URL / www.* autolink
         if (src.regionMatches(i, "https://", 0, 8, ignoreCase = false) ||
             src.regionMatches(i, "http://", 0, 7, ignoreCase = false)) {
             val end = findUrlEnd(src, i)
             if (end > i) {
                 val url = src.substring(i, end)
+                appendLink(url, url, classifyLink(url), linkColor, downloadColor, imageLinkColor, externalColor)
+                i = end; continue
+            }
+        }
+        if (src.regionMatches(i, "www.", 0, 4)) {
+            val end = findUrlEnd(src, i)
+            if (end > i + 4) {
+                val url = "https://${src.substring(i, end)}"
                 appendLink(url, url, classifyLink(url), linkColor, downloadColor, imageLinkColor, externalColor)
                 i = end; continue
             }
@@ -502,28 +619,50 @@ internal fun stringFromSource(
                 }
             }
         }
-        // Bold **text**
-        if (i + 1 < src.length && src[i] == '*' && src[i + 1] == '*') {
-            val end = src.indexOf("**", i + 2)
-            if (end != -1) {
-                withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(src.substring(i + 2, end)) }
-                i = end + 2; continue
+        // GFM emphasis — ***x*** / **x** / *x* / __x__ / _x_ (recursive).
+        // Asterisk branches require the char after the opening marker not to be
+        // whitespace, so "a * b * c" stays plain text.
+        if (src.startsWith("***", i)) {
+            val close = closeOf(i + 3, "***", wordBoundaryAfter = false)
+            if (close != null && close > i + 3) {
+                emit(src.substring(i + 3, close), SpanStyle(fontWeight = FontWeight.Bold, fontStyle = FontStyle.Italic))
+                i = close + 3; continue
             }
         }
-        // Italic *text*
-        if (src[i] == '*') {
-            val end = src.indexOf('*', i + 1)
-            if (end != -1) {
-                withStyle(SpanStyle(fontStyle = FontStyle.Italic)) { append(src.substring(i + 1, end)) }
-                i = end + 1; continue
+        if (src.startsWith("**", i)) {
+            val close = closeOf(i + 2, "**", wordBoundaryAfter = false)
+            if (close != null && close > i + 2 && !src.startsWith(" ", i + 2)) {
+                emit(src.substring(i + 2, close), SpanStyle(fontWeight = FontWeight.Bold))
+                i = close + 2; continue
             }
         }
-        // Strikethrough ~~text~~
-        if (i + 1 < src.length && src[i] == '~' && src[i + 1] == '~') {
-            val end = src.indexOf("~~", i + 2)
-            if (end != -1) {
-                withStyle(SpanStyle(textDecoration = TextDecoration.LineThrough)) { append(src.substring(i + 2, end)) }
-                i = end + 2; continue
+        if (src[i] == '*' && src.getOrElse(i + 1) { ' ' } != '*' && !src.startsWith(" ", i + 1)) {
+            val close = closeOf(i + 1, "*", wordBoundaryAfter = false)
+            if (close != null && close > i + 1) {
+                emit(src.substring(i + 1, close), SpanStyle(fontStyle = FontStyle.Italic))
+                i = close + 1; continue
+            }
+        }
+        if (src.startsWith("__", i) && (i == 0 || !src[i - 1].isLetterOrDigit())) {
+            val close = closeOf(i + 2, "__", wordBoundaryAfter = true)
+            if (close != null && close > i + 2 && !src.startsWith(" ", i + 2)) {
+                emit(src.substring(i + 2, close), SpanStyle(fontWeight = FontWeight.Bold))
+                i = close + 2; continue
+            }
+        }
+        if (src[i] == '_' && (i == 0 || !src[i - 1].isLetterOrDigit()) && !src.startsWith(" ", i + 1)) {
+            val close = closeOf(i + 1, "_", wordBoundaryAfter = true)
+            if (close != null && close > i + 1) {
+                emit(src.substring(i + 1, close), SpanStyle(fontStyle = FontStyle.Italic))
+                i = close + 1; continue
+            }
+        }
+        // Strikethrough ~~text~~ (recursive so inner emphasis still renders)
+        if (src.startsWith("~~", i)) {
+            val close = closeOf(i + 2, "~~", wordBoundaryAfter = false)
+            if (close != null && close > i + 2) {
+                emit(src.substring(i + 2, close), SpanStyle(textDecoration = TextDecoration.LineThrough))
+                i = close + 2; continue
             }
         }
         // Inline code `text`

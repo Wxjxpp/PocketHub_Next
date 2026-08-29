@@ -34,12 +34,13 @@ import androidx.compose.ui.unit.sp
 /**
  * A lightweight, dependency-free Markdown renderer (enhanced).
  *
- * Supports: H1-H6, bold (**), italic (*), strikethrough (~~), inline code, fenced code blocks,
- * ordered / unordered lists (with nesting), GitHub task lists (- [ ] / - [x]), blockquotes,
- * horizontal rules, paragraphs, GitHub-style pipe tables, images `![alt](src)`, wrapped badge
- * links `[![alt](src)](href)`, autolinks (`<url>` and bare URLs), GitHub-relative references
- * (#123 issue, @user, owner/repo, bare commit SHA), and common raw-HTML inline tags
- * (<strong>/<b>, <em>/<i>, <code>/<kbd>, <del>, <br>, <hr>, <img>).
+ * Supports: H1-H6, bold (**/__), italic (*/_), bold-italic (***), strikethrough (~~), inline code, fenced code blocks
+ * (``` and ~~~, nested long fences), ordered / unordered lists (with nesting and continuation lines),
+ * GitHub task lists (- [ ] / - [x]), blockquotes, GFM alerts (> [!NOTE] etc), horizontal rules, paragraphs
+ * with hard line breaks, GitHub-style pipe tables (alignment + escaped pipes), reference-style links
+ * ([text][ref] + [ref]: url), images `![alt](src)`, wrapped badge links `[![alt](src)](href)`,
+ * autolinks (`<url>` and bare URLs), GitHub-relative references (#123 issue, @user, owner/repo, bare commit SHA),
+ * and common raw-HTML inline tags (<strong>/<b>, <em>/<i>, <code>/<kbd>, <del>, <br>, <hr>, <img>).
  *
  * Images are loaded with Coil so README badges / banners / screenshots render properly inside
  * the Overview tab. Content images fill the column width at their natural aspect ratio (capped
@@ -146,7 +147,7 @@ fun MarkdownText(
                 }
 
                 is MdBlock.CodeBlock -> {
-                    Box(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(blockShape)
@@ -154,14 +155,40 @@ fun MarkdownText(
                             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, blockShape)
                             .horizontalScroll(rememberScrollState()),
                     ) {
+                        if (!block.lang.isNullOrBlank()) {
+                            Text(
+                                block.lang.uppercase(),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                modifier = Modifier.padding(start = 12.dp, top = 10.dp),
+                            )
+                        }
                         Text(
                             text = block.code,
                             style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(12.dp),
+                            modifier = Modifier.padding(
+                                start = 12.dp, end = 12.dp,
+                                top = if (block.lang.isNullOrBlank()) 12.dp else 4.dp,
+                                bottom = 12.dp,
+                            ),
                         )
                     }
                     Spacer(Modifier.height(6.dp))
+                }
+
+                is MdBlock.Alert -> {
+                    AlertBlock(
+                        block,
+                        linkResolver,
+                        imageResolver,
+                        codeBackgroundColor,
+                        linkColor,
+                        downloadColor,
+                        imageLinkColor,
+                        externalColor,
+                        onTap,
+                    )
                 }
 
                 is MdBlock.Blockquote -> {
@@ -239,9 +266,12 @@ internal sealed class MdBlock {
     data class Paragraph(val text: String) : MdBlock()
     data class CodeBlock(val code: String, val lang: String?) : MdBlock()
     data class Blockquote(val text: String) : MdBlock()
+    /** GFM alert (`> [!NOTE]` etc). kind: NOTE/TIP/IMPORTANT/WARNING/CAUTION. */
+    data class Alert(val kind: String, val text: String) : MdBlock()
     /** `task`: null = not a task item; ' ' = unchecked; 'x' = checked. */
     data class ListItem(val text: String, val ordered: Boolean, val index: Int, val level: Int, val task: Char? = null) : MdBlock()
-    data class Table(val headers: List<String>, val rows: List<List<String>>) : MdBlock()
+    /** alignments per column: 0 left, 1 center, 2 right (from the `:---:` separator row). */
+    data class Table(val headers: List<String>, val rows: List<List<String>>, val alignments: List<Int> = emptyList()) : MdBlock()
     object HorizontalRule : MdBlock()
 }
 
