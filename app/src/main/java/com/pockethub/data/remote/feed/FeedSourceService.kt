@@ -8,6 +8,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -49,6 +50,12 @@ class FeedSourceService @Inject constructor(
         .readTimeout(20, TimeUnit.SECONDS)
         .writeTimeout(15, TimeUnit.SECONDS)
         .build()
+
+    /** Max wait for a third-party "primary" host before switching to mirrors.
+     *  CDN-backed primaries normally answer <1s; on censored networks the TCP
+     *  connection just hangs, and the full OkHttp timeout (15-20s) is what
+     *  users perceive as a slow source. */
+    private val PRIMARY_DEADLINE_MS = 3_500L
 
     /**
      * Effective base URL for [source], with custom-URL override honoured,
@@ -457,25 +464,44 @@ class FeedSourceService @Inject constructor(
         val category = cfg.komiCategory.ifBlank { "trending" }
         val platform = cfg.komiPlatform.ifBlank { "android" }
 
-        val primary = base.ifEmpty { "https://api.github-store.org/v1/" } + "categories/$category/$platform"
-        val primaryList = runCatching {
-            requestText(primary, forceFresh)?.let { body ->
-                parseKomiItems(body, source)
-            }
-        }.getOrNull().orEmpty()
-        if (primaryList.isNotEmpty()) return primaryList
+        val primaryUrl = base.ifEmpty { "https://api.github-store.org/v1/" } + "categories/$category/$platform"
+        // Offline mirrors (same items, wrapped in a { repositories: [...] }
+        // envelope): the project's GitHub-raw dump first, then the jsDelivr CDN
+        // copy — jsDelivr is usually reachable where raw.githubusercontent.com
+        // is blocked.
+        val mirrorUrls = listOf(
+            "https://raw.githubusercontent.com/kurikomi-labs/komi-store-backend-data/main" +
+                "/cached-data/$category/$platform.json",
+            "https://cdn.jsdelivr.net/gh/kurikomi-labs/komi-store-backend-data@main" +
+                "/cached-data/$category/$platform.json",
+        )
 
-        // Offline mirror: same items, wrapped in a { repositories: [...] } envelope.
-        val mirror = "https://raw.githubusercontent.com/kurikomi-labs/komi-store-backend-data/main" +
-            "/cached-data/$category/$platform.json"
-        return runCatching {
-            requestText(mirror, forceFresh)?.let { body ->
-                val env = json.parseToJsonElement(body) as? JsonObject
-                val items = (env?.get("repositories") as? JsonArray)?.toString()
-                    ?: body
-                parseKomiItems(items, source)
+        // Primary first, but with a tight deadline: the backend is CDN-cached
+        // and normally answers in well under a second. On censored networks the
+        // connection just hangs until OkHttp's full 20s timeout — users perceive
+        // that as "the source is very slow" — so we cap the wait and move on to
+        // the mirrors quickly. (Verified: api.github-store.org gets
+        // ERR_CONNECTION_CLOSED on mainland networks; raw.githubusercontent.com
+        // is also unreliable; jsDelivr is the reliable last resort.)
+        return coroutineScope {
+            val primaryJob = async { runCatching { requestText(primaryUrl, forceFresh) }.getOrNull() }
+            val primaryBody = withTimeoutOrNull(PRIMARY_DEADLINE_MS) { primaryJob.await() }
+            if (primaryBody == null) {
+                primaryJob.cancel()
+                null
+            } else {
+                parseKomiItems(primaryBody, source)
+            }?.takeIf { it.isNotEmpty() } ?: run {
+                for (mirror in mirrorUrls) {
+                    val body = runCatching { requestText(mirror, forceFresh) }.getOrNull() ?: continue
+                    val env = runCatching { json.parseToJsonElement(body) as? JsonObject }.getOrNull()
+                    val items = (env?.get("repositories") as? JsonArray)?.toString() ?: body
+                    val parsed = parseKomiItems(items, source)
+                    if (parsed.isNotEmpty()) return@coroutineScope parsed
+                }
+                emptyList()
             }
-        }.getOrNull().orEmpty()
+        }
     }
 
     /** Decode a bare JSON array of BackendRepoResponse into [DiscoverItem]s. */
