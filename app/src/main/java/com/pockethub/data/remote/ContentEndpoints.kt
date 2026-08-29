@@ -35,4 +35,17 @@ interface ContentEndpoints {
         @Path("repo") repo: String,
         @Query("ref") ref: String? = null,
     ): kotlinx.serialization.json.JsonElement
+
+    /**
+     * Full recursive file tree of a ref ([treeSha] accepts a branch name or SHA).
+     * One request returns the whole tree; large repos come back with
+     * [GitHubApi.GitTreeResponse.truncated] = true.
+     */
+    @GET("repos/{owner}/{repo}/git/trees/{treeSha}")
+    suspend fun getGitTree(
+        @Path("owner") owner: String,
+        @Path("repo") repo: String,
+        @Path("treeSha", encoded = true) treeSha: String,
+        @Query("recursive") recursive: String = "1",
+    ): GitHubApi.GitTreeResponse
 }

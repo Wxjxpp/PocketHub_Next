@@ -63,6 +63,11 @@ class CodeBrowserViewModel @Inject constructor(
         val isLoadingBranches: Boolean = false,
         /** Map of entry.path → last commit for the currently visible directory. */
         val lastCommits: Map<String, LastCommit> = emptyMap(),
+        /** Full recursive file tree (for the full-screen viewer's tree panel). */
+        val fullTree: List<GitHubApi.GitTreeEntry> = emptyList(),
+        val isLoadingTree: Boolean = false,
+        /** GitHub caps the recursive tree at 100k entries / 7MB — flag it when hit. */
+        val treeTruncated: Boolean = false,
     )
 
     private val _state = MutableStateFlow(State())
@@ -228,8 +233,33 @@ class CodeBrowserViewModel @Inject constructor(
         val s = _state.value
         if (s.ref == ref) return
         commitCache.clear() // ref changed → cached commit info is stale
-        _state.update { it.copy(ref = ref, viewingFile = null, fileContent = null, lastCommits = emptyMap()) }
+        _state.update { it.copy(ref = ref, viewingFile = null, fileContent = null, lastCommits = emptyMap(), fullTree = emptyList()) }
         listDir("")
+    }
+
+    /**
+     * Fetch the full recursive file tree once per ref (used by the full-screen
+     * viewer's file-tree panel). Cached in [State.fullTree] until the ref changes.
+     */
+    fun loadTree() {
+        val s = _state.value
+        if (s.fullTree.isNotEmpty() || s.isLoadingTree) return
+        viewModelScope.launch {
+            _state.update { it.copy(isLoadingTree = true) }
+            try {
+                val resp = api.getGitTree(s.owner, s.repo, s.ref ?: "HEAD")
+                _state.update {
+                    it.copy(
+                        fullTree = resp.tree.filter { e -> e.type == "blob" || e.type == "tree" },
+                        isLoadingTree = false,
+                        treeTruncated = resp.truncated,
+                    )
+                }
+            } catch (e: Exception) {
+                issueReporter.reportError("Code", "loadTree", e)
+                _state.update { it.copy(isLoadingTree = false) }
+            }
+        }
     }
 
     private fun buildPathStack(path: String): List<String> {

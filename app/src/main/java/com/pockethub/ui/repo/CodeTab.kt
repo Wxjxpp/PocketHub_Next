@@ -34,6 +34,7 @@ import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.FolderZip
+import androidx.compose.material.icons.outlined.Fullscreen
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -48,6 +49,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -79,6 +81,7 @@ fun CodeTab(
     vm: CodeBrowserViewModel = hiltViewModel(),
 ) {
     val state by vm.state.collectAsState()
+    var showFullViewer by rememberSaveable { mutableStateOf(false) }
 
     // Lazy initialise for this owner/repo pair on first composition.
     androidx.compose.runtime.LaunchedEffect(owner, repo) {
@@ -158,6 +161,7 @@ fun CodeTab(
                 isLoading = state.isLoading,
                 onClose = { vm.closeFile() },
                 onDownload = { state.viewingFile?.let { downloadFile(it) } },
+                onFullScreen = { showFullViewer = true },
             )
 
             state.error != null && state.entries.isEmpty() -> Column(
@@ -187,6 +191,10 @@ fun CodeTab(
                 }
             }
         }
+    }
+
+    if (showFullViewer && state.viewingFile != null) {
+        FullScreenFileViewer(vm = vm, onDismiss = { showFullViewer = false })
     }
 }
 
@@ -360,6 +368,7 @@ private fun FileViewerContent(
     isLoading: Boolean,
     onClose: () -> Unit,
     onDownload: () -> Unit,
+    onFullScreen: () -> Unit = {},
 ) {
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
@@ -388,6 +397,14 @@ private fun FileViewerContent(
                         Icons.Outlined.ContentCopy,
                         contentDescription = stringResource(R.string.action_copy),
                         modifier = Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                IconButton(onClick = onFullScreen) {
+                    Icon(
+                        Icons.Outlined.Fullscreen,
+                        contentDescription = stringResource(R.string.cd_fullscreen),
+                        modifier = Modifier.size(20.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -428,7 +445,7 @@ private const val HIGHLIGHT_MAX_CHARS = 200_000
  * of each line.
  */
 @Composable
-private fun SyntaxHighlightedCode(
+internal fun SyntaxHighlightedCode(
     code: String,
     fileName: String,
     modifier: Modifier = Modifier,

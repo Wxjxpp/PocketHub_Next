@@ -55,6 +55,11 @@
     <string name="update_downloaded_ready">Download complete — tapping Install will run the system updater.</string>
     <string name="update_download_failed">Download failed: %1$s</string>
     <string name="update_downloading">Downloading…</string>
+    <string name="cd_fullscreen">View in full screen</string>
+    <string name="cd_toggle_file_tree">Toggle file tree</string>
+    <string name="file_tree_unavailable">File tree unavailable</string>
+    <string name="file_tree_truncated">This repository is very large — the file tree may be incomplete.</string>
+    <string name="file_viewer_pick_hint">Pick a file from the tree to view it here</string>
     <string name="update_changelog_generic">UI improvements, bug fixes and feature updates.</string>
     <string name="update_changelog_title">What\'s new</string>
     <string name="download_folder_label">Download location</string>

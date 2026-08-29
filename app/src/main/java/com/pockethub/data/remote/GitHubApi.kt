@@ -104,10 +104,25 @@ interface GitHubApi :
         val encoding: String = "none",
     )
 
+    /** Response of the recursive git/trees endpoint. */
+    data class GitTreeResponse(
+        val sha: String = "",
+        val truncated: Boolean = false,
+        val tree: List<GitTreeEntry> = emptyList(),
+    )
+
+    /** One entry of a git tree: blob (file) or tree (directory). */
+    data class GitTreeEntry(
+        val path: String = "",
+        val mode: String = "",
+        val type: String = "blob", // "blob" | "tree" | "commit"
+        val sha: String = "",
+        val size: Long = 0,
+    )
+
     // ──────────────────────────────────────────────
     //  Issues & Pull Requests
     // ──────────────────────────────────────────────
-
     @kotlinx.serialization.Serializable
     data class IssueCreateRequest(
         val title: String,
