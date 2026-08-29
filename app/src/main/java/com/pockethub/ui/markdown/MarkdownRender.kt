@@ -187,16 +187,16 @@ private fun AdaptiveImage(img: InlineToken.Image, onTap: (String, LinkKind) -> U
         img.hintW != null && img.hintH != null && img.hintW > 0 && img.hintH > 0 -> {
             val wDp = img.hintW.dp.coerceAtMost(320.dp)
             val hDp = img.hintH.dp.coerceAtMost(360.dp)
-            RenderSizedImage(img, wDp, hDp, clickTarget, kind)
+            RenderSizedImage(img, wDp, hDp, clickTarget, kind, onTap)
         }
         // Small image (badge / shield, ~20dp on the web) → natural size, inline.
         intrinsic != null && with(density) { intrinsic.height.toDp() } <= SMALL_IMAGE_MAX_DP -> {
             val hDp = with(density) { intrinsic.height.toDp() }.coerceAtLeast(12.dp)
             val wDp = with(density) { intrinsic.width.toDp() }.coerceAtMost(280.dp).coerceAtLeast(12.dp)
-            RenderSizedImage(img, wDp, hDp, clickTarget, kind)
+            RenderSizedImage(img, wDp, hDp, clickTarget, kind, onTap)
         }
         // Content image (banner / screenshot) → full-width, readable.
-        intrinsic != null -> RenderContentImage(img, clickTarget, kind)
+        intrinsic != null -> RenderContentImage(img, clickTarget, kind, onTap)
         // Size unknown yet → compact placeholder (most badges resolve in a frame).
         else -> Box(
             Modifier
