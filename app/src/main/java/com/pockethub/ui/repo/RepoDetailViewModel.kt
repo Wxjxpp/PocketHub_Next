@@ -42,6 +42,13 @@ enum class IssueStateFilter(val apiValue: String) {
     OPEN("open"), CLOSED("closed"), ALL("all"),
 }
 
+/** PR tab filter — GitHub PRs have a distinct merged state (open/closed/
+ * merged/all on the web). MERGED fetches state=closed and filters client-side
+ * on merged_at (the /pulls list endpoint has no merged query param). */
+enum class PRStateFilter(val apiValue: String) {
+    OPEN("open"), CLOSED("closed"), MERGED("merged"), ALL("all"),
+}
+
 @HiltViewModel
 class RepoDetailViewModel @Inject constructor(
     internal val api: GitHubApi,
@@ -65,6 +72,11 @@ class RepoDetailViewModel @Inject constructor(
     /** Current state filter shared by the Issues and PRs tabs. */
     internal val _issueStateFilter = MutableStateFlow(IssueStateFilter.OPEN)
     val issueStateFilter: StateFlow<IssueStateFilter> = _issueStateFilter
+
+    // PR tab keeps its OWN filter — it was sharing the issues filter before,
+    // so switching tabs silently changed what the other tab would reload.
+    internal val _prStateFilter = MutableStateFlow(PRStateFilter.OPEN)
+    val prStateFilter: StateFlow<PRStateFilter> = _prStateFilter
 
     /** True while a further page is being fetched. */
     internal val _isLoadingMoreIssues = MutableStateFlow(false)
@@ -97,12 +109,26 @@ class RepoDetailViewModel @Inject constructor(
 
     /** Select a state explicitly and reload the current issue/PR source. */
     fun setIssueStateFilter(owner: String, repo: String, filter: IssueStateFilter) {
-        if (_issueStateFilter.value == filter) return
+        val force = _issueStateFilter.value != filter
         _issueStateFilter.value = filter
         // The filter is shared by the Issues and PRs tabs — refresh whichever
-        // list is on screen (each has its own fetch path now).
+        // list is on screen (each has its own fetch path now). Re-tapping the
+        // active chip also refreshes: the recovery path when a flaky request
+        // left an empty list and the old code short-circuited on "same filter".
+        if (currentTab.value == RepoTab.PRS) {
+            _prStateFilter.value = when (filter) {
+                IssueStateFilter.OPEN -> PRStateFilter.OPEN
+                IssueStateFilter.CLOSED -> PRStateFilter.CLOSED
+                IssueStateFilter.ALL -> PRStateFilter.ALL
+            }
+            loadPulls(owner, repo, force = true)
+        } else loadIssues(owner, repo, force = true)
+    }
+
+    fun setPrStateFilter(owner: String, repo: String, filter: PRStateFilter) {
+        val force = _prStateFilter.value != filter
+        _prStateFilter.value = filter
         if (currentTab.value == RepoTab.PRS) loadPulls(owner, repo, force = true)
-        else loadIssues(owner, repo, force = true)
     }
 
     internal val _error = MutableStateFlow<String?>(null)

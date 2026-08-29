@@ -524,6 +524,7 @@
     <string name="no_issues">没有 issues</string>
     <string name="no_open_prs">没有开放的 PR</string>
     <string name="no_closed_prs">没有已关闭的 PR</string>
+    <string name="no_merged_prs">没有已合并的 PR</string>
     <string name="no_prs">没有 PR</string>
 
     <!-- 提交详情 -->

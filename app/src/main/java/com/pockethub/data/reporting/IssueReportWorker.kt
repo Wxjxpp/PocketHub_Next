@@ -150,36 +150,43 @@ class IssueReportWorker @AssistedInject constructor(
     }
 
     // ── Body rendering ───────────────────────────────────────────────────
-    // Compact digest: one header line (device / OS / version), then one line
-    // per event ("screen · location · problem"). Stack traces trimmed to the
-    // first app-relevant frames only, so the email stays short and readable.
+    // Digest layout: device header, then one clearly-delimited block per
+    // event — timestamp, screen/flow breadcrumbs (what the user was doing,
+    // which API call had just run), subject, and the first app-relevant
+    // stack frames. Kept short and scannable; full stacks stay in the log.
     private fun buildBody(events: List<IssueEvent>, githubMarkdown: Boolean): String {
         val first = events.first()
         val last = events.last()
         val crash = events.count { it.kind == IssueKind.CRASH }
         val anr = events.count { it.kind == IssueKind.ANR }
-        val err = events.count { it.kind == IssueKind.ERROR }
 
-        fun line(s: String) = if (githubMarkdown) "$s\n" else s + "\n"
+        fun line(s: String = "") = if (githubMarkdown) "$s\n" else s + "\n"
 
         val sb = StringBuilder()
-        sb.append(line("PocketHub 问题报告（${events.size} 条：崩溃$crash / 卡死$anr / 其他错误$err）"))
+        sb.append(line("PocketHub 严重问题报告（${events.size} 条：崩溃 $crash · 卡死 $anr）"))
         sb.append(line("设备: ${first.deviceModel} · Android ${first.sdkInt} · v${first.appVersionName}(${first.appVariant})"))
-        sb.append(line("时间: ${first.isoTs} ~ ${last.isoTs}"))
-        sb.append(line(""))
+        sb.append(line("时间范围: ${first.isoTs} ~ ${last.isoTs}"))
 
         events.forEachIndexed { idx, e ->
-            val where = e.extra["screen"]?.let { s ->
-                e.extra["where"]?.let { w -> "$s.$w" } ?: s
-            } ?: e.threadName
-            sb.append(line("#${idx + 1} [${e.kind.id.uppercase()}] $where — ${e.subject.take(120)} (${e.isoTs})"))
-            // Only keep frames that point into our own code, capped at 3 lines.
+            sb.append(line("━━━ #${idx + 1} ${e.kind.id.uppercase()} ━━━"))
+            sb.append(line("时间: ${e.isoTs} · 线程: ${e.threadName}"))
+            // What was happening: last screens + API calls before the event.
+            val crumbs = e.extra[IssueReporter.BKEY_BREADCRUMBS]
+                ?.lineSequence()?.toList().orEmpty()
+            if (crumbs.isNotEmpty()) {
+                sb.append(line("现场（最近操作 →）:"))
+                crumbs.takeLast(6).forEach { c -> sb.append(line("  $c")) }
+            }
+            sb.append(line("问题: ${e.subject.take(200)}"))
+            // Only frames that point into our own code, capped at 4 lines.
             val appFrames = e.stackTrace.lineSequence()
                 .filter { it.contains("com.pockethub") && !it.contains("IssueReporter") }
-                .take(3).toList()
+                .take(4).toList()
             if (appFrames.isNotEmpty()) {
-                sb.append(line("    at " + appFrames.joinToString(" | ") { f -> f.substringBefore("(").trim() }))
+                sb.append(line("堆栈关键帧:"))
+                appFrames.forEach { f -> sb.append(line("  at ${f.trim()}")) }
             }
+            sb.append(line())
         }
         return sb.toString()
     }

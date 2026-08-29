@@ -49,6 +49,20 @@ class IssueReporter @Inject constructor(
     val events: SharedFlow<IssueEvent> = _events.asSharedFlow()
     private val mutex = Mutex()
     private val installedCrashHook = AtomicBoolean(false)
+
+    /** What the user was doing right before the event: screens visited and
+     *  network calls made, newest last. Kept in memory only; attached to
+     *  crash/ANR events so each digest entry answers "where did this happen
+     *  and what had the app just done?". */
+    private val breadcrumbs = java.util.concurrent.CopyOnWriteArrayList<String>()
+
+    fun breadcrumb(message: String) {
+        val ts = formatter.format(Date())
+        breadcrumbs.add("$ts $message")
+        while (breadcrumbs.size > MAX_BREADCRUMBS) breadcrumbs.removeAt(0)
+    }
+
+    private fun breadcrumbsSnapshot(): String = breadcrumbs.joinToString("\n")
     private val watchDogRunning = AtomicBoolean(false)
     private val heartbeatMs = AtomicLong(System.currentTimeMillis())
     private val formatter = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ", Locale.US)
@@ -192,7 +206,7 @@ class IssueReporter @Inject constructor(
                     subject = "${e.javaClass.name}: ${e.message ?: "<no message>"}",
                     stackTrace = stack.take(MAX_STACK),
                     threadName = t.name,
-                    extra = emptyMap(),
+                    extra = mapOf(BKEY_BREADCRUMBS to breadcrumbsSnapshot()),
                 )
                 appendToFileSync(event)
             } catch (_: Throwable) { /* never let the hook throw while already crashing */ }
@@ -229,7 +243,11 @@ class IssueReporter @Inject constructor(
                         subject = "Main thread blocked for ${lag}ms (threshold ${ANR_THRESHOLD_MS}ms)",
                         stackTrace = mainStack,
                         threadName = mainThread.name,
-                        extra = mapOf("threadState" to mainThread.state.name, "lagMs" to lag.toString()),
+                        extra = mapOf(
+                            "threadState" to mainThread.state.name,
+                            "lagMs" to lag.toString(),
+                            BKEY_BREADCRUMBS to breadcrumbsSnapshot(),
+                        ),
                     )
                     // Back-off so we don't emit a flood of dupes for the same stall.
                     kotlinx.coroutines.delay(ANR_COOLDOWN_MS)
@@ -302,6 +320,9 @@ class IssueReporter @Inject constructor(
     }
 
     companion object {
+        /** extra[] key carrying the breadcrumb trail of a crash/ANR event. */
+        const val BKEY_BREADCRUMBS = "breadcrumbs"
+        private const val MAX_BREADCRUMBS = 20
         private const val MAX_EVENTS = 200
         private const val MAX_SUBJECT = 400
         private const val MAX_STACK = 8_000

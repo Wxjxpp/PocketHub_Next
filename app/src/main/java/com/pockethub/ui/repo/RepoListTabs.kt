@@ -188,14 +188,44 @@ internal fun IssuesTab(
     }
 }
 
+/** PR tab filter chips: Open / Closed / Merged / All (GitHub web parity). */
+@Composable
+internal fun PRStateFilterChips(
+    selected: PRStateFilter,
+    onSelect: (PRStateFilter) -> Unit,
+) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        PRStateFilter.entries.forEach { filter ->
+            val label = when (filter) {
+                PRStateFilter.OPEN -> stringResource(R.string.issue_state_open)
+                PRStateFilter.CLOSED -> stringResource(R.string.issue_state_closed)
+                PRStateFilter.MERGED -> stringResource(R.string.pr_state_merged)
+                PRStateFilter.ALL -> stringResource(R.string.issue_state_all)
+            }
+            androidx.compose.material3.FilterChip(
+                selected = selected == filter,
+                onClick = { onSelect(filter) },
+                label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                ),
+            )
+        }
+    }
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun PullsTab(
     pulls: List<Issue>,
-    stateFilter: IssueStateFilter,
+    stateFilter: PRStateFilter,
     isLoading: Boolean,
     isLoadingMore: Boolean,
-    onSelectFilter: (IssueStateFilter) -> Unit,
+    onSelectFilter: (PRStateFilter) -> Unit,
     onLoadMore: () -> Unit,
     onClick: (Int) -> Unit,
     onNavigateToUser: (String) -> Unit = {},
@@ -212,7 +242,7 @@ internal fun PullsTab(
     }
 
     Column(Modifier.fillMaxSize()) {
-        IssueStateFilterChips(selected = stateFilter, onSelect = onSelectFilter)
+        PRStateFilterChips(selected = stateFilter, onSelect = onSelectFilter)
 
         if (isLoading && pulls.isEmpty()) {
             com.pockethub.ui.components.SkeletonList(Modifier.fillMaxSize(), rows = 8, topPadding = 8.dp)
@@ -221,9 +251,10 @@ internal fun PullsTab(
         if (pulls.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 val emptyText = when (stateFilter) {
-                    IssueStateFilter.OPEN -> stringResource(R.string.no_open_prs)
-                    IssueStateFilter.CLOSED -> stringResource(R.string.no_closed_prs)
-                    IssueStateFilter.ALL -> stringResource(R.string.no_prs)
+                    PRStateFilter.OPEN -> stringResource(R.string.no_open_prs)
+                    PRStateFilter.CLOSED -> stringResource(R.string.no_closed_prs)
+                    PRStateFilter.MERGED -> stringResource(R.string.no_merged_prs)
+                    PRStateFilter.ALL -> stringResource(R.string.no_prs)
                 }
                 Text(emptyText, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -238,7 +269,7 @@ internal fun PullsTab(
                 // State indicator dot — green=open, violet-red=merged, red=closed
                 val prColor = when {
                     pr.state == "open" -> Color(0xFF2EA043)
-                    pr.merged -> Color(0xFF8957E5)
+                    pr.isMerged -> Color(0xFF8957E5)
                     else -> Color(0xFFBD2C00)
                 }
                 Box(
@@ -279,12 +310,12 @@ internal fun PullsTab(
                         )
                         Spacer(Modifier.weight(1f))
                         val stateLabel = when {
-                            pr.merged -> stringResource(R.string.pr_state_merged)
+                            pr.isMerged -> stringResource(R.string.pr_state_merged)
                             pr.state == "open" -> stringResource(R.string.issue_state_open)
                             else -> stringResource(R.string.issue_state_closed)
                         }
                         val stateColor = when {
-                            pr.merged -> Color(0xFF8957E5)
+                            pr.isMerged -> Color(0xFF8957E5)
                             pr.state == "open" -> Color(0xFF2EA043)
                             else -> Color(0xFFBD2C00)
                         }

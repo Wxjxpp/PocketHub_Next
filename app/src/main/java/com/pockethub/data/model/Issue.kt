@@ -38,8 +38,13 @@ data class Issue(
     // PR-specific (present when ?pulls endpoint is used)
     @SerialName("pull_request") val pullRequest: PullRequestRef? = null,
 
-    /** True when the PR was merged (only the /pulls list & detail endpoints set it). */
+    /** True when the PR was merged. Only the /pulls DETAIL endpoint sets this
+     *  flag — the LIST endpoints don't include it, so prefer [mergedAt]. */
     val merged: Boolean = false,
+
+    /** Merge timestamp. The ONLY reliable merged signal on list endpoints:
+     *  /pulls returns merged_at but has no `merged` boolean at all. */
+    @SerialName("merged_at") val mergedAt: String? = null,
 
     // Only present on /search/issues responses — lets a work-list surface the
     // owning repo without re-fetching. Null on the per-repo issues endpoint.
@@ -50,6 +55,9 @@ data class Issue(
     /** e.g. "https://api.github.com/repos/owner/repo" — present in search results. */
     @SerialName("repository_url") val repositoryUrl: String? = null,
 ) {
+    /** Merged = explicit flag OR merged_at present (list endpoints only give the timestamp). */
+    val isMerged: Boolean get() = merged || mergedAt != null
+
     @Serializable
     data class Label(
         val id: Long? = null,

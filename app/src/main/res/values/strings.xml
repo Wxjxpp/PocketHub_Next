@@ -577,6 +577,7 @@
     <string name="no_issues">No issues</string>
     <string name="no_open_prs">No open pull requests</string>
     <string name="no_closed_prs">No closed pull requests</string>
+    <string name="no_merged_prs">No merged pull requests</string>
     <string name="no_prs">No pull requests</string>
 
     <!-- Commit detail -->

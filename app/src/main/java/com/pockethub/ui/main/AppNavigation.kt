@@ -119,6 +119,15 @@ fun PocketHubApp(
     val updateState by updateVm.state.collectAsState()
     val context = androidx.compose.ui.platform.LocalContext.current
 
+    // Severe-issue diagnostics: record every navigation so a crash/ANR digest
+    // can answer "which screen was the user on?".
+    androidx.compose.runtime.LaunchedEffect(navController) {
+        val reporter = (context.applicationContext as? com.pockethub.PocketHubApp)?.issueReporter
+        navController.addOnDestinationChangedListener { _, dest, _ ->
+            reporter?.breadcrumb("→ ${dest.route ?: dest.label ?: "?"}")
+        }
+    }
+
     // Run the throttled auto-check once on launch — the ViewModel handles the
     // 24h interval and the "ignored version" gates.
     androidx.compose.runtime.LaunchedEffect(Unit) {
