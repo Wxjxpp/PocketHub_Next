@@ -165,19 +165,24 @@ internal fun WorkflowRunRow(
                 }
             }
             Spacer(Modifier.height(3.dp))
-            // Line 3: branch chip · actor · date+time · duration
+            // Line 3: branch chip · actor · date+time · duration.
+            // The chip carries weight(1f) so it absorbs any width pressure and
+            // ellipsizes itself — the fixed-width date/duration texts must never
+            // get squeezed into wrapping (they used to stack one char per line).
             Row(verticalAlignment = Alignment.CenterVertically) {
                 val branch = run.headBranch?.takeIf { it.isNotBlank() }
                 if (branch != null) {
                     Surface(
                         shape = RoundedCornerShape(4.dp),
                         color = MaterialTheme.colorScheme.surfaceVariant,
+                        modifier = Modifier.weight(1f),
                     ) {
                         Text(
                             branch,
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
+                            softWrap = false,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
                         )
@@ -198,6 +203,7 @@ internal fun WorkflowRunRow(
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
+                        softWrap = false,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.clickable { onNavigateToUser(actor.login) },
                     )
@@ -208,6 +214,9 @@ internal fun WorkflowRunRow(
                         formatDateTime(it),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
                 formatDuration(run.runStartedAt, run.updatedAt)?.let { d ->
@@ -216,6 +225,9 @@ internal fun WorkflowRunRow(
                         d,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
