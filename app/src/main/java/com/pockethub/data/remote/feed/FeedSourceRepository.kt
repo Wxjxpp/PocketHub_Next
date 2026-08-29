@@ -91,7 +91,12 @@ class FeedSourceRepository @Inject constructor(
             trendingRange = "Daily",
         )
         val raw = prefs[keyFor(tab)] ?: return default
-        return runCatching { json.decodeFromString<FeedSourceConfig>(raw) }.getOrDefault(default)
+        val decoded = runCatching { json.decodeFromString<FeedSourceConfig>(raw) }.getOrDefault(default)
+        // Sources pruned from a tab's option list (e.g. old installs that had
+        // OSS Insight on Trending) fall back to the tab default so users are
+        // never stuck on a source the settings screen no longer shows.
+        return if (FeedSourceOption.optionsFor(tab).any { it.id == decoded.sourceId }) decoded
+        else decoded.copy(sourceId = default.sourceId, customBaseUrl = "")
     }
 
     private fun keyFor(tab: FeedTab): Preferences.Key<String> = when (tab) {

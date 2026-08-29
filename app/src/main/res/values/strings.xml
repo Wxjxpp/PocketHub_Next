@@ -138,7 +138,7 @@
 
     <!-- Feed sources (settings page) -->
     <string name="feed_sources">Explore information sources</string>
-    <string name="feed_sources_intro">Pick the data source backing each Explore tab. Some sources let you override the base URL to point at a self-hosted instance of the same API shape.</string>
+    <string name="feed_sources_intro">Pick the data source backing the Trending and Featured Explore tabs. Some sources let you override the base URL to point at a self-hosted instance of the same API shape.</string>
     <string name="feed_sources_reset">Reset to default</string>
     <string name="feed_source_custom_url">Custom base URL</string>
     <string name="feed_source_custom_url_hint">Unsaved — tap Apply to commit.</string>

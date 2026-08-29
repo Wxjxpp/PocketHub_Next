@@ -68,7 +68,6 @@ fun FeedSourcesScreen(
 ) {
     val trendingCfg by vm.trendingConfig.collectAsState()
     val featuredCfg by vm.featuredConfig.collectAsState()
-    val followingCfg by vm.followingConfig.collectAsState()
 
     Scaffold(
         topBar = {
@@ -119,17 +118,8 @@ fun FeedSourcesScreen(
                 onReset = { vm.resetTab(FeedTab.FEATURED) },
             )
 
-            Spacer(Modifier.height(8.dp))
-            SectionHeader(stringResource(R.string.section_following))
-            SourceGroup(
-                tab = FeedTab.FOLLOWING,
-                config = followingCfg,
-                options = FeedSourceOption.optionsFor(FeedTab.FOLLOWING),
-                onSelect = { src -> vm.selectSource(FeedTab.FOLLOWING, src, "") },
-                onCustomUrlChange = { src, url -> vm.setCustomBaseUrl(FeedTab.FOLLOWING, src, url) },
-                onGithubOptionsChange = { sort, min, max, archived -> vm.setGithubOptions(FeedTab.FOLLOWING, sort, min, max, archived) },
-                onReset = { vm.resetTab(FeedTab.FOLLOWING) },
-            )
+            // The Following tab has exactly one practical public source
+            // (GitHub events), so it intentionally has no settings section here.
 
             Spacer(Modifier.height(80.dp))
         }

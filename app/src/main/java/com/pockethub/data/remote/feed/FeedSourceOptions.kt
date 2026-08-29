@@ -105,10 +105,12 @@ enum class FeedSourceOption(
 
         /** All options selectable for the given tab (used by the settings screen). */
         fun optionsFor(tab: FeedTab): List<FeedSourceOption> = when (tab) {
-            // Keep the official GitHub endpoint first so it is easy to find and
-            // remains the obvious zero-configuration choice.
-            FeedTab.TRENDING  -> listOf(GITHUB_SEARCH, OSS_INSIGHT, GITHUB_TRENDING_API)
-            FeedTab.FEATURED  -> listOf(OSS_INSIGHT, HACKER_NEWS_SHOWHN, NPM_REGISTRY, LOBSTERS, REDDIT_TOP, GITHUB_SEARCH)
+            // Trending keeps only the official GitHub endpoint — stable, token-
+            // cached and the obvious zero-configuration choice.
+            FeedTab.TRENDING  -> listOf(GITHUB_SEARCH)
+            // Featured keeps its first three sources; the rest were pruned to
+            // keep the settings screen focused.
+            FeedTab.FEATURED  -> listOf(OSS_INSIGHT, HACKER_NEWS_SHOWHN, NPM_REGISTRY)
             FeedTab.FOLLOWING -> listOf(GITHUB_EVENTS)
         }
     }
