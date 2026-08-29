@@ -96,6 +96,7 @@ fun SettingsScreen(
     val appStyle by vm.appStyle.collectAsState()
     val appLocale by vm.appLocale.collectAsState()
     val customClientId by vm.customClientId.collectAsState()
+    val downloadMirrorPrefix by vm.downloadMirrorPrefix.collectAsState()
     val customClientSecret by vm.customClientSecret.collectAsState()
     val notifPollMinutes by vm.notifPollMinutes.collectAsState()
     val accountCount by vm.accountCount.collectAsState()
@@ -106,6 +107,7 @@ fun SettingsScreen(
     var showTranslateSheet by remember { mutableStateOf(false) }
     var showNotifPollSheet by remember { mutableStateOf(false) }
     var showOAuthSheet by remember { mutableStateOf(false) }
+    var showMirrorSheet by remember { mutableStateOf(false) }
     var showAbout by remember { mutableStateOf(false) }
     var showSignOutDialog by remember { mutableStateOf(false) }
     val issueCount by vm.issueCount.collectAsState()
@@ -215,6 +217,12 @@ fun SettingsScreen(
                 headlineContent = { Text(stringResource(R.string.custom_oauth_client)) },
                 supportingContent = { Text(if (customClientId.isBlank()) stringResource(R.string.custom_oauth_client_not_configured) else stringResource(R.string.custom_oauth_client_configured, customClientId.take(8))) },
                 modifier = Modifier.clickable { showOAuthSheet = true },
+            )
+            ListItem(
+                leadingContent = { Icon(Icons.Outlined.RocketLaunch, contentDescription = null) },
+                headlineContent = { Text(stringResource(R.string.mirror_prefix_title)) },
+                supportingContent = { Text(if (downloadMirrorPrefix.isBlank()) stringResource(R.string.mirror_prefix_not_set) else stringResource(R.string.mirror_prefix_set, downloadMirrorPrefix)) },
+                modifier = Modifier.clickable { showMirrorSheet = true },
             )
             ListItem(
                 leadingContent = { Icon(Icons.Outlined.CleaningServices, contentDescription = null) },
@@ -364,6 +372,14 @@ fun SettingsScreen(
         )
     }
 
+    if (showMirrorSheet) {
+        MirrorPrefixSheet(
+            initial = downloadMirrorPrefix,
+            onDismiss = { showMirrorSheet = false },
+            onSave = { prefix -> vm.setDownloadMirrorPrefix(prefix); showMirrorSheet = false },
+        )
+    }
+
     if (showAbout) {
         ModalBottomSheet(onDismissRequest = { showAbout = false }, sheetState = rememberModalBottomSheetState()) {
             AboutContent()
@@ -437,6 +453,52 @@ fun SettingsScreen(
 }
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
+/**
+ * Accelerator-prefix editor (net branch experiment): a "gh-proxy"-style base
+ * URL prepended to GitHub FILE downloads. Blank = direct connection.
+ */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun MirrorPrefixSheet(
+    initial: String,
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit,
+) {
+    var value by rememberSaveable { mutableStateOf(initial) }
+
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState()) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+                .imePadding()
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(stringResource(R.string.mirror_prefix_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(
+                stringResource(R.string.mirror_prefix_summary),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            OutlinedTextField(
+                value = value,
+                onValueChange = { value = it },
+                label = { Text(stringResource(R.string.mirror_prefix_label)) },
+                placeholder = { Text("https://gh-proxy.com/") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = { onSave(value.trim()) }) { Text(stringResource(R.string.action_save)) }
+                OutlinedButton(onClick = { onSave("") }) { Text(stringResource(R.string.action_clear)) }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+            }
+            Spacer(Modifier.height(24.dp))
+        }
+    }
+}
+
 private fun OAuthClientSheet(
     initialId: String,
     initialSecret: String,

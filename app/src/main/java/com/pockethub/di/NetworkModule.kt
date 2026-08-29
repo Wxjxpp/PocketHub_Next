@@ -15,6 +15,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import kotlinx.serialization.json.Json
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -35,9 +36,43 @@ object NetworkModule {
         encodeDefaults = false
     }
 
+    /**
+     * DoH-backed resolver with system-DNS fallback (net branch experiment).
+     *
+     * Mainland ISPs poison GitHub DNS records; resolving through an encrypted
+     * public resolver (AliDNS — reachable in CN, no account) returns the real
+     * IPs and sidesteps that. If DoH itself is unreachable we fall back to the
+     * system resolver so the app never hard-fails because of this feature.
+     */
     @Provides
     @Singleton
-    fun provideOkHttpClient(authInterceptor: AuthInterceptor): OkHttpClient {
+    fun provideDns(): okhttp3.Dns {
+        val bootstrapClient = OkHttpClient.Builder()
+            .connectTimeout(5, TimeUnit.SECONDS)
+            .readTimeout(5, TimeUnit.SECONDS)
+            .build()
+        val doh = okhttp3.dnsoverhttps.DnsOverHttps.Builder()
+            .client(bootstrapClient)
+            .resolver(okhttp3.Dns.SYSTEM)
+            .url("https://dns.alidns.com/dns-query".toHttpUrl())
+            .bootstrapDnsHosts(
+                java.net.InetAddress.getByName("223.5.5.5"),
+                java.net.InetAddress.getByName("223.6.6.6"),
+            )
+            .includeIPv6(false)
+            .build()
+        return okhttp3.Dns { hostname ->
+            try {
+                doh.lookup(hostname)
+            } catch (_: Throwable) {
+                okhttp3.Dns.SYSTEM.lookup(hostname)
+            }
+        }
+    }
+
+    @Provides
+    @Singleton
+    fun provideOkHttpClient(authInterceptor: AuthInterceptor, dns: okhttp3.Dns): OkHttpClient {
         val builder = OkHttpClient.Builder()
             .followRedirects(false)
             .followSslRedirects(false)
@@ -45,6 +80,7 @@ object NetworkModule {
             .readTimeout(20, TimeUnit.SECONDS)
             .writeTimeout(15, TimeUnit.SECONDS)
             .addInterceptor(authInterceptor)
+            .dns(dns)
 
         if (BuildConfig.DEBUG) {
             builder.addInterceptor(

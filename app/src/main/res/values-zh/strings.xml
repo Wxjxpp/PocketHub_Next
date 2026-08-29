@@ -583,6 +583,11 @@
     <string name="komi_platform_windows">Windows</string>
     <string name="komi_platform_macos">macOS</string>
     <string name="komi_platform_linux">Linux</string>
+    <string name="mirror_prefix_title">下载加速镜像</string>
+    <string name="mirror_prefix_not_set">未启用 — 直连</string>
+    <string name="mirror_prefix_set">%1$s</string>
+    <string name="mirror_prefix_summary">在 GitHub 文件下载(Release 附件、raw 文件、zip 源码包)前拼接 gh-proxy 类加速前缀。API 请求不受影响。示例:https://gh-proxy.com/ — 留空则关闭。</string>
+    <string name="mirror_prefix_label">加速前缀 URL</string>
     <string name="update_changelog_generic">UI 优化、问题修复、更新功能</string>
     <string name="update_changelog_title">更新内容</string>
     <string name="download_folder_label">下载位置</string>

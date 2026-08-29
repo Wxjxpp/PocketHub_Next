@@ -48,6 +48,10 @@ class SettingsViewModel @Inject constructor(
     val customClientSecret: StateFlow<String> = settings.customClientSecret
         .stateIn(viewModelScope, SharingStarted.Eagerly, "")
 
+    /** GitHub file-download accelerator prefix (net branch experiment). */
+    val downloadMirrorPrefix: StateFlow<String> = settings.downloadMirrorPrefix
+        .stateIn(viewModelScope, SharingStarted.Eagerly, "")
+
     val notifPollMinutes: StateFlow<Int> = settings.notifPollMinutes
         .stateIn(viewModelScope, SharingStarted.Eagerly, 0)
 
@@ -103,6 +107,10 @@ class SettingsViewModel @Inject constructor(
 
     fun setCustomOAuthClient(id: String, secret: String) {
         viewModelScope.launch { settings.setCustomOAuthClient(id, secret) }
+    }
+
+    fun setDownloadMirrorPrefix(prefix: String) {
+        viewModelScope.launch { settings.setDownloadMirrorPrefix(prefix) }
     }
 
     fun setNotifPollMinutes(minutes: Int) {
