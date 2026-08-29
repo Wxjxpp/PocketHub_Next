@@ -372,6 +372,7 @@ private fun sourceDisplayName(source: FeedSourceOption): String = when (source) 
     FeedSourceOption.LOBSTERS              -> stringResource(R.string.source_name_lobsters)
     FeedSourceOption.REDDIT_TOP           -> stringResource(R.string.source_name_reddit_top)
     FeedSourceOption.GITHUB_EVENTS        -> stringResource(R.string.source_name_github_events)
+    FeedSourceOption.KOMI_TOP_CHARTS      -> stringResource(R.string.source_name_komi)
 }
 
 /** LazyColumn section listing a [DiscoverItem] collection with loading / error / empty states.
