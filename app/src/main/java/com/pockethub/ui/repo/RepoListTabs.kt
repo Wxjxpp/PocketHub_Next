@@ -65,6 +65,10 @@ internal fun IssueStateFilterChips(
                 selected = selected == filter,
                 onClick = { onSelect(filter) },
                 label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                ),
             )
         }
     }
@@ -272,6 +276,25 @@ internal fun PullsTab(
                             stringResource(R.string.issue_meta, pr.number, pr.comments),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.weight(1f))
+                        val stateLabel = when {
+                            pr.merged -> stringResource(R.string.pr_state_merged)
+                            pr.state == "open" -> stringResource(R.string.issue_state_open)
+                            else -> stringResource(R.string.issue_state_closed)
+                        }
+                        val stateColor = when {
+                            pr.merged -> Color(0xFF8957E5)
+                            pr.state == "open" -> Color(0xFF2EA043)
+                            else -> Color(0xFFBD2C00)
+                        }
+                        Text(
+                            stateLabel,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = stateColor,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            softWrap = false,
                         )
                     }
                 }

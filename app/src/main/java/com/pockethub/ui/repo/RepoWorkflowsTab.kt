@@ -135,6 +135,9 @@ internal fun WorkflowRunRow(
                         eventLabel(it),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.padding(start = 8.dp),
                     )
                 }
@@ -165,17 +168,17 @@ internal fun WorkflowRunRow(
                 }
             }
             Spacer(Modifier.height(3.dp))
-            // Line 3: branch chip · actor · date+time · duration.
-            // The chip carries weight(1f) so it absorbs any width pressure and
-            // ellipsizes itself — the fixed-width date/duration texts must never
-            // get squeezed into wrapping (they used to stack one char per line).
+            // Line 3: branch chip · actor · … · date · duration.
+            // Chip wraps its content (weight fill=false) but yields space under
+            // pressure; date/duration stay single-line and are pushed to the
+            // row's end, GitHub-mobile style.
             Row(verticalAlignment = Alignment.CenterVertically) {
                 val branch = run.headBranch?.takeIf { it.isNotBlank() }
                 if (branch != null) {
                     Surface(
                         shape = RoundedCornerShape(4.dp),
                         color = MaterialTheme.colorScheme.surfaceVariant,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f, fill = false),
                     ) {
                         Text(
                             branch,
@@ -209,6 +212,7 @@ internal fun WorkflowRunRow(
                     )
                     Spacer(Modifier.width(6.dp))
                 }
+                Spacer(Modifier.weight(1f))
                 run.createdAt?.let {
                     Text(
                         formatDateTime(it),

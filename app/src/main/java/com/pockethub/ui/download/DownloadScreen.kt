@@ -240,6 +240,8 @@ private fun ActiveDownloadItem(
                         entity.repoKey + (entity.releaseTag?.let { " · $it" } ?: ""),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
                 Spacer(Modifier.width(8.dp))
