@@ -17,16 +17,44 @@ internal fun RepoDetailViewModel.loadIssues(owner: String, repo: String, state: 
 }
 
 internal fun RepoDetailViewModel.loadPulls(owner: String, repo: String, state: String? = null, force: Boolean = false): Job? {
-    // Shares the issues fetch (PRs come from the same endpoint); just ensure loaded.
-    return loadIssues(owner, repo, state, force)
+    // Dedicated /pulls endpoint — PRs paginate on their own, and `merged`
+    // comes back from the API so merged PRs are not mislabelled "closed".
+    val effectiveState = state ?: _issueStateFilter.value.apiValue
+    if (!force && loadedPullState == effectiveState && _pulls.value.isNotEmpty()) return null
+    loadedPullState = effectiveState
+    prPage = 1
+    pullsCanLoadMore = true
+    return fetchPullsPage(owner, repo, effectiveState, append = false, forceFresh = force)
 }
 
-/** Fetch the next page of issues/PRs for the current filter. */
-internal fun RepoDetailViewModel.loadMoreIssues(owner: String, repo: String) {
-    if (!issuesCanLoadMore || _isLoadingMoreIssues.value) return
+/** Fetch the next page of PRs for the current filter. */
+internal fun RepoDetailViewModel.loadMorePulls(owner: String, repo: String) {
+    if (!pullsCanLoadMore || _isLoadingMorePulls.value) return
     val state = _issueStateFilter.value.apiValue
-    issuePage++
-    fetchIssuesPage(owner, repo, state, append = true)
+    prPage++
+    fetchPullsPage(owner, repo, state, append = true)
+}
+
+internal fun RepoDetailViewModel.fetchPullsPage(owner: String, repo: String, state: String, append: Boolean, forceFresh: Boolean = false): Job {
+    return viewModelScope.launch {
+        if (append) _isLoadingMorePulls.update { true } else _isLoadingPulls.update { true }
+        try {
+            val pulls = api.getPullRequests(owner, repo, state = state, page = prPage)
+            if (append) {
+                val existingIds = _pulls.value.map { it.id }.toSet()
+                _pulls.update { it + pulls.filter { n -> n.id !in existingIds } }
+            } else {
+                _pulls.update { pulls }
+            }
+            pullsCanLoadMore = pulls.size >= 30
+        } catch (e: Exception) {
+            issueReporter.reportError("RepoDetail", "fetchPullsPage", e)
+            if (!append) _pulls.update { emptyList() }
+            _error.update { e.userMessage("Failed to load pull requests") }
+        } finally {
+            if (append) _isLoadingMorePulls.update { false } else _isLoadingPulls.update { false }
+        }
+    }
 }
 
 internal fun RepoDetailViewModel.fetchIssuesPage(owner: String, repo: String, state: String, append: Boolean, forceFresh: Boolean = false): Job {

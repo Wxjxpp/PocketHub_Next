@@ -92,6 +92,7 @@ internal fun rememberLinkResolver(repoContext: String?): LinkResolver = LinkReso
     val raw = ref.trim()
     if (raw.isEmpty()) return@LinkResolver null
     if (raw.startsWith("http://") || raw.startsWith("https://")) return@LinkResolver raw
+    if (raw.startsWith("mailto:")) return@LinkResolver raw
     val gh = "https://github.com"
     if (raw.startsWith("#")) {
         val num = raw.removePrefix("#").trim()

@@ -196,53 +196,72 @@ private fun UpdateHeader(info: UpdateChecker.UpdateInfo, downloadState: UpdateVi
 @Composable
 private fun ChangelogSection(notes: String) {
     val isZh = Locale.getDefault().language == "zh"
-    val parsed = parseChangelogItems(
-        notes,
-        tags = ChangelogTags(
-            new = stringResource(R.string.tag_new),
-            fix = stringResource(R.string.tag_fix),
-            improved = stringResource(R.string.tag_improved),
-            faster = stringResource(R.string.tag_faster),
-            reverted = stringResource(R.string.tag_reverted),
-            update = stringResource(R.string.tag_update),
-        ),
-    ).take(8)
-    if (parsed.isEmpty()) return
 
-    // Chinese app locale: translate each item body into Chinese using the
-    // app's free multi-provider translation chain. If translation fails (all
-    // providers down / too jargon-heavy), fall back to a vague localized
-    // summary instead of showing untranslated English.
-    val zhTexts by produceState<List<String>?>(null, parsed, isZh) {
-        if (!isZh) return@produceState
-        value = try {
-            coroutineScope {
-                parsed.map { item ->
-                    async {
-                        if (GoogleTranslate.detectLanguage(item.text) == "zh") {
-                            item.text
-                        } else {
-                            GoogleTranslate.translate(item.text, "zh-CN")
-                        }
-                    }
-                }.awaitAll()
-            }
-        } catch (_: Exception) {
-            null
-        }
-    }
+    // Preferred source: the structured bilingual block the CI embeds in the
+    // release body at build time (<!--pockethub-changelog {json}-->).
+    // Content is already locale-split and polished — no runtime translation.
+    val structured = remember(notes) { parseStructuredChangelog(notes) }
+    val tags = ChangelogTags(
+        new = stringResource(R.string.tag_new),
+        fix = stringResource(R.string.tag_fix),
+        improved = stringResource(R.string.tag_improved),
+        faster = stringResource(R.string.tag_faster),
+        reverted = stringResource(R.string.tag_reverted),
+        update = stringResource(R.string.tag_update),
+    )
 
     val items: List<ChangeItem> = when {
-        zhTexts != null -> parsed.mapIndexed { i, item -> item.copy(text = zhTexts!![i]) }
-        isZh -> listOf(
-            ChangeItem(
-                tag = parsed.first().tag,
-                text = stringResource(R.string.update_changelog_generic),
-                tagColor = parsed.first().tagColor,
-            ),
-        )
-        else -> parsed
+        structured != null -> structured.mapNotNull { entry ->
+            val text = if (isZh) entry.optString("zh", "") else entry.optString("en", "")
+            val text2 = text.ifBlank { entry.optString("en", entry.optString("zh", "")) }
+            if (text2.isBlank()) return@mapNotNull null
+            val tagText = when (entry.optString("type", "improve")) {
+                "feat" -> tags.new
+                "fix" -> tags.fix
+                "perf" -> tags.faster
+                "revert" -> tags.reverted
+                else -> tags.improved
+            }
+            ChangeItem(tagText, text2, changelogTagColor(entry.optString("type", "improve")))
+        }
+        // Legacy releases without the block: fall back to parsing commit
+        // subjects; zh locale gets runtime translation with a vague-summary
+        // fallback if every provider fails.
+        else -> {
+            val parsed = parseChangelogItems(notes, tags).take(8)
+            if (parsed.isEmpty()) return
+            val zhTexts by produceState<List<String>?>(parsed.map { it.text }, parsed, isZh) {
+                if (!isZh) return@produceState
+                value = try {
+                    coroutineScope {
+                        parsed.map { item ->
+                            async {
+                                if (GoogleTranslate.detectLanguage(item.text) == "zh") {
+                                    item.text
+                                } else {
+                                    GoogleTranslate.translate(item.text, "zh-CN")
+                                }
+                            }
+                        }.awaitAll()
+                    }
+                } catch (_: Exception) {
+                    null
+                }
+            }
+            when {
+                zhTexts != null -> parsed.mapIndexed { i, item -> item.copy(text = zhTexts!![i]) }
+                isZh -> listOf(
+                    ChangeItem(
+                        tag = parsed.first().tag,
+                        text = stringResource(R.string.update_changelog_generic),
+                        tagColor = parsed.first().tagColor,
+                    ),
+                )
+                else -> parsed
+            }
+        }
     }
+    if (items.isEmpty()) return
 
     Column {
         Text(
@@ -425,6 +444,32 @@ private data class ChangeItem(
     val text: String,
     val tagColor: Color,
 )
+
+/** Color per changelog item type (mirrors parseChangelogItems' palette). */
+private fun changelogTagColor(type: String): Color = when (type) {
+    "feat" -> Color(0xFF3FB950)
+    "fix" -> Color(0xFF58A6FF)
+    "perf", "refactor" -> Color(0xFFD29922)
+    "revert" -> Color(0xFF58A6FF)
+    else -> Color(0xFF8B949E)
+}
+
+/**
+ * Extract the structured bilingual block the CI embeds in the release body:
+ * <!--pockethub-changelog {"items":[{"type":"feat","zh":"…","en":"…"}]}-->
+ * Returns the items array, or null when the block is absent/corrupt.
+ */
+private fun parseStructuredChangelog(notes: String): org.json.JSONArray? {
+    val marker = "<!--pockethub-changelog"
+    val start = notes.indexOf(marker)
+    if (start == -1) return null
+    val jsonStart = notes.indexOf('{', start)
+    val end = notes.indexOf("-->", jsonStart)
+    if (jsonStart == -1 || end == -1) return null
+    return runCatching {
+        org.json.JSONObject(notes.substring(jsonStart, end).trim()).optJSONArray("items")
+    }.getOrNull()
+}
 
 /** Localized changelog category tags (resolved from string resources). */
 private data class ChangelogTags(

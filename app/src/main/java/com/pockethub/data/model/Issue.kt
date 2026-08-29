@@ -38,6 +38,9 @@ data class Issue(
     // PR-specific (present when ?pulls endpoint is used)
     @SerialName("pull_request") val pullRequest: PullRequestRef? = null,
 
+    /** True when the PR was merged (only the /pulls list & detail endpoints set it). */
+    val merged: Boolean = false,
+
     // Only present on /search/issues responses — lets a work-list surface the
     // owning repo without re-fetching. Null on the per-repo issues endpoint.
     // NOTE: GitHub stopped returning `repository` in search results; owner/repo

@@ -85,11 +85,24 @@ class RepoDetailViewModel @Inject constructor(
     internal var issuesCanLoadMore = true
     internal var loadedIssueState: String? = null
 
+    // PRs paginate independently (dedicated /pulls endpoint) — sharing the
+    // issues page counter meant PRs drowned out by issues never appeared.
+    internal var prPage = 1
+    internal var pullsCanLoadMore = true
+    internal var loadedPullState: String? = null
+    internal val _isLoadingPulls = MutableStateFlow(false)
+    val isLoadingPulls: StateFlow<Boolean> = _isLoadingPulls.asStateFlow()
+    internal val _isLoadingMorePulls = MutableStateFlow(false)
+    val isLoadingMorePulls: StateFlow<Boolean> = _isLoadingMorePulls.asStateFlow()
+
     /** Select a state explicitly and reload the current issue/PR source. */
     fun setIssueStateFilter(owner: String, repo: String, filter: IssueStateFilter) {
         if (_issueStateFilter.value == filter) return
         _issueStateFilter.value = filter
-        loadIssues(owner, repo, force = true)
+        // The filter is shared by the Issues and PRs tabs — refresh whichever
+        // list is on screen (each has its own fetch path now).
+        if (currentTab.value == RepoTab.PRS) loadPulls(owner, repo, force = true)
+        else loadIssues(owner, repo, force = true)
     }
 
     internal val _error = MutableStateFlow<String?>(null)

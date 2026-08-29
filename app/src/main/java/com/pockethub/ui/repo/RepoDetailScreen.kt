@@ -142,6 +142,8 @@ fun RepoDetailScreen(
     val translateTarget by vm.translateTarget.collectAsState()
     val translateMessage by vm.translateMessage.collectAsState()
     val issueStateFilter by vm.issueStateFilter.collectAsState()
+    val isLoadingPulls by vm.isLoadingPulls.collectAsState()
+    val isLoadingMorePulls by vm.isLoadingMorePulls.collectAsState()
     val isLoadingMoreIssues by vm.isLoadingMoreIssues.collectAsState()
     val isLoadingIssues by vm.isLoadingIssues.collectAsState()
     val isLoadingReleases by vm.isLoadingReleases.collectAsState()
@@ -461,10 +463,10 @@ fun RepoDetailScreen(
                 RepoTab.PRS -> PullsTab(
                     pulls,
                     stateFilter = issueStateFilter,
-                    isLoading = isLoadingIssues,
-                    isLoadingMore = isLoadingMoreIssues,
+                    isLoading = isLoadingPulls,
+                    isLoadingMore = isLoadingMorePulls,
                     onSelectFilter = { filter -> vm.setIssueStateFilter(owner, repo, filter) },
-                    onLoadMore = { vm.loadMoreIssues(owner, repo) },
+                    onLoadMore = { vm.loadMorePulls(owner, repo) },
                     onClick = onNavigateToPR,
                     onNavigateToUser = onNavigateToUser,
                 )
