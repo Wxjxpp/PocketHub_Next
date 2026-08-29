@@ -59,21 +59,36 @@ class IssueReporter @Inject constructor(
      * Install the global uncaught-exception handler and ANR watch-dog.
      * Safe to call multiple times — guards prevent double-install. Should
      * be called once from [com.pockethub.PocketHubApp.onCreate].
+     *
+     * Also prunes any legacy `error`-kind entries from earlier builds (the
+     * digest now only carries crash/ANR), so the settings counter reflects
+     * the current policy after upgrade.
      */
     fun install() {
+        pruneLegacyErrors()
         installCrashHook()
         installAnrWatchDog()
     }
 
     /**
-     * Fire-and-forget severe-error report from anywhere in app code.
-     *
-     * Use this in catch blocks: it never blocks, never throws, and tags the
-     * event with the screen and code location so the email digest pinpoints
-     * where things broke. Only call for genuinely severe failures — routine
-     * empty states / expected misses should stay silent.
+     * Diagnostic hook from catch blocks. By default it does NOT record
+     * anything — the severe-issues digest only carries crashes and ANRs.
+     * Expected failures (offline, 404, rate limits…) were flooding the
+     * digest and drowned the signal, so regular exceptions are logged to
+     * logcat only. Pass [severe] = true for a failure that genuinely
+     * corrupts app state and cannot be surfaced in the UI.
      */
-    fun reportError(screen: String, where: String, error: Throwable?, extra: Map<String, String> = emptyMap()) {
+    fun reportError(
+        screen: String,
+        where: String,
+        error: Throwable?,
+        extra: Map<String, String> = emptyMap(),
+        severe: Boolean = false,
+    ) {
+        if (!severe) {
+            android.util.Log.d("IssueReporter", "non-severe $screen/$where: $error")
+            return
+        }
         reporterScope.launch {
             runCatching {
                 report(
@@ -226,6 +241,27 @@ class IssueReporter @Inject constructor(
 
     private val mainThreadHandler by lazy {
         android.os.Handler(Looper.getMainLooper())
+    }
+
+    /** Drop pre-policy `error` entries so the digest is crash/ANR-only. */
+    private fun pruneLegacyErrors() {
+        reporterScope.launch {
+            runCatching {
+                mutex.withLock {
+                    if (!logFile.exists()) return@withLock
+                    val lines = logFile.readLines()
+                    val kept = lines.filter { line ->
+                        line.isBlank() || runCatching {
+                            JSONObject(line).optString("kind") != IssueKind.ERROR.id
+                        }.getOrDefault(true)
+                    }
+                    when {
+                        kept.isEmpty() -> logFile.delete()
+                        kept.size != lines.size -> logFile.writeText(kept.joinToString("\n") + "\n")
+                    }
+                }
+            }
+        }
     }
 
     private suspend fun appendToLogFile(event: IssueEvent) = mutex.withLock {
