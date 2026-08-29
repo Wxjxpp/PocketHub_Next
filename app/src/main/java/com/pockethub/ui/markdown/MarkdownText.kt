@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -178,22 +180,13 @@ fun MarkdownText(
                 }
 
                 is MdBlock.Alert -> {
-                    AlertBlock(
-                        block,
-                        linkResolver,
-                        imageResolver,
-                        codeBackgroundColor,
-                        linkColor,
-                        downloadColor,
-                        imageLinkColor,
-                        externalColor,
-                        onTap,
-                    )
+                    val parts = renderRichInline(block.text, linkResolver, imageResolver, codeBackgroundColor, linkColor, downloadColor, imageLinkColor, externalColor)
+                    SimpleAlertCard(block.kind, parts, onTap)
                 }
 
                 is MdBlock.Blockquote -> {
                     val parts = renderRichInline(block.text, linkResolver, imageResolver, codeBackgroundColor, linkColor, downloadColor, imageLinkColor, externalColor)
-                    RichBlockquote(parts, accentColor, mutedColor, onTap)
+                    SimpleBlockquote(parts, mutedColor, onTap)
                 }
 
                 is MdBlock.ListItem -> {
@@ -203,9 +196,8 @@ fun MarkdownText(
                         block.task == ' ' -> "☐ "
                         else -> "• "
                     }
-                    val indent = (block.level - 1) * 14
                     val parts = renderRichInline(block.text, linkResolver, imageResolver, codeBackgroundColor, linkColor, downloadColor, imageLinkColor, externalColor)
-                    RichListItem(bullet, parts, indent, mutedColor, onTap)
+                    SimpleListItem(bullet, parts, (block.level - 1) * 14, onTap)
                 }
 
                 is MdBlock.Table -> {
@@ -229,6 +221,93 @@ fun MarkdownText(
                 }
             }
         }
+    }
+}
+
+/** Minimal GFM alert card ([!NOTE] etc.) — accent-colored left rule + label. */
+@Composable
+private fun SimpleAlertCard(
+    kind: String,
+    parts: List<InlineToken>,
+    onTap: (String, LinkKind) -> Unit,
+) {
+    val (label, color) = when (kind.uppercase()) {
+        "NOTE" -> "Note" to MaterialTheme.colorScheme.primary
+        "TIP" -> "Tip" to Color(0xFF2EA043)
+        "IMPORTANT" -> "Important" to Color(0xFF8250DF)
+        "WARNING" -> "Warning" to Color(0xFFBF8700)
+        "CAUTION" -> "Caution" to Color(0xFFD1242F)
+        else -> kind.ifBlank { "Note" } to MaterialTheme.colorScheme.primary
+    }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(6.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            .padding(10.dp),
+    ) {
+        Box(
+            Modifier
+                .width(3.dp)
+                .height(IntrinsicSize.Min)
+                .fillMaxHeight()
+                .background(color, RoundedCornerShape(2.dp)),
+        )
+        Spacer(Modifier.width(10.dp))
+        Column {
+            Text(
+                label,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = color,
+            )
+            Spacer(Modifier.height(2.dp))
+            RichParagraph(parts, onTap, paragraphSpacing = 2.dp)
+        }
+    }
+    Spacer(Modifier.height(8.dp))
+}
+
+/** Minimal blockquote — left rule + muted text. */
+@Composable
+private fun SimpleBlockquote(
+    parts: List<InlineToken>,
+    mutedColor: Color,
+    onTap: (String, LinkKind) -> Unit,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+    ) {
+        Box(
+            Modifier
+                .width(3.dp)
+                .height(IntrinsicSize.Min)
+                .fillMaxHeight()
+                .background(mutedColor.copy(alpha = 0.6f), RoundedCornerShape(2.dp)),
+        )
+        Spacer(Modifier.width(10.dp))
+        RichParagraph(parts, onTap)
+    }
+    Spacer(Modifier.height(4.dp))
+}
+
+/** Minimal list item — hanging bullet + inline content. */
+@Composable
+private fun SimpleListItem(
+    bullet: String,
+    parts: List<InlineToken>,
+    indentDp: Int,
+    onTap: (String, LinkKind) -> Unit,
+) {
+    Row(Modifier.padding(start = indentDp.dp, bottom = 3.dp)) {
+        Text(
+            bullet,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        RichParagraph(parts, onTap)
     }
 }
 
