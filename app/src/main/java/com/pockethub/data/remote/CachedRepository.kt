@@ -50,20 +50,52 @@ class CachedRepository @Inject constructor(
     }
 
     /**
-     * Fetch only the total count of starred repos by requesting per_page=1 and
-     * parsing the last-page number from the GitHub Link header.  Falls back to
-     * the body size when the header is absent (single page).
+     * Total starred-repo count for the signed-in user. GitHub has no REST field
+     * for it, so we go through three layers:
+     *  1. GraphQL `viewer.starredRepositories.totalCount` — exact, one round
+     *     trip, immune to proxies that strip response headers (the bug that
+     *     made this read "1").
+     *  2. REST `link` header last-page number (per_page=1).
+     *  3. Link header missing/unparseable → page through per_page=100.
      */
     suspend fun getStarredTotalCount(): Int {
+        try {
+            val resp = api.graphQL(
+                GitHubApi.GraphQLRequest(
+                    query = "query { viewer { starredRepositories(first: 1) { totalCount } } }",
+                ),
+            )
+            val total = resp.data?.get("viewer")
+                ?.let { it as? kotlinx.serialization.json.JsonObject }
+                ?.get("starredRepositories")
+                ?.let { it as? kotlinx.serialization.json.JsonObject }
+                ?.get("totalCount")
+                ?.let { it as? kotlinx.serialization.json.JsonPrimitive }
+                ?.content?.toIntOrNull()
+            if (total != null) return total
+        } catch (_: Exception) {
+            // fall through to REST
+        }
         return try {
             val resp = api.getStarredRepositories(page = 1, perPage = 1)
             val link = resp.headers()["link"]
-            if (link != null) {
-                // Link: <...&page=2>; rel="next", <...&page=42>; rel="last"
-                val lastMatch = Regex("""page=(\d+)>;\s*rel="last"""").find(link)
-                lastMatch?.groupValues?.get(1)?.toIntOrNull() ?: resp.body().orEmpty().size
+            // Link: <...&page=2>; rel="next", <...&page=42>; rel="last"
+            val last = link?.let {
+                Regex("""page=(\d+)>;\s*rel="last"""").find(it)?.groupValues?.get(1)?.toIntOrNull()
+            }
+            if (last != null) {
+                last
             } else {
-                resp.body().orEmpty().size
+                // Header stripped by a proxy — count by paging.
+                var page = 1
+                var total = 0
+                while (page <= 10) {
+                    val items = api.getStarredRepositories(page = page, perPage = 100).body().orEmpty()
+                    total += items.size
+                    if (items.size < 100) break
+                    page++
+                }
+                total
             }
         } catch (_: Exception) {
             0
