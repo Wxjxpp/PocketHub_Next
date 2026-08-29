@@ -57,6 +57,8 @@
     <string name="update_downloading">Downloading…</string>
     <string name="cd_fullscreen">View in full screen</string>
     <string name="cd_toggle_file_tree">Toggle file tree</string>
+    <string name="file_tree_search">Filter files…</string>
+    <string name="file_tree_no_match">No matching files</string>
     <string name="file_tree_unavailable">File tree unavailable</string>
     <string name="file_tree_truncated">This repository is very large — the file tree may be incomplete.</string>
     <string name="file_viewer_pick_hint">Pick a file from the tree to view it here</string>

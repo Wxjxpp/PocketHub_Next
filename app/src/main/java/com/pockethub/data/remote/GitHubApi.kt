@@ -105,6 +105,7 @@ interface GitHubApi :
     )
 
     /** Response of the recursive git/trees endpoint. */
+    @kotlinx.serialization.Serializable
     data class GitTreeResponse(
         val sha: String = "",
         val truncated: Boolean = false,
@@ -112,6 +113,7 @@ interface GitHubApi :
     )
 
     /** One entry of a git tree: blob (file) or tree (directory). */
+    @kotlinx.serialization.Serializable
     data class GitTreeEntry(
         val path: String = "",
         val mode: String = "",

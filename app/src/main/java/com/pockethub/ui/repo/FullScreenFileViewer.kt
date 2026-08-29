@@ -35,6 +35,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -113,7 +114,7 @@ internal fun FullScreenFileViewer(
                     FileTreePanel(
                         vm = vm,
                         modifier = Modifier
-                            .width(264.dp)
+                            .width(200.dp)
                             .fillMaxHeight(),
                     )
                     HorizontalDivider(
@@ -218,24 +219,48 @@ private fun FileTreePanel(
 ) {
     val state by vm.state.collectAsState()
     var expanded by remember { mutableStateOf(setOf<String>()) }
+    var query by rememberSaveable { mutableStateOf("") }
 
-    val rows = remember(state.fullTree, expanded) {
-        buildList {
-            val children = state.fullTree.groupBy { it.path.substringBeforeLast('/', "") }
-            fun walk(parent: String, depth: Int) {
-                val dirs = children[parent].orEmpty()
-                    .filter { it.type == "tree" }
-                    .sortedBy { it.path.substringAfterLast('/').lowercase() }
-                val files = children[parent].orEmpty()
-                    .filter { it.type == "blob" }
-                    .sortedBy { it.path.substringAfterLast('/').lowercase() }
-                dirs.forEach { dir ->
-                    add(TreeRow(dir, depth))
-                    if (dir.path in expanded) walk(dir.path, depth + 1)
-                }
-                files.forEach { add(TreeRow(it, depth)) }
+    // On first tree load, expand the current file's ancestor folders so the
+    // opened file is visible in the tree.
+    LaunchedEffect(state.fullTree) {
+        val cur = state.viewingFile?.path ?: return@LaunchedEffect
+        val ancestors = buildList {
+            var acc = ""
+            cur.substringBeforeLast('/').split('/').forEach { seg ->
+                acc = if (acc.isEmpty()) seg else "$acc/$seg"
+                add(acc)
             }
-            walk("", 0)
+        }
+        expanded = expanded + ancestors
+    }
+
+    val rows = remember(state.fullTree, expanded, query) {
+        if (query.isNotBlank()) {
+            // Filter mode: flat list of everything matching the query, indented
+            // by path depth — this is how very long trees stay navigable.
+            state.fullTree
+                .filter { it.path.contains(query.trim(), ignoreCase = true) }
+                .sortedBy { it.path.lowercase() }
+                .map { TreeRow(it, depth = it.path.count { ch -> ch == '/' }.coerceAtMost(4)) }
+        } else {
+            buildList {
+                val children = state.fullTree.groupBy { it.path.substringBeforeLast('/', "") }
+                fun walk(parent: String, depth: Int) {
+                    val dirs = children[parent].orEmpty()
+                        .filter { it.type == "tree" }
+                        .sortedBy { it.path.substringAfterLast('/').lowercase() }
+                    val files = children[parent].orEmpty()
+                        .filter { it.type == "blob" }
+                        .sortedBy { it.path.substringAfterLast('/').lowercase() }
+                    dirs.forEach { dir ->
+                        add(TreeRow(dir, depth))
+                        if (dir.path in expanded) walk(dir.path, depth + 1)
+                    }
+                    files.forEach { add(TreeRow(it, depth)) }
+                }
+                walk("", 0)
+            }
         }
     }
 
@@ -249,6 +274,17 @@ private fun FileTreePanel(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
         )
+        // Filter box — type to search the whole tree by path.
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it },
+            placeholder = { Text(stringResource(R.string.file_tree_search), style = MaterialTheme.typography.labelSmall) },
+            singleLine = true,
+            textStyle = MaterialTheme.typography.bodySmall,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+        )
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
         when {
             state.isLoadingTree -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -256,7 +292,7 @@ private fun FileTreePanel(
             }
             rows.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
-                    stringResource(R.string.file_tree_unavailable),
+                    stringResource(if (query.isNotBlank()) R.string.file_tree_no_match else R.string.file_tree_unavailable),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(16.dp),

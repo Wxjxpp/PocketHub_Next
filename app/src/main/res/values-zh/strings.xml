@@ -569,6 +569,8 @@
     <string name="update_downloading">下载中…</string>
     <string name="cd_fullscreen">全屏浏览</string>
     <string name="cd_toggle_file_tree">切换文件树</string>
+    <string name="file_tree_search">搜索文件…</string>
+    <string name="file_tree_no_match">没有匹配的文件</string>
     <string name="file_tree_unavailable">文件树不可用</string>
     <string name="file_tree_truncated">仓库过大，文件树可能不完整</string>
     <string name="file_viewer_pick_hint">从左侧文件树选择文件即可在此查看</string>
