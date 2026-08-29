@@ -432,7 +432,9 @@ fun RepoDetailScreen(
                     onToggleTranslation = { vm.toggleTranslation() },
                     onTopicClick = { topic -> onNavigateToSearch(topic) },
                     onNavigateToRepo = onNavigateToRepo,
-                    onLinkClick = rememberMarkdownLinkHandler(owner, repo, onNavigateToRepo, onNavigateToRepoTab, onNavigateToFile, onNavigateToUser, onNavigateToIssue, onNavigateToIssueFull, onNavigateToPRFull, onNavigateToCommit, onNavigateToWorkflowRun, onNavigateToCreateIssue, downloadVm = downloadVm, onNavigateToDownloads = onNavigateToDownloads),
+                    onLinkClick = rememberMarkdownLinkHandler(owner, repo, onNavigateToRepo, onNavigateToRepoTab, onNavigateToFile, onNavigateToUser, onNavigateToIssue, onNavigateToIssueFull, onNavigateToPRFull, onNavigateToCommit, onNavigateToWorkflowRun, onNavigateToCreateIssue, downloadVm = downloadVm, onNavigateToDownloads = onNavigateToDownloads, onSameRepoTab = { target ->
+                        RepoTab.entries.firstOrNull { it.name.equals(target.name, ignoreCase = true) }?.let { vm.currentTab.value = it }
+                    }),
                 )
                 RepoTab.CODE -> CodeTab(
                     owner = owner,
@@ -473,7 +475,9 @@ fun RepoDetailScreen(
                     canDelete = canManageReleases,
                     isDeletingRelease = isDeletingRelease,
                     isLoading = isLoadingReleases,
-                    onLinkClick = rememberMarkdownLinkHandler(owner, repo, onNavigateToRepo, onNavigateToRepoTab, onNavigateToFile, onNavigateToUser, onNavigateToIssue, onNavigateToIssueFull, onNavigateToPRFull, onNavigateToCommit, onNavigateToWorkflowRun, onNavigateToCreateIssue, downloadVm = downloadVm, onNavigateToDownloads = onNavigateToDownloads),
+                    onLinkClick = rememberMarkdownLinkHandler(owner, repo, onNavigateToRepo, onNavigateToRepoTab, onNavigateToFile, onNavigateToUser, onNavigateToIssue, onNavigateToIssueFull, onNavigateToPRFull, onNavigateToCommit, onNavigateToWorkflowRun, onNavigateToCreateIssue, downloadVm = downloadVm, onNavigateToDownloads = onNavigateToDownloads, onSameRepoTab = { target ->
+                        RepoTab.entries.firstOrNull { it.name.equals(target.name, ignoreCase = true) }?.let { vm.currentTab.value = it }
+                    }),
                     onNavigateToUser = onNavigateToUser,
                     onDownloadAsset = { asset ->
                         downloadVm.enqueue(
@@ -673,6 +677,8 @@ private fun rememberMarkdownLinkHandler(
     onNavigateToCreateIssue: (String, String) -> Unit,
     downloadVm: com.pockethub.ui.download.DownloadViewModel,
     onNavigateToDownloads: (tab: String) -> Unit,
+    /** Same-repo tab links switch tabs in place (no nav churn). */
+    onSameRepoTab: (com.pockethub.ui.markdown.RepoTabTarget) -> Unit,
 ): (String, com.pockethub.ui.markdown.LinkKind) -> Unit {
     // Unified GitHub in-app router — README / release notes links resolve to
     // the right screen (issue vs PR vs commit vs workflow run vs repo file),
@@ -683,12 +689,9 @@ private fun rememberMarkdownLinkHandler(
             owner = owner,
             repo = repo,
             onRepo = { o, r, tab ->
-                if (o == owner && r == repo && tab != null) {
-                    // Same repo, different tab → switch in place, no nav churn.
-                    RepoTabTarget.fromWire(tab)?.let { target ->
-                        RepoTab.entries.firstOrNull { it.name.equals(target.name, ignoreCase = true) }
-                            ?.let { vm.currentTab.value = it }
-                    }
+                val target = tab?.let { RepoTabTarget.fromWire(it) }
+                if (o == owner && r == repo && target != null) {
+                    onSameRepoTab(target)
                 } else {
                     onNavigateToRepoTab(o, r, tab)
                 }
