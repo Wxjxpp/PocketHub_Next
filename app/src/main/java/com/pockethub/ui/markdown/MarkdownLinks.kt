@@ -107,6 +107,22 @@ internal fun rememberLinkResolver(repoContext: String?): LinkResolver = LinkReso
     if ((raw.startsWith("/") || raw.startsWith("./") || raw.startsWith("../")) && repoContext != null) {
         return@LinkResolver "$gh/$repoContext/${raw.removePrefix("./")}"
     }
+    // Relative doc/file links without a ./ prefix: `README_zh-CN.md`,
+    // `docs/faq.md`. The old owner/repo regex mis-parsed `docs/faq.md` as
+    // repo "faq.md" of owner "docs". Disambiguate by document extension and
+    // segment count: exactly one slash without a doc extension is a repo
+    // slug ("owner/repo", incl. dotted names like "mrdoob/three.js").
+    val lastSegment = raw.substringAfterLast('/')
+    val docExt = Regex("\\.(md|markdown|txt|rst|adoc)$", RegexOption.IGNORE_CASE)
+    if (repoContext != null && !raw.contains(':') && !raw.startsWith("#") && !raw.startsWith("@") &&
+        raw.matches(Regex("^(?:\\.{0,2}/)?[A-Za-z0-9_./\\-]+$"))
+    ) {
+        val slashCount = raw.count { it == '/' }
+        val isFile = (slashCount <= 1 && docExt.containsMatchIn(lastSegment)) || slashCount >= 2
+        if (isFile) {
+            return@LinkResolver "$gh/$repoContext/${raw.removePrefix("./")}"
+        }
+    }
     val repoIssue = Regex("^([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)(?:#(\\d+))?$").matchEntire(raw)
     if (repoIssue != null) {
         val (owner, name, num) = repoIssue.destructured

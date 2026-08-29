@@ -88,6 +88,10 @@ fun IssueDetailScreen(
     issueNumber: Int,
     onNavigateToRepo: (String, String) -> Unit = { _, _ -> },
     onNavigateToUser: (String) -> Unit = {},
+    /** 仓库文件(blob/文档)打开 app 内查看器。 */
+    onNavigateToFile: (String, String, String, String?) -> Unit = { o, r, _, _ -> onNavigateToRepo(o, r) },
+    /** 仓库指定 tab(issues/pulls/releases/…)。 */
+    onNavigateToRepoTab: (String, String, String?) -> Unit = { o, r, _ -> onNavigateToRepo(o, r) },
     /** GitHub 站内链接跨仓库跳转(AppNavigation 传全局路由)。 */
     onNavigateToIssue: (String, String, Int) -> Unit = { _, _, _ -> },
     onNavigateToPR: (String, String, Int) -> Unit = { _, _, _ -> },
@@ -125,7 +129,8 @@ fun IssueDetailScreen(
             com.pockethub.ui.markdown.GitHubLinkNav(
                 owner = owner,
                 repo = repo,
-                onRepo = onNavigateToRepo,
+                onRepo = onNavigateToRepoTab,
+                onFile = onNavigateToFile,
                 onIssue = onNavigateToIssue,
                 onPull = onNavigateToPR,
                 onCommit = onNavigateToCommit,

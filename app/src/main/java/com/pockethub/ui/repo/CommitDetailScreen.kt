@@ -87,6 +87,8 @@ fun CommitDetailScreen(
     onNavigateToUser: (String) -> Unit = {},
     /** GitHub 站内链接跳转(commit message 引用 issue/PR/其他仓库)。 */
     onNavigateToRepo: (String, String) -> Unit = { _, _ -> },
+    onNavigateToFile: (String, String, String, String?) -> Unit = { o, r, _, _ -> onNavigateToRepo(o, r) },
+    onNavigateToRepoTab: (String, String, String?) -> Unit = { o, r, _ -> onNavigateToRepo(o, r) },
     onNavigateToIssue: (String, String, Int) -> Unit = { _, _, _ -> },
     onNavigateToPR: (String, String, Int) -> Unit = { _, _, _ -> },
     onNavigateToCommit: (String, String, String) -> Unit = { _, _, _ -> },
@@ -386,7 +388,8 @@ fun CommitDetailScreen(
                 com.pockethub.ui.markdown.GitHubLinkNav(
                     owner = owner,
                     repo = repo,
-                    onRepo = onNavigateToRepo,
+                    onRepo = onNavigateToRepoTab,
+                    onFile = onNavigateToFile,
                     onIssue = onNavigateToIssue,
                     onPull = onNavigateToPR,
                     onCommit = onNavigateToCommit,

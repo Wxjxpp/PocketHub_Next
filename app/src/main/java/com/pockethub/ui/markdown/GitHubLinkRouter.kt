@@ -1,34 +1,52 @@
 package com.pockethub.ui.markdown
 
-// GitHub in-app link router (net branch).
+// GitHub in-app link router (net branch, v2).
 //
-// README / issue / PR / release bodies are full of github.com links. This
-// parses any such URL into a structured target and maps it onto the app's
-// navigation graph, falling back to the system browser only for things the
-// app genuinely can't show.
+// Routing is driven by the URL's own path parameters — every github.com URL
+// maps to the deepest destination the app actually supports, degrading
+// gracefully one level at a time:
 //
-// Routing table (verified against GitHub URL shapes in 20 real READMEs —
-// see the test corpus in the commit message):
 //   github.com/{login}                              → user profile
-//   github.com/{login}?tab=repositories             → user profile
-//   github.com/orgs/{org}/...                       → org profile
-//   github.com/{owner}/{repo}                       → repo home
+//   github.com/orgs/{org}/...                       → user profile (org)
+//   github.com/{owner}/{repo}                       → repo (overview)
+//   github.com/{owner}/{repo}?tab=                  → repo at the given tab
+//   github.com/{owner}/{repo}/issues                → repo, Issues tab
+//   github.com/{owner}/{repo}/issues/new            → Create Issue screen
 //   github.com/{owner}/{repo}/issues/{n}            → issue detail
+//   github.com/{owner}/{repo}/pulls                 → repo, PR tab
 //   github.com/{owner}/{repo}/pull/{n}              → PR detail
-//   github.com/{owner}/{repo}/commit(s)/{sha}       → commit detail
-//   github.com/{owner}/{repo}/actions/runs/{id}     → workflow run detail (same repo)
-//   github.com/{owner}/{repo}/tree|blob/...         → repo home (code browser can't deep-link a path yet)
-//   github.com/{owner}/{repo}/<anything else>       → repo home (releases, wiki, discussions, projects, …)
-//   github.com/features|topics|about|...            → system browser (marketing pages)
-//   non-github hosts, gists                         → system browser
+//   github.com/{owner}/{repo}/commits[/x]           → repo, Commits tab / commit detail
+//   github.com/{owner}/{repo}/actions[/runs/{id}]   → repo, Workflows tab / run detail
+//   github.com/{owner}/{repo}/releases[/tag/{t}]    → repo, Releases tab
+//   github.com/{owner}/{repo}/blob/{ref}/{path}     → in-app file viewer
+//   github.com/{owner}/{repo}/{some/doc/path.md}    → in-app file viewer
+//   github.com/{owner}/{repo}/tree|wiki|discussions… → repo (nearest supported)
+//   marketing pages, gists, other hosts             → system browser
+//
 // Fragments (#readme, #L12) and query strings are stripped before parsing.
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalUriHandler
 
+/** Repo destinations the app can show directly. */
+enum class RepoTabTarget(val wire: String) {
+    CODE("code"), ISSUES("issues"), PULLS("pulls"), RELEASES("releases"),
+    COMMITS("commits"), ACTIONS("actions");
+
+    companion object {
+        fun fromWire(value: String?): RepoTabTarget? =
+            entries.firstOrNull { it.wire.equals(value, ignoreCase = true) }
+    }
+}
+
 sealed class GitHubLinkTarget {
-    data class Repo(val owner: String, val repo: String) : GitHubLinkTarget()
+    /** Repo home, or a specific tab when the URL's section asks for one. */
+    data class Repo(
+        val owner: String,
+        val repo: String,
+        val tab: RepoTabTarget? = null,
+    ) : GitHubLinkTarget()
     data class Issue(val owner: String, val repo: String, val number: Int) : GitHubLinkTarget()
     data class Pull(val owner: String, val repo: String, val number: Int) : GitHubLinkTarget()
     data class Commit(val owner: String, val repo: String, val sha: String) : GitHubLinkTarget()
@@ -36,6 +54,13 @@ sealed class GitHubLinkTarget {
     data class User(val login: String) : GitHubLinkTarget()
     /** github.com/{o}/{r}/issues/new — the app's Create Issue screen. */
     data class CreateIssue(val owner: String, val repo: String) : GitHubLinkTarget()
+    /** A file inside a repo — blob links and relative README doc links. */
+    data class File(
+        val owner: String,
+        val repo: String,
+        val path: String,
+        val ref: String? = null,
+    ) : GitHubLinkTarget()
     /** Nothing the app can render — open in the system browser. */
     object Unknown : GitHubLinkTarget()
 }
@@ -48,6 +73,13 @@ private val GITHUB_RESERVED_SEGMENTS = setOf(
     "orgs", "apps", "customer-stories", "readme", "issues", "pulls", "search",
     "developer", "new", "import", "install", "updates", "git-guides",
     "account", "dashboard", "finance", "trust", "premium-support",
+)
+
+/** Sections that are repo pages but have no dedicated app screen. */
+private val REPO_FALLBACK_SECTIONS = setOf(
+    "wiki", "discussions", "compare", "network", "stargazers", "forks",
+    "watchers", "projects", "pulse", "graphs", "milestone", "milestones",
+    "deploy", "purchase", "packages",
 )
 
 private fun urlDecode(s: String): String =
@@ -86,39 +118,65 @@ fun parseGitHubLink(url: String): GitHubLinkTarget {
     return when {
         section == "issues" && arg.toIntOrNull() != null ->
             GitHubLinkTarget.Issue(owner, repo, arg.toInt())
-        // github.com/{o}/{r}/issues/new — the web's new-issue form maps to the
-        // app's Create Issue screen.
         section == "issues" && segments.size >= 4 && segments[3].equals("new", ignoreCase = true) ->
             GitHubLinkTarget.CreateIssue(owner, repo)
+        section == "issues" ->
+            GitHubLinkTarget.Repo(owner, repo, RepoTabTarget.ISSUES)
         section == "pull" && arg.toIntOrNull() != null ->
             GitHubLinkTarget.Pull(owner, repo, arg.toInt())
+        section == "pulls" ->
+            GitHubLinkTarget.Repo(owner, repo, RepoTabTarget.PULLS)
         (section == "commits" || section == "commit") && arg.isNotBlank() ->
             GitHubLinkTarget.Commit(owner, repo, arg)
+        section == "commits" ->
+            GitHubLinkTarget.Repo(owner, repo, RepoTabTarget.COMMITS)
         section == "actions" ->
             if (segments.size >= 5 && segments[3].equals("runs", ignoreCase = true)) {
                 segments[4].toLongOrNull()
                     ?.let { GitHubLinkTarget.WorkflowRun(owner, repo, it) }
-                    ?: GitHubLinkTarget.Repo(owner, repo)
+                    ?: GitHubLinkTarget.Repo(owner, repo, RepoTabTarget.ACTIONS)
+            } else {
+                GitHubLinkTarget.Repo(owner, repo, RepoTabTarget.ACTIONS)
+            }
+        section == "releases" || section == "tag" ->
+            GitHubLinkTarget.Repo(owner, repo, RepoTabTarget.RELEASES)
+        // blob/{ref}/{path} opens the exact file; a bare blob/{ref} lands on Code.
+        section == "blob" ->
+            if (segments.size >= 5) {
+                GitHubLinkTarget.File(owner, repo, path = segments.drop(4).joinToString("/"), ref = arg.ifBlank { null })
+            } else {
+                GitHubLinkTarget.Repo(owner, repo, RepoTabTarget.CODE)
+            }
+        // Directories: the code browser can't deep-link a path yet → Code tab.
+        section == "tree" ->
+            GitHubLinkTarget.Repo(owner, repo, RepoTabTarget.CODE)
+        section in REPO_FALLBACK_SECTIONS ->
+            GitHubLinkTarget.Repo(owner, repo)
+        else -> {
+            // /{o}/{r}/{unrecognised/path} — if the last segment looks like a
+            // file (has an extension), treat it as a repo file link. This is
+            // what README-relative doc links resolve to (docs/faq.md etc.).
+            val relPath = segments.drop(2).joinToString("/")
+            val last = relPath.substringAfterLast('/')
+            if (last.contains('.') && !last.endsWith(".")) {
+                GitHubLinkTarget.File(owner, repo, path = relPath, ref = null)
             } else {
                 GitHubLinkTarget.Repo(owner, repo)
             }
-        // tree/blob/releases/wiki/discussions/compare/network/stargazers/forks/
-        // projects/pulse/graphs/security/pulls(anything else) — all live inside
-        // the repo in GitHub's web UI; the app surfaces the repo home.
-        else -> GitHubLinkTarget.Repo(owner, repo)
+        }
     }
 }
 
 /**
  * Navigation callbacks the host screen can provide. Any null callback makes
- * that target class degrade to the system browser instead of doing nothing.
- * [owner]/[repo] is the screen's own context (used to route same-repo
- * workflow runs to the run detail screen).
+ * that target class degrade one level (repo home → browser). [owner]/[repo]
+ * is the screen's own context (used for same-repo workflow-run routing).
  */
 data class GitHubLinkNav(
     val owner: String,
     val repo: String,
-    val onRepo: ((owner: String, repo: String) -> Unit)? = null,
+    /** [tab] is a [RepoTabTarget.wire] value or null for the repo home. */
+    val onRepo: ((owner: String, repo: String, tab: String?) -> Unit)? = null,
     val onIssue: ((owner: String, repo: String, number: Int) -> Unit)? = null,
     val onPull: ((owner: String, repo: String, number: Int) -> Unit)? = null,
     val onCommit: ((owner: String, repo: String, sha: String) -> Unit)? = null,
@@ -127,6 +185,8 @@ data class GitHubLinkNav(
     val onWorkflowRun: ((runId: Long) -> Unit)? = null,
     /** github.com/{o}/{r}/issues/new — null degrades to the system browser. */
     val onCreateIssue: ((owner: String, repo: String) -> Unit)? = null,
+    /** Open a repo file in the in-app viewer — null degrades to the repo home. */
+    val onFile: ((owner: String, repo: String, path: String, ref: String?) -> Unit)? = null,
     /** Release assets / raw files — enqueue into the in-app download manager. */
     val onDownload: ((url: String, fileName: String) -> Unit)? = null,
 )
@@ -166,7 +226,7 @@ fun rememberGitHubLinkHandler(nav: GitHubLinkNav): (String, LinkKind) -> Unit {
             when (val target = parseGitHubLink(url)) {
                 is GitHubLinkTarget.Repo -> {
                     val go = nav.onRepo
-                    if (go != null) go(target.owner, target.repo) else browser()
+                    if (go != null) go(target.owner, target.repo, target.tab?.wire) else browser()
                 }
                 is GitHubLinkTarget.Issue -> {
                     val go = nav.onIssue
@@ -188,11 +248,17 @@ fun rememberGitHubLinkHandler(nav: GitHubLinkNav): (String, LinkKind) -> Unit {
                     val go = nav.onCreateIssue
                     if (go != null) go(target.owner, target.repo) else browser()
                 }
+                is GitHubLinkTarget.File -> {
+                    val go = nav.onFile
+                    if (go != null) go(target.owner, target.repo, target.path, target.ref)
+                    else nav.onRepo?.invoke(target.owner, target.repo, RepoTabTarget.CODE.wire)
+                        ?: browser()
+                }
                 is GitHubLinkTarget.WorkflowRun -> {
                     val sameRepo = target.owner.equals(nav.owner, true) && target.repo.equals(nav.repo, true)
                     when {
                         sameRepo && nav.onWorkflowRun != null -> nav.onWorkflowRun!!.invoke(target.runId)
-                        nav.onRepo != null -> nav.onRepo!!.invoke(target.owner, target.repo)
+                        nav.onRepo != null -> nav.onRepo!!.invoke(target.owner, target.repo, RepoTabTarget.ACTIONS.wire)
                         else -> browser()
                     }
                 }
