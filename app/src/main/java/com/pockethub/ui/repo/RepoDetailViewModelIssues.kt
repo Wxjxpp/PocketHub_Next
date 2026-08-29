@@ -35,6 +35,14 @@ internal fun RepoDetailViewModel.loadMorePulls(owner: String, repo: String) {
     fetchPullsPage(owner, repo, state, append = true)
 }
 
+/** Fetch the next page of issues for the current filter. */
+internal fun RepoDetailViewModel.loadMoreIssues(owner: String, repo: String) {
+    if (!issuesCanLoadMore || _isLoadingMoreIssues.value) return
+    val state = _issueStateFilter.value.apiValue
+    issuePage++
+    fetchIssuesPage(owner, repo, state, append = true)
+}
+
 internal fun RepoDetailViewModel.fetchPullsPage(owner: String, repo: String, state: String, append: Boolean, forceFresh: Boolean = false): Job {
     return viewModelScope.launch {
         if (append) _isLoadingMorePulls.update { true } else _isLoadingPulls.update { true }
