@@ -26,9 +26,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Description
-import androidx.compose.material.icons.outlined.DriveFileMove
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.FolderOpen
+import androidx.compose.material.icons.outlined.ViewSidebar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -124,7 +124,15 @@ internal fun FullScreenFileViewer(
                             .width(0.5.dp),
                     )
                 }
-                Box(Modifier.weight(1f).fillMaxHeight()) {
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        // Tree open: a tap anywhere in the reading area collapses
+                        // the panel for immersive reading (scrolls still work —
+                        // children consume drag gestures first).
+                        .clickable(enabled = treeOpen) { treeOpen = false },
+                ) {
                     val content = state.fileContent
                     val entry = state.viewingFile
                     when {
@@ -183,7 +191,7 @@ private fun TopBar(
         actions = {
             IconButton(onClick = onToggleTree) {
                 Icon(
-                    Icons.Outlined.DriveFileMove,
+                    Icons.Outlined.ViewSidebar,
                     contentDescription = stringResource(R.string.cd_toggle_file_tree),
                     tint = if (treeOpen) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
