@@ -494,7 +494,7 @@ private fun MirrorPrefixSheet(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun OAuthClientSheet(
     initialId: String,
