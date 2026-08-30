@@ -92,6 +92,10 @@ fun ProfileScreen(
 ) {
     val user by vm.user.collectAsState()
     val isRefreshing by vm.isLoading.collectAsState()
+    // Belt-and-suspenders scroll restore: re-applies the saved position once
+    // content exists, covering cases where the saveable state was clamped to
+    // the top while the list was briefly empty at restore time.
+    val listState = com.pockethub.ui.components.rememberRestorableListState(contentReady = user != null)
     val allAccounts by vm.allAccounts.collectAsState()
     val activeAccount by vm.activeAccount.collectAsState()
     val topRepos by vm.topRepos.collectAsState()
@@ -140,6 +144,7 @@ fun ProfileScreen(
             modifier = modifier.padding(padding),
         ) {
         LazyColumn(
+            state = listState,
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
