@@ -173,57 +173,97 @@ class UpdateViewModel @Inject constructor(
                 withContext(Dispatchers.IO) {
                     // Route the APK download through the accelerator when configured.
                     val mirrored = com.pockethub.util.applyMirrorPrefix(url, settings.downloadMirrorPrefix.first())
-                    val request = Request.Builder().url(mirrored).build()
                     // GitHub CDN issues redirects to release-assets; follow them.
+                    // (OkHttp preserves the Range header across redirect hops.)
                     val dlClient = client.newBuilder().followRedirects(true).build()
-                    dlClient.newCall(request).execute().use { resp ->
-                        if (!resp.isSuccessful) {
-                            _download.value = DownloadState.Failed("HTTP ${resp.code}")
-                            return@withContext
-                        }
-                        val total = (resp.body?.contentLength()?.takeIf { it > 0 }
-                            ?: info.assetSizeBytes).coerceAtLeast(0)
-                        val body = resp.body ?: throw java.io.IOException("Empty body")
-                        body.byteStream().use { input ->
-                            tmp.outputStream().use { output ->
-                                val buf = ByteArray(32 * 1024)
-                                var read = 0L
-                                var lastEmit = 0L
-                                while (true) {
-                                    val n = input.read(buf)
-                                    if (n == -1) break
-                                    if (!isActive) throw kotlinx.coroutines.CancellationException("cancelled")
-                                    output.write(buf, 0, n)
-                                    read += n
-                                    if (read - lastEmit >= 200 * 1024) {
-                                        val pct = if (total > 0) ((read * 100) / total).toInt().coerceIn(0, 100) else 0
-                                        _download.value = DownloadState.Running(pct, read, total)
-                                        lastEmit = read
+
+                    // Byte-range resume: a leftover .part file (previous failure /
+                    // app kill) re-requests only the missing tail — 206 appends,
+                    // 200 restarts, 416 (stale part) drops it once and retries.
+                    // Transient network errors (EOF mid-stream etc.) auto-resume
+                    // up to MAX_RESUME times with a linear backoff.
+                    var droppedStale = false
+                    var autoResumes = 0
+                    while (true) {
+                        try {
+                            val base = if (tmp.exists()) tmp.length() else 0L
+                            val req = Request.Builder().url(mirrored)
+                            if (base > 0) req.header("Range", "bytes=$base-")
+                            var retryStale = false
+                            dlClient.newCall(req.build()).execute().use { resp ->
+                                if (resp.code == 416 && base > 0 && !droppedStale) {
+                                    droppedStale = true
+                                    retryStale = true
+                                    return@use
+                                }
+                                if (!resp.isSuccessful) {
+                                    _download.value = DownloadState.Failed("HTTP ${resp.code}")
+                                    return@withContext
+                                }
+                                val resume = resp.code == 206 && base > 0
+                                val already = if (resume) base else 0L
+                                val total = when {
+                                    resp.code == 206 -> resp.header("Content-Range")
+                                        ?.let { Regex("bytes .*/(\\d+)").find(it)?.groupValues?.get(1)?.toLong() }
+                                        ?: (base + (resp.body?.contentLength()?.takeIf { it > 0 } ?: 0L))
+                                    else -> resp.body?.contentLength()?.takeIf { it > 0 } ?: info.assetSizeBytes
+                                }.coerceAtLeast(0)
+                                val body = resp.body ?: throw java.io.IOException("Empty body")
+                                body.byteStream().use { input ->
+                                    java.io.FileOutputStream(tmp, resume).use { output ->
+                                        val buf = ByteArray(32 * 1024)
+                                        var read = 0L
+                                        var lastEmit = 0L
+                                        while (true) {
+                                            val n = input.read(buf)
+                                            if (n == -1) break
+                                            if (!isActive) throw kotlinx.coroutines.CancellationException("cancelled")
+                                            output.write(buf, 0, n)
+                                            read += n
+                                            if (read - lastEmit >= 200 * 1024) {
+                                                val downloaded = already + read
+                                                val pct = if (total > 0) ((downloaded * 100) / total).toInt().coerceIn(0, 100) else 0
+                                                _download.value = DownloadState.Running(pct, downloaded, total)
+                                                lastEmit = read
+                                            }
+                                        }
                                     }
                                 }
                             }
+                            if (retryStale) { tmp.delete(); continue }
+
+                            if (dest.exists()) dest.delete()
+                            if (!tmp.renameTo(dest)) {
+                                tmp.copyTo(dest, overwrite = true)
+                                tmp.delete()
+                            }
+                            // Auto-launch the system PackageInstaller — the user already
+                            // tapped Download, so handing off immediately spares them an extra
+                            // confirmation tap inside the dialog. The OS still shows its own
+                            // permission prompt, preserving user control.
+                            _download.value = DownloadState.Done(dest.absolutePath)
+                            install(appContext, dest.absolutePath)
+                            return@withContext
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
+                        } catch (e: java.io.IOException) {
+                            // Transient network error mid-transfer: the .part file kept
+                            // everything downloaded so far — loop re-issues the Range
+                            // request and only fetches the tail.
+                            if (autoResumes >= MAX_RESUME) throw e
+                            autoResumes++
+                            kotlinx.coroutines.delay(RESUME_BACKOFF_MS * autoResumes)
                         }
                     }
-                    if (dest.exists()) dest.delete()
-                    if (!tmp.renameTo(dest)) {
-                        tmp.copyTo(dest, overwrite = true)
-                        tmp.delete()
-                    }
-                    // Auto-launch the system PackageInstaller — the user already
-                    // tapped Download, so handing off immediately spares them an extra
-                    // confirmation tap inside the dialog. The OS still shows its own
-                    // permission prompt, preserving user control.
-                    _download.value = DownloadState.Done(dest.absolutePath)
-                    install(appContext, dest.absolutePath)
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
-                tmp.delete()
+                // Keep the .part file — the next download attempt resumes from it.
                 // On cancel we surface Idle rather than Failed — user already saw it die.
                 _download.value = DownloadState.Idle
                 throw e
             } catch (e: Throwable) {
                 issueReporter.reportError("Update", "startDownload", e)
-                tmp.delete()
+                // Keep the .part file so the retry byte-range resumes.
                 _download.value = DownloadState.Failed(e.userMessage(e.javaClass.simpleName))
             }
         }
@@ -264,5 +304,13 @@ class UpdateViewModel @Inject constructor(
         val dir = File(appContext.cacheDir, "updates")
         if (!dir.exists()) dir.mkdirs()
         return dir
+    }
+
+    private companion object {
+        /** Bounded auto-resume attempts for transient network errors (EOF mid-stream etc.). */
+        const val MAX_RESUME = 3
+
+        /** Linear backoff between auto-resume attempts, multiplied by the attempt number. */
+        const val RESUME_BACKOFF_MS = 1_500L
     }
 }
