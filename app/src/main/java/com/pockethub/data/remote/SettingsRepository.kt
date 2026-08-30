@@ -51,6 +51,7 @@ class SettingsRepository @Inject constructor(
         val ISSUE_REPORT_EMAIL = stringPreferencesKey("issue_report_email")
         val ISSUE_REPORT_MODE = stringPreferencesKey("issue_report_mode")
         val ISSUE_REPORT_TARGET_REPO = stringPreferencesKey("issue_report_target_repo")
+        val FOLLOW_SYSTEM_THEME = booleanPreferencesKey("follow_system_theme")
     }
 
     // ── Theme ─────────────────────────────────────────────
@@ -78,6 +79,17 @@ class SettingsRepository @Inject constructor(
         context.dataStore.edit { prefs ->
             if (style == null) prefs.remove(Keys.APP_STYLE) else prefs[Keys.APP_STYLE] = style.key
         }
+    }
+
+    // ── Follow system dark mode ──────────────────────────
+    /** When on: system enters night mode → force the built-in dark style;
+     *  system leaves it → back to the user's chosen style. */
+    val followSystemTheme: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[Keys.FOLLOW_SYSTEM_THEME] ?: false
+    }
+
+    suspend fun setFollowSystemTheme(on: Boolean) {
+        context.dataStore.edit { prefs -> prefs[Keys.FOLLOW_SYSTEM_THEME] = on }
     }
 
     // ── Language ──────────────────────────────────────────

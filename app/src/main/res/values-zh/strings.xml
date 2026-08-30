@@ -579,6 +579,8 @@
     <string name="file_viewer_pick_hint">从左侧文件树选择文件即可在此查看</string>
     <string name="source_name_komi">Komi 排行榜</string>
     <string name="source_desc_komi">github-store.org 聚合的开源排行榜 —— 按平台查看趋势、最新热门与最受欢迎的项目。</string>
+    <string name="source_name_komi_feed">Komi 发现</string>
+    <string name="source_desc_komi_feed">Komi Store 每日轮换的精选发现(github-store.org)</string>
     <string name="komi_cat_trending">趋势</string>
     <string name="komi_cat_new">最新热门</string>
     <string name="komi_cat_popular">最受欢迎</string>

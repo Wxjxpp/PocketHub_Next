@@ -38,6 +38,13 @@ class SettingsViewModel @Inject constructor(
     val appStyle: StateFlow<AppStyle?> = settings.appStyle
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
+    val followSystemTheme: StateFlow<Boolean> = settings.followSystemTheme
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun setFollowSystemTheme(on: Boolean) {
+        viewModelScope.launch { settings.setFollowSystemTheme(on) }
+    }
+
     val appLocale: StateFlow<AppLocale> = settings.appLocale
         .map { AppLocale.fromKey(it) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, AppLocale.SYSTEM)

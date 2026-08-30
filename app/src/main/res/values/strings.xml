@@ -65,6 +65,8 @@
     <string name="file_viewer_pick_hint">Pick a file from the tree to view it here</string>
     <string name="source_name_komi">Komi Top Charts</string>
     <string name="source_desc_komi">Aggregated top charts from github-store.org — trending, new-release and most-popular open source, per platform.</string>
+    <string name="source_name_komi_feed">Komi Discover</string>
+    <string name="source_desc_komi_feed">Daily rotating picks from Komi Store (github-store.org)</string>
     <string name="komi_cat_trending">Trending</string>
     <string name="komi_cat_new">New releases</string>
     <string name="komi_cat_popular">Most popular</string>

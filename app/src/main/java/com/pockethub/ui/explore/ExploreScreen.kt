@@ -58,6 +58,9 @@ internal val TIME_RANGES = listOf("Daily", "Weekly", "Monthly")
 internal val KOMI_CATEGORIES = listOf("trending", "new-releases", "most-popular")
 internal val KOMI_PLATFORMS = listOf("android", "windows", "macos", "linux")
 
+/** Discovery feed adds an explicit "all platforms" bucket (backend default). */
+internal val KOMI_DISCOVER_PLATFORMS = listOf("all") + KOMI_PLATFORMS
+
 @Composable
 internal fun komiCategoryLabel(category: String): String = when (category) {
     "new-releases" -> stringResource(R.string.komi_cat_new)
@@ -67,6 +70,7 @@ internal fun komiCategoryLabel(category: String): String = when (category) {
 
 @Composable
 internal fun komiPlatformLabel(platform: String): String = when (platform) {
+        "all" -> stringResource(R.string.trending_language_all)
     "windows" -> stringResource(R.string.komi_platform_windows)
     "macos" -> stringResource(R.string.komi_platform_macos)
     "linux" -> stringResource(R.string.komi_platform_linux)
@@ -253,7 +257,28 @@ fun ExploreScreen(
                     // gets category + platform chips (same visual language).
                     // Sources that respond to neither drop the surface entirely
                     // rather than misleading the user.
-                    if (trendingSource == FeedSourceOption.KOMI_TOP_CHARTS) {
+                    if (trendingSource == FeedSourceOption.KOMI_DISCOVER) {
+                        // Discovery feed: platform chips only (all / android / …).
+                        item {
+                            LazyRow(
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                items(KOMI_DISCOVER_PLATFORMS) { platform ->
+                                    FilterChip(
+                                        selected = komiPlatform == platform,
+                                        onClick = { vm.setKomiFilters(komiCategory, platform) },
+                                        label = { Text(komiPlatformLabel(platform), style = MaterialTheme.typography.labelMedium) },
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        ),
+                                    )
+                                }
+                            }
+                        }
+                        item { Spacer(Modifier.height(4.dp)) }
+                    } else if (trendingSource == FeedSourceOption.KOMI_TOP_CHARTS) {
                         // Category chips
                         item {
                             LazyRow(
@@ -433,6 +458,7 @@ private fun sourceDisplayName(source: FeedSourceOption): String = when (source) 
     FeedSourceOption.REDDIT_TOP           -> stringResource(R.string.source_name_reddit_top)
     FeedSourceOption.GITHUB_EVENTS        -> stringResource(R.string.source_name_github_events)
     FeedSourceOption.KOMI_TOP_CHARTS      -> stringResource(R.string.source_name_komi)
+    FeedSourceOption.KOMI_DISCOVER        -> stringResource(R.string.source_name_komi_feed)
 }
 
 /** LazyColumn section listing a [DiscoverItem] collection with loading / error / empty states.

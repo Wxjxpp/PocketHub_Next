@@ -17,6 +17,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.CleaningServices
+import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.Leaderboard
 import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material.icons.outlined.Storage
@@ -151,6 +152,7 @@ private fun SourceGroup(
                 FeedSourceOption.REDDIT_TOP           -> Icons.Outlined.Public
                 FeedSourceOption.GITHUB_EVENTS        -> Icons.Outlined.Storage
                 FeedSourceOption.KOMI_TOP_CHARTS      -> Icons.Outlined.Leaderboard
+                FeedSourceOption.KOMI_DISCOVER        -> Icons.Outlined.Explore
             }
             Card(
                 shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
@@ -331,6 +333,7 @@ private fun optionDisplayName(option: FeedSourceOption): String = when (option) 
     FeedSourceOption.REDDIT_TOP           -> stringResource(R.string.source_name_reddit_top)
     FeedSourceOption.GITHUB_EVENTS        -> stringResource(R.string.source_name_github_events)
     FeedSourceOption.KOMI_TOP_CHARTS      -> stringResource(R.string.source_name_komi)
+    FeedSourceOption.KOMI_DISCOVER        -> stringResource(R.string.source_name_komi_feed)
 }
 
 @Composable
@@ -344,4 +347,5 @@ private fun optionDescription(option: FeedSourceOption): String = when (option) 
     FeedSourceOption.REDDIT_TOP           -> stringResource(R.string.source_desc_reddit_top)
     FeedSourceOption.GITHUB_EVENTS        -> stringResource(R.string.source_desc_github_events)
     FeedSourceOption.KOMI_TOP_CHARTS      -> stringResource(R.string.source_desc_komi)
+    FeedSourceOption.KOMI_DISCOVER        -> stringResource(R.string.source_desc_komi_feed)
 }

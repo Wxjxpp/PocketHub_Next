@@ -61,6 +61,14 @@ enum class FeedSourceOption(
         defaultBaseUrl = "https://api.github-store.org/v1/",
     ),
 
+    KOMI_DISCOVER(
+        id = "KOMI_DISCOVER",
+        // github-store.org daily-rotating discovery feed (komi-store backend):
+        // GET /v1/feed?platform=… — a fresh pick of installable repos per
+        // platform each day. Platform filter reuses the Trending-tab chips.
+        defaultBaseUrl = "https://api.github-store.org/v1/",
+    ),
+
     // Public discovery sources. OSS Insight and Hacker News are intentionally
     // retained as built-in defaults alongside the official GitHub source.
     OSS_INSIGHT(
@@ -115,7 +123,7 @@ enum class FeedSourceOption(
         fun optionsFor(tab: FeedTab): List<FeedSourceOption> = when (tab) {
             // Trending keeps only the official GitHub endpoint — stable, token-
             // cached and the obvious zero-configuration choice.
-            FeedTab.TRENDING  -> listOf(GITHUB_SEARCH, KOMI_TOP_CHARTS)
+            FeedTab.TRENDING  -> listOf(GITHUB_SEARCH, KOMI_TOP_CHARTS, KOMI_DISCOVER)
             // Featured keeps its first three sources; the rest were pruned to
             // keep the settings screen focused.
             FeedTab.FEATURED  -> listOf(OSS_INSIGHT, HACKER_NEWS_SHOWHN, NPM_REGISTRY)
