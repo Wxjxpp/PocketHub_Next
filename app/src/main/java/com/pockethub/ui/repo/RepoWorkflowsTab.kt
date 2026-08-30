@@ -30,6 +30,8 @@ import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.ArrowDropDown
 import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.Circle
+import androidx.compose.material.icons.outlined.KeyboardArrowUp
 import androidx.compose.runtime.remember
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.AlertDialog
@@ -449,61 +451,86 @@ internal fun BranchSelectorChip(
     onToggle: () -> Unit,
     onSelect: (String) -> Unit,
 ) {
+    // Inline expandable picker instead of a DropdownMenu: popups anchored
+    // inside a dialog re-position when their anchor moves — with many branches
+    // the menu visibly "drifted". The embedded list lives inside the dialog
+    // layout, so it can't.
     var expanded by remember { mutableStateOf(false) }
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(vertical = 6.dp)
-            .clickable(enabled = enabled) { expanded = true }
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(
-            Icons.Outlined.Public,
-            contentDescription = null,
-            modifier = Modifier.size(18.dp),
-            tint = MaterialTheme.colorScheme.primary,
-        )
-        Spacer(Modifier.width(8.dp))
-        Text(
-            stringResource(R.string.workflow_dispatch_ref_label),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.weight(1f))
-        if (isLoadingBranches) {
-            CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-        } else {
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clip(MaterialTheme.shapes.small)
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                .clickable(enabled = enabled) { expanded = !expanded }
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                Icons.Outlined.Public,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+                tint = MaterialTheme.colorScheme.primary,
+            )
+            Spacer(Modifier.width(8.dp))
             Text(
-                currentRef,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
+                stringResource(R.string.workflow_dispatch_ref_label),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.weight(1f))
+            if (isLoadingBranches) {
+                CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+            } else {
+                Text(
+                    currentRef,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+            Icon(
+                if (expanded) Icons.Outlined.KeyboardArrowUp else Icons.Outlined.ArrowDropDown,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Icon(
-            Icons.Outlined.ArrowDropDown,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-    DropdownMenu(expanded = expanded && enabled, onDismissRequest = { expanded = false }) {
-        branchNames.forEach { name ->
-            DropdownMenuItem(
-                text = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (name == currentRef) {
-                            Icon(Icons.Outlined.Check, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(8.dp))
-                        }
-                        Text(name, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        androidx.compose.animation.AnimatedVisibility(visible = expanded && enabled) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp)
+                    .heightIn(max = 180.dp)
+                    .verticalScroll(rememberScrollState())
+                    .clip(MaterialTheme.shapes.small)
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
+            ) {
+                branchNames.forEach { name ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable { onSelect(name); expanded = false }
+                            .padding(horizontal = 12.dp, vertical = 9.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            if (name == currentRef) Icons.Outlined.Check else Icons.Outlined.Circle,
+                            contentDescription = null,
+                            modifier = Modifier.size(15.dp),
+                            tint = if (name == currentRef) MaterialTheme.colorScheme.primary
+                                   else MaterialTheme.colorScheme.outlineVariant,
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            name,
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            fontWeight = if (name == currentRef) FontWeight.SemiBold else FontWeight.Normal,
+                        )
                     }
-                },
-                onClick = {
-                    onSelect(name)
-                    expanded = false
-                },
-            )
+                }
+            }
         }
     }
 }

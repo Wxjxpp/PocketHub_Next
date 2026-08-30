@@ -99,14 +99,12 @@ fun SettingsScreen(
     val customClientId by vm.customClientId.collectAsState()
     val downloadMirrorPrefix by vm.downloadMirrorPrefix.collectAsState()
     val customClientSecret by vm.customClientSecret.collectAsState()
-    val notifPollMinutes by vm.notifPollMinutes.collectAsState()
     val accountCount by vm.accountCount.collectAsState()
     val cacheSizeBytes by vm.cacheSizeBytes.collectAsState()
     val translateTarget by vm.translateTarget.collectAsState()
     var showStyleSheet by remember { mutableStateOf(false) }
     var showLanguageSheet by remember { mutableStateOf(false) }
     var showTranslateSheet by remember { mutableStateOf(false) }
-    var showNotifPollSheet by remember { mutableStateOf(false) }
     var showOAuthSheet by remember { mutableStateOf(false) }
     var showMirrorSheet by remember { mutableStateOf(false) }
     var showAbout by remember { mutableStateOf(false) }
@@ -178,12 +176,6 @@ fun SettingsScreen(
             SectionHeader(stringResource(R.string.section_notifications))
             com.pockethub.ui.components.PhCard(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), cornerRadius = 18.dp) {
                 Column {
-            ListItem(
-                leadingContent = { Icon(Icons.Outlined.Notifications, contentDescription = null) },
-                headlineContent = { Text(stringResource(R.string.polling_cadence)) },
-                supportingContent = { Text(notificationCadenceLabel(notifPollMinutes)) },
-                modifier = Modifier.clickable { showNotifPollSheet = true },
-            )
             ListItem(
                 leadingContent = { Icon(Icons.Outlined.Brightness2, contentDescription = null) },
                 headlineContent = { Text(stringResource(R.string.system_notification_settings)) },
@@ -384,27 +376,6 @@ fun SettingsScreen(
     if (showAbout) {
         ModalBottomSheet(onDismissRequest = { showAbout = false }, sheetState = rememberModalBottomSheetState()) {
             AboutContent()
-        }
-    }
-
-    if (showNotifPollSheet) {
-        ModalBottomSheet(onDismissRequest = { showNotifPollSheet = false }, sheetState = rememberModalBottomSheetState()) {
-            Column(Modifier.padding(bottom = 24.dp)) {
-                Text(stringResource(R.string.polling_cadence), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(16.dp))
-                listOf(0, 15, 60, 1440).forEach { minutes ->
-                    Row(
-                        Modifier.fillMaxWidth().clickable {
-                            vm.setNotifPollMinutes(minutes)
-                            showNotifPollSheet = false
-                        }.padding(vertical = 8.dp).padding(horizontal = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        RadioButton(selected = notifPollMinutes == minutes, onClick = null)
-                        Spacer(Modifier.width(12.dp))
-                        Text(notificationCadenceLabel(minutes))
-                    }
-                }
-            }
         }
     }
 

@@ -70,8 +70,8 @@ class IssueReportWorker @AssistedInject constructor(
         require(parts.size == 2 && parts.all { it.isNotBlank() }) { "target repo must be owner/repo, got: $targetRepo" }
         val (owner, repo) = parts
 
-        val subject = "[PocketHub] 严重问题汇总 ${events.size} 条 — v${events.first().appVersionName}"
-        val body = buildBody(events, githubMarkdown = true)
+        val subject = IssueReportFormat.emailSubject(events)
+        val body = IssueReportFormat.markdownBody(events)
 
         val request = GitHubApi.IssueCreateRequest(
             title = subject,
@@ -89,10 +89,11 @@ class IssueReportWorker @AssistedInject constructor(
         // Even if blank we leave the ring intact — see doWork's guard.
         require(email.isNotBlank()) { "issue_report_email not set; cannot stage" }
 
-        val subject = "[PocketHub] 严重问题汇总 ${events.size} 条 — v${events.first().appVersionName}"
-        val body = buildBody(events, githubMarkdown = false)
+        val subject = IssueReportFormat.emailSubject(events)
+        val body = IssueReportFormat.plainEmailBody(events)
+        val html = IssueReportFormat.htmlEmailBody(events)
 
-        stageEmailIntoOutbox(email, subject, body)
+        stageEmailIntoOutbox(email, subject, body, html)
         postStagedNotification(events.size)
     }
 
@@ -101,12 +102,15 @@ class IssueReportWorker @AssistedInject constructor(
      * Settings screen can always re-(open) the draft for the user, plus fire
      * a broadcast so an in-app listener (if registered) can react.
      */
-    private fun stageEmailIntoOutbox(toEmail: String, subject: String, body: String) {
+    private fun stageEmailIntoOutbox(toEmail: String, subject: String, body: String, html: String) {
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = "message/rfc822"
             putExtra(Intent.EXTRA_EMAIL, arrayOf(toEmail))
             putExtra(Intent.EXTRA_SUBJECT, subject)
             putExtra(Intent.EXTRA_TEXT, body)
+            // Styled variant (colored kind badges, monospace stacks) — Gmail
+            // honors it; clients that don't fall back to EXTRA_TEXT.
+            putExtra(Intent.EXTRA_HTML_TEXT, html)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         runCatching {
@@ -119,6 +123,7 @@ class IssueReportWorker @AssistedInject constructor(
             putExtra("to", toEmail)
             putExtra("subject", subject)
             putExtra("body", body)
+            putExtra("html", html)
         }
         context.sendBroadcast(pending)
 
@@ -127,6 +132,7 @@ class IssueReportWorker @AssistedInject constructor(
             .putString("to", toEmail)
             .putString("subject", subject)
             .putString("body", body)
+            .putString("html", html)
             .apply()
     }
 

@@ -210,11 +210,6 @@ fun NotificationsScreen(
                             notif = notif,
                             onMarkRead = { vm.markRead(notif.id) },
                             onUnsubscribe = { pendingUnsubId = notif.id },
-                            onCopy = {
-                                val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                cm.setPrimaryClip(ClipData.newPlainText("notification", notif.subject.title))
-                                scope.launch { snackbarHostState.showSnackbar("Copied") }
-                            },
                             onClick = {
                                 val owner = repoFullName.substringBefore('/')
                                 val repo = repoFullName.substringAfter('/')
@@ -272,10 +267,8 @@ private fun NotificationItem(
     notif: GitHubNotification,
     onMarkRead: () -> Unit,
     onUnsubscribe: () -> Unit,
-    onCopy: () -> Unit,
     onClick: () -> Unit,
 ) {
-    var menuOpen by remember { mutableStateOf(false) }
     com.pockethub.ui.components.PhCard(
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         onClick = onClick,
@@ -332,30 +325,34 @@ private fun NotificationItem(
             }
         }
 
-        // Overflow menu
-        IconButton(onClick = { menuOpen = true }) {
-            Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.cd_notif_actions), tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
-        }
-        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+        // Inline action buttons — replaced the overflow popup, which anchored
+        // to a row that moved and rendered in a drifting position.
+        Column(
+            horizontalAlignment = androidx.compose.ui.Alignment.End,
+            verticalArrangement = Arrangement.spacedBy(0.dp),
+        ) {
             if (notif.unread) {
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.action_mark_read)) },
-                    leadingIcon = { Icon(Icons.Outlined.Done, null, modifier = Modifier.size(18.dp)) },
-                    onClick = { menuOpen = false; onMarkRead() },
-                )
+                ActionTextButton(stringResource(R.string.action_mark_read), MaterialTheme.colorScheme.primary, onMarkRead)
             }
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.action_unsubscribe)) },
-                leadingIcon = { Icon(Icons.Outlined.Unsubscribe, null, modifier = Modifier.size(18.dp)) },
-                onClick = { menuOpen = false; onUnsubscribe() },
-            )
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.action_copy)) },
-                onClick = { menuOpen = false; onCopy() },
-            )
+            ActionTextButton(stringResource(R.string.action_unsubscribe), MaterialTheme.colorScheme.onSurfaceVariant, onUnsubscribe)
         }
         }
     }
+}
+
+/** Tiny text-only action button used in notification rows. */
+@Composable
+private fun ActionTextButton(label: String, tint: androidx.compose.ui.graphics.Color, onClick: () -> Unit) {
+    Text(
+        label,
+        style = MaterialTheme.typography.labelSmall,
+        color = tint,
+        fontWeight = FontWeight.Medium,
+        modifier = Modifier
+            .clip(MaterialTheme.shapes.small)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+    )
 }
 
 @Composable
