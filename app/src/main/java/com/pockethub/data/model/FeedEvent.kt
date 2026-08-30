@@ -47,7 +47,18 @@ data class FeedEvent(
         val commits: List<Commit> = emptyList(),
         @SerialName("pull_request") val pullRequest: PullRequestRef? = null,
         val forkee: RepoRef? = null,
+        /** IssuesEvent / IssueCommentEvent carry the target issue. When the
+         *  issue object embeds a `pull_request` field it is actually a PR
+         *  (GitHub shares the issue/PR number sequence). */
+        val issue: IssueRef? = null,
     ) {
+        @Serializable
+        data class IssueRef(
+            val number: Int = 0,
+            val title: String? = null,
+            @SerialName("html_url") val htmlUrl: String? = null,
+            @SerialName("pull_request") val pullRequest: kotlinx.serialization.json.JsonObject? = null,
+        )
         @Serializable
         data class Commit(
             val sha: String = "",

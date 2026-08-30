@@ -66,6 +66,9 @@ private fun formatRelativeTime(iso: String): String = try {
 fun ActivityCard(
     event: FeedEvent,
     onNavigateToRepo: (String) -> Unit,
+    onNavigateToIssue: ((String, String, Int) -> Unit)? = null,
+    onNavigateToPR: ((String, String, Int) -> Unit)? = null,
+    onNavigateToCommit: ((String, String, String) -> Unit)? = null,
 ) {
     val (icon, verb) = when (event.type) {
         "PushEvent" -> Icons.Outlined.CloudUpload to stringResource(R.string.event_pushed)
@@ -94,13 +97,39 @@ fun ActivityCard(
     }
     val createdAt = event.createdAt?.let { formatRelativeTime(it) } ?: ""
 
+    // Click target: land as deep as the event allows — commit for pushes, the
+    // issue/PR for issue activity, the fork for forks — falling back to the repo.
+    val openEvent: (() -> Unit)? = run {
+        val parts = repoName.split("/", limit = 2)
+        val owner = parts.getOrNull(0)
+        val repo = parts.getOrNull(1)
+        if (owner.isNullOrBlank() || repo.isNullOrBlank()) return@run null
+        val issue = event.payload?.issue
+        val prNumber = event.payload?.pullRequest?.number?.takeIf { it > 0 }
+            ?: issue?.number?.takeIf { it > 0 && issue.pullRequest != null }
+        val issueNumber = issue?.number?.takeIf { it > 0 && issue.pullRequest == null }
+        val sha = event.payload?.commits?.lastOrNull()?.sha?.takeIf { it.isNotBlank() }
+        when {
+            event.type == "PushEvent" && sha != null && onNavigateToCommit != null ->
+                { onNavigateToCommit(owner, repo, sha) }
+            event.type == "PullRequestEvent" && prNumber != null && onNavigateToPR != null ->
+                { onNavigateToPR(owner, repo, prNumber) }
+            event.type == "IssueCommentEvent" && prNumber != null && onNavigateToPR != null ->
+                { onNavigateToPR(owner, repo, prNumber) }
+            (event.type == "IssueCommentEvent" || event.type == "IssuesEvent") &&
+                issueNumber != null && onNavigateToIssue != null ->
+                { onNavigateToIssue(owner, repo, issueNumber) }
+            event.type == "ForkEvent" && !event.payload?.forkee?.fullName.isNullOrBlank() ->
+                { onNavigateToRepo(event.payload.forkee.fullName) }
+            else -> if (repoName.isNotEmpty()) { onNavigateToRepo(repoName) } else null
+        }
+    }
+
     PhCard(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 6.dp),
-        onClick = if (repoName.isNotEmpty()) {
-            { onNavigateToRepo(repoName) }
-        } else null,
+        onClick = openEvent,
         cornerRadius = 16.dp,
     ) {
         Column(Modifier.padding(16.dp)) {
