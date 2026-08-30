@@ -83,6 +83,7 @@ fun ProfileScreen(
     onNavigateToRepo: (String, String) -> Unit,
     onNavigateToIssue: (String, String, Int) -> Unit = { _, _, _ -> },
     onNavigateToPR: (String, String, Int) -> Unit = { _, _, _ -> },
+    onNavigateToCommit: (String, String, String) -> Unit = { _, _, _ -> },
     onNavigateToUser: (String, Int) -> Unit = { _, _ -> },
     onBack: () -> Unit,
     showTopBar: Boolean = true,
@@ -106,7 +107,9 @@ fun ProfileScreen(
 
     // 0 = repos, 1 = activity — mirrors UserDetailScreen so the layout & toggle UX
     // is identical when moving between your own profile and another user's.
-    var sectionTab by remember { mutableIntStateOf(0) }
+    // rememberSaveable: survives navigate-away/back (A → B → A restores the
+    // segmented tab the user was on when they left this page).
+    var sectionTab by rememberSaveable { mutableIntStateOf(0) }
 
     Scaffold(
         topBar = {
@@ -258,6 +261,9 @@ fun ProfileScreen(
                                 val parts = full.split("/", limit = 2)
                                 if (parts.size == 2) onNavigateToRepo(parts[0], parts[1])
                             },
+                            onNavigateToIssue = onNavigateToIssue,
+                            onNavigateToPR = onNavigateToPR,
+                            onNavigateToCommit = { o, r, sha -> onNavigateToCommit(o, r, sha) },
                         )
                     }
                 }

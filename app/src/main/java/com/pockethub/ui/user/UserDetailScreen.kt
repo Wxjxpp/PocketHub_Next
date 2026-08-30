@@ -91,6 +91,9 @@ fun UserDetailScreen(
     initialFollowTab: Int = -1,
     onNavigateToRepo: (String, String) -> Unit,
     onNavigateToUser: (String) -> Unit = {},
+    onNavigateToIssue: (String, String, Int) -> Unit = { _, _, _ -> },
+    onNavigateToPR: (String, String, Int) -> Unit = { _, _, _ -> },
+    onNavigateToCommit: (String, String, String) -> Unit = { _, _, _ -> },
     onBack: () -> Unit,
     vm: UserDetailViewModel = hiltViewModel(),
 ) {
@@ -152,7 +155,8 @@ fun UserDetailScreen(
 
         val events by vm.events.collectAsState()
         val isLoadingEvents by vm.isLoadingEvents.collectAsState()
-        var sectionTab by remember { mutableIntStateOf(0) }
+    // rememberSaveable: survives navigate-away/back (see ProfileScreen).
+    var sectionTab by rememberSaveable { mutableIntStateOf(0) }
 
         com.pockethub.ui.components.RefreshContainer(
             isRefreshing = isLoading,
@@ -256,10 +260,16 @@ fun UserDetailScreen(
                     }
                 } else {
                     items(events, key = { it.id }) { ev ->
-                        com.pockethub.ui.components.ActivityCard(event = ev, onNavigateToRepo = { full ->
-                            val (o, r) = full.split("/", limit = 2).let { it[0] to it.getOrElse(1) { "" } }
-                            if (r.isNotEmpty()) onNavigateToRepo(o, r)
-                        })
+                        com.pockethub.ui.components.ActivityCard(
+                            event = ev,
+                            onNavigateToRepo = { full ->
+                                val (o, r) = full.split("/", limit = 2).let { it[0] to it.getOrElse(1) { "" } }
+                                if (r.isNotEmpty()) onNavigateToRepo(o, r)
+                            },
+                            onNavigateToIssue = onNavigateToIssue,
+                            onNavigateToPR = onNavigateToPR,
+                            onNavigateToCommit = onNavigateToCommit,
+                        )
                     }
                 }
             }
