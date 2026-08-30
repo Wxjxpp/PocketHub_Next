@@ -3,8 +3,9 @@ package com.pockethub.ui.auth
 import com.pockethub.R
 
 import androidx.compose.ui.res.stringResource
-
 import android.net.Uri
+import androidx.activity.ComponentActivity
+
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -94,8 +95,9 @@ private fun HyperlinkLabel(
 @Composable
 fun LoginScreen(
     onLoginSuccess: () -> Unit,
-    vm: LoginViewModel = hiltViewModel(),
 ) {
+    val activity = LocalContext.current as ComponentActivity
+    val vm: LoginViewModel = hiltViewModel(activity)
     val ui by vm.ui.collectAsState()
     val loginHistory by vm.loginHistory.collectAsState(initial=emptyList())
     val context = LocalContext.current
