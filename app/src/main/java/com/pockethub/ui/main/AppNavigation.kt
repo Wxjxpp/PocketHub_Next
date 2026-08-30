@@ -104,6 +104,7 @@ object Routes {
 fun PocketHubApp(
     themeMode: ThemeMode,
     appStyle: AppStyle? = null,
+    forceDark: Boolean = false,
     deepLinkUri: Uri? = null,
     onDeepLinkConsumed: () -> Unit = {},
 ) {
@@ -182,7 +183,7 @@ fun PocketHubApp(
         }
     }
 
-    PocketHubTheme(mode = themeMode, styleOverride = appStyle) {
+    PocketHubTheme(mode = themeMode, styleOverride = appStyle, forceDark = forceDark) {
         val imagePreviewOpener = remember<(String) -> Unit> {
             { url -> navController.navigate(Routes.imagePreview(url)) }
         }

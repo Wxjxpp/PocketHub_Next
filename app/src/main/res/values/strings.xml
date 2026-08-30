@@ -445,6 +445,9 @@
     <string name="theme_dark">Dark (Linear-inspired)</string>
     <string name="theme_light">Light (Primer-inspired)</string>
     <string name="app_style">Style</string>
+    <string name="follow_system_theme">Follow system dark mode</string>
+    <string name="follow_system_theme_desc">When the system enters night mode, temporarily switch to the built-in dark style; restore your chosen style when it exits</string>
+    <string name="follow_system_theme_style_hint">Overridden by built-in dark style in system night mode</string>
     <string name="style_linear_dark">Linear Dark</string>
     <string name="style_primer_light">Primer Light</string>
     <string name="style_paper">Paper</string>

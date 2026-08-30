@@ -58,6 +58,11 @@ class MainActivity : AppCompatActivity() {
                 val settingsVm: SettingsViewModel = hiltViewModel()
                 val themeMode by settingsVm.themeMode.collectAsState()
                 val appStyle by settingsVm.appStyle.collectAsState()
+                val followSystemTheme by settingsVm.followSystemTheme.collectAsState()
+                // Recomposes on uiMode configuration change (covers both the
+                // default activity recreation and brands that handle uiMode
+                // configChanges in-place, e.g. some OEM ROMs).
+                val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
                 val loginVm: LoginViewModel = hiltViewModel()
 
                 // Process OAuth callback if launched via the pockethub://oauth/callback deep link,
@@ -84,6 +89,7 @@ class MainActivity : AppCompatActivity() {
                 PocketHubApp(
                     themeMode = themeMode,
                     appStyle = appStyle,
+                    forceDark = followSystemTheme && systemDark,
                     deepLinkUri = deepLinkUri.value,
                     onDeepLinkConsumed = { deepLinkUri.value = null },
                 )

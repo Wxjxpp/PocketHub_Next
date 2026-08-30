@@ -389,6 +389,9 @@
     <string name="theme_dark">深色（Linear 风格）</string>
     <string name="theme_light">浅色（Primer 风格）</string>
     <string name="app_style">风格</string>
+    <string name="follow_system_theme">跟随系统夜间模式</string>
+    <string name="follow_system_theme_desc">系统进入夜间模式时自动切换到内置深色风格，退出后恢复你选择的风格</string>
+    <string name="follow_system_theme_style_hint">系统夜间模式期间将临时使用内置深色风格</string>
     <string name="style_linear_dark">Linear 暗夜</string>
     <string name="style_primer_light">Primer 明亮</string>
     <string name="style_paper">纸张阅读</string>

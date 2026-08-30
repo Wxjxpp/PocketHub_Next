@@ -211,6 +211,14 @@ private fun resolveStyle(styleOverride: AppStyle?, mode: ThemeMode, systemDark: 
         ThemeMode.System -> if (systemDark) AppStyle.LinearDark else AppStyle.PrimerLight
     }
 
+/**
+ * Built-in dark style forced on when "follow system dark mode" is enabled and
+ * the system is currently in night mode. [styleOverride] stays untouched — it
+ * is the user's chosen baseline and is restored as soon as the system leaves
+ * night mode.
+ */
+private val FORCE_DARK_STYLE = AppStyle.LinearDark
+
 /** Color used for the status / navigation bars. Default dark — matches Linear dark theme. */
 private val LocalSystemBarsDark = compositionLocalOf { true }
 
@@ -241,10 +249,16 @@ private fun deriveSurfaceContainers(s: ColorScheme, isDark: Boolean): ColorSchem
 fun PocketHubTheme(
     mode: ThemeMode = ThemeMode.Dark,
     styleOverride: AppStyle? = null,
+    forceDark: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val systemDark = isSystemInDarkTheme()
-    val style = resolveStyle(styleOverride, mode, systemDark)
+    // "Follow system" night mode: while the OS is in dark mode the built-in
+    // dark style is forced on regardless of the user's chosen style; once the
+    // system leaves night mode the chosen style takes effect again. Applied on
+    // top of styleOverride so the persisted preference is never mutated.
+    val effectiveOverride = if (forceDark && systemDark) FORCE_DARK_STYLE else styleOverride
+    val style = resolveStyle(effectiveOverride, mode, systemDark)
     val def = styleDef(style)
     val view = androidx.compose.ui.platform.LocalView.current
     if (!view.isInEditMode) {

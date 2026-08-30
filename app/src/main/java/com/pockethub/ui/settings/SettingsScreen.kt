@@ -26,6 +26,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Brightness2
+import androidx.compose.material.icons.outlined.Brightness6
 import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.outlined.CleaningServices
 import androidx.compose.material.icons.outlined.GTranslate
@@ -42,6 +43,7 @@ import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material.icons.outlined.VpnKey
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -95,6 +97,7 @@ fun SettingsScreen(
 ) {
     val themeMode by vm.themeMode.collectAsState()
     val appStyle by vm.appStyle.collectAsState()
+    val followSystemTheme by vm.followSystemTheme.collectAsState()
     val appLocale by vm.appLocale.collectAsState()
     val customClientId by vm.customClientId.collectAsState()
     val downloadMirrorPrefix by vm.downloadMirrorPrefix.collectAsState()
@@ -145,6 +148,21 @@ fun SettingsScreen(
                 headlineContent = { Text(stringResource(R.string.app_style)) },
                 supportingContent = { Text(styleLabel(appStyle)) },
                 modifier = Modifier.clickable { showStyleSheet = true },
+            )
+            // Follow-system night mode: when on, the OS entering dark mode
+            // forces the built-in dark style; leaving it restores the style
+            // chosen above. The persisted style preference is never modified.
+            ListItem(
+                leadingContent = { Icon(Icons.Outlined.Brightness6, contentDescription = null) },
+                headlineContent = { Text(stringResource(R.string.follow_system_theme)) },
+                supportingContent = { Text(stringResource(R.string.follow_system_theme_desc)) },
+                trailingContent = {
+                    Checkbox(
+                        checked = followSystemTheme,
+                        onCheckedChange = { vm.setFollowSystemTheme(it) },
+                    )
+                },
+                modifier = Modifier.clickable { vm.setFollowSystemTheme(!followSystemTheme) },
             )
                 }
             }
@@ -318,7 +336,7 @@ fun SettingsScreen(
                     // (Dark) theme mode — show that as selected so first-run
                     // users land on a highlighted row.
                     val isSelected = appStyle == style || (appStyle == null && style == AppStyle.LinearDark)
-                    StyleOption(style, isSelected) {
+                    StyleOption(style, isSelected, followSystemTheme) {
                         vm.setAppStyle(style)
                         // Keep themeMode consistent: dark styles → Dark, light styles → Light,
                         // so the legacy status-bar / system-bar tint logic stays correct.
@@ -326,6 +344,8 @@ fun SettingsScreen(
                         showStyleSheet = false
                     }
                 }
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+                FollowSystemOption(followSystemTheme) { vm.setFollowSystemTheme(it) }
             }
         }
     }
@@ -551,7 +571,7 @@ private fun styleLabel(style: AppStyle?): String = when (style) {
 
 /** Visual style picker row — shows the style's palette as swatches plus a shape hint. */
 @Composable
-private fun StyleOption(style: AppStyle, selected: Boolean, onClick: () -> Unit) {
+private fun StyleOption(style: AppStyle, selected: Boolean, followSystemTheme: Boolean = false, onClick: () -> Unit) {
     val def = com.pockethub.ui.theme.styleDef(style)
     Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
         RadioButton(selected = selected, onClick = onClick)
@@ -575,6 +595,35 @@ private fun StyleOption(style: AppStyle, selected: Boolean, onClick: () -> Unit)
             Text(styleLabel(style), style = MaterialTheme.typography.bodyLarge)
             Text(
                 if (def.isDark) stringResource(R.string.theme_dark) else stringResource(R.string.theme_light),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            // Light styles double as the night-mode baseline: with "follow
+            // system" on, the OS dark mode temporarily overrides this style.
+            if (!def.isDark && followSystemTheme) {
+                Text(
+                    stringResource(R.string.follow_system_theme_style_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * "Follow system dark mode" toggle at the bottom of the style sheet. When on,
+ * the system entering night mode forces the built-in dark style over any
+ * selected style; leaving night mode restores the user's choice.
+ */
+@Composable
+private fun FollowSystemOption(checked: Boolean, onChecked: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth().clickable { onChecked(!checked) }.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Checkbox(checked = checked, onCheckedChange = { onChecked(it) })
+        Column(Modifier.padding(start = 12.dp)) {
+            Text(stringResource(R.string.follow_system_theme), style = MaterialTheme.typography.bodyLarge)
+            Text(
+                stringResource(R.string.follow_system_theme_desc),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
