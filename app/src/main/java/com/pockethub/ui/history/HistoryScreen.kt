@@ -211,7 +211,7 @@ private fun SwipeDismissHistoryItem(
     }
 }
 
-: Long): String {
+private fun formatAgo(timestamp: Long): String {
     val diff = System.currentTimeMillis() - timestamp
     val minutes = diff / 60_000
     return when {
