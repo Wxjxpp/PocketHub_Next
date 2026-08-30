@@ -125,6 +125,7 @@ internal fun FeedEventCard(
  * signal scrollability) while matching the lists' 16dp horizontal padding.
  * Name-only — no icon, no owner line.
  */
+@Composable
 internal fun PinnedRepoCard(
     slug: String,
     onClick: () -> Unit,
