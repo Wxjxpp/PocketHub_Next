@@ -2,6 +2,12 @@ package com.pockethub.ui.history
 
 import com.pockethub.R
 
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.layout.offset
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.input.pointer.pointerInput
+
 import com.pockethub.ui.components.PhAsyncImage
 
 import androidx.compose.foundation.background
