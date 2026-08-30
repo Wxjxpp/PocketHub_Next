@@ -40,16 +40,36 @@ jobs:
           chmod +x build.sh
           ./build.sh
 
-      - name: Generate bilingual changelog (AI when LLM_API_KEY is set, deterministic fallback)
+      - name: Generate bilingual changelog (AI-authored file first, then AI/fallback)
         run: |
-          mapfile -t LOG_LINES < <(
-            git log --pretty=format:'%s' -n 40 \
-              --grep='chore: release' --invert-grep \
-              --grep='\[skip ci\]' --invert-grep
-          )
-          printf '%s\n' "${LOG_LINES[@]}" > /tmp/commits.txt
-          python3 scripts/gen_changelog.py /tmp/commits.txt > /tmp/changelog.json \
-            || echo '{"items":[]}' > /tmp/changelog.json
+          VERSION_NAME=$(grep '^versionName=' version.properties | cut -d= -f2)
+          # Preferred source: changelog/latest.json committed to the repo before
+          # the build was triggered (authored by a local AI pass over this
+          # round's actual changes — polished plain-language zh + en). Only used
+          # when its version matches the version being built, so a stale file
+          # can never describe the wrong release.
+          if [ -f changelog/latest.json ]; then
+            FILE_V=$(python3 -c "import json;print(json.load(open('changelog/latest.json')).get('version',''))" 2>/dev/null || echo "")
+            if [ "$FILE_V" = "$VERSION_NAME" ]; then
+              cp changelog/latest.json /tmp/changelog.json
+              echo "Using AI-authored changelog/latest.json for v$VERSION_NAME"
+            else
+              echo "changelog/latest.json is for v$FILE_V, building v$VERSION_NAME — falling back to generation"
+            fi
+          fi
+          # Fallback: generate from commit subjects (AI when LLM_API_KEY is set,
+          # deterministic phrasing otherwise). Runs when no matching committed
+          # changelog exists.
+          if [ ! -f /tmp/changelog.json ]; then
+            mapfile -t LOG_LINES < <(
+              git log --pretty=format:'%s' -n 40 \
+                --grep='chore: release' --invert-grep \
+                --grep='\[skip ci\]' --invert-grep
+            )
+            printf '%s\n' "${LOG_LINES[@]}" > /tmp/commits.txt
+            python3 scripts/gen_changelog.py /tmp/commits.txt > /tmp/changelog.json \
+              || echo '{"items":[]}' > /tmp/changelog.json
+          fi
           echo "changelog: $(cat /tmp/changelog.json)"
 
       # Expose the built APK as a workflow artifact so the run detail page

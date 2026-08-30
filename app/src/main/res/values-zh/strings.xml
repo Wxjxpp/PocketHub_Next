@@ -522,6 +522,7 @@
     <string name="action_copy">复制</string>
     <string name="copied_toast">已复制到剪贴板</string>
     <string name="copy_address">复制地址</string>
+    <string name="queued_download">已加入下载队列</string>
 
     <!-- Issue / PR 状态过滤 -->
     <string name="issue_state_all">全部</string>
