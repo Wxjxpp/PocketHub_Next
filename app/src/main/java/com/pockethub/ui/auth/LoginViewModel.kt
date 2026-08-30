@@ -94,6 +94,7 @@ class LoginViewModel @Inject constructor(
     private var oauthState: String? = null
     fun startOAuth() {
         viewModelScope.launch {
+            try {
             val backend = settings.oauthBackendUrl.first().trim().removeSuffix("/")
             if (!backend.startsWith("https://")) {
                 _ui.update { it.copy(error = "请先在设置 → Custom OAuth Client 中填写 OAuth 后端地址。") }
@@ -112,6 +113,10 @@ class LoginViewModel @Inject constructor(
             settings.setPendingOAuthState(oauthState!!)
             val url=config.authorizeUrl+"?client_id=${java.net.URLEncoder.encode(clientId,"UTF-8")}"+"&redirect_uri=${java.net.URLEncoder.encode(redirectUri,"UTF-8")}"+"&scope=${java.net.URLEncoder.encode(scope,"UTF-8")}"+"&state=${java.net.URLEncoder.encode(oauthState,"UTF-8")}"
             _ui.update { it.copy(oauthUrl = url) }
+            } catch (e: Exception) {
+                issueReporter.reportError("Login", "startOAuth", e)
+                _ui.update { it.copy(isLoading = false, error = e.userMessage("OAuth 后端不可用，请检查地址和 GITHUB_CLIENT_ID 配置。")) }
+            }
         }
     }
 
