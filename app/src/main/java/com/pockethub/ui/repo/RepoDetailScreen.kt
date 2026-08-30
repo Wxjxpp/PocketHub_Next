@@ -105,6 +105,7 @@ fun RepoDetailScreen(
     val releases by vm.releases.collectAsState()
     val workflowRuns by vm.workflowRuns.collectAsState()
     val readme by vm.readme.collectAsState()
+    val readmeMissing by vm.readmeMissing.collectAsState()
     val isLoading by vm.isLoading.collectAsState()
     val isRefreshing by vm.isRefreshing.collectAsState()
     val isStarred by vm.isStarred.collectAsState()
