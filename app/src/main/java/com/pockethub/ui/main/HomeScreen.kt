@@ -80,6 +80,7 @@ fun HomeScreen(
     onNavigateToRepo: (String, String) -> Unit,
     onNavigateToIssue: (String, String, Int) -> Unit,
     onNavigateToPR: (String, String, Int) -> Unit,
+    onNavigateToCommit: (String, String, String) -> Unit = { _, _, _ -> },
     onNavigateToUser: (String) -> Unit = {},
     onNavigateToHistory: () -> Unit,
     onNavigateToDownloads: () -> Unit,
@@ -240,6 +241,9 @@ fun HomeScreen(
                 onNavigateToSettings = onNavigateToSettings,
                 onNavigateToUserDetail = onNavigateToUser,
                 onNavigateToRepo = onNavigateToRepo,
+                onNavigateToIssue = onNavigateToIssue,
+                onNavigateToPR = onNavigateToPR,
+                onNavigateToCommit = onNavigateToCommit,
                 onBack = {},
                 showTopBar = false,
             )

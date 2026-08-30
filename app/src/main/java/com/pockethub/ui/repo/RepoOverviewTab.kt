@@ -161,11 +161,15 @@ internal fun OverviewTab(
             // ── Info card: owner, description, homepage, stats, topics ──
             com.pockethub.ui.components.PhCard(modifier = Modifier.fillMaxWidth(), cornerRadius = 18.dp) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    // Owner row — tap to open the profile.
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.clickable { onLinkClick(data.owner.htmlUrl ?: "https://github.com/${data.owner.login}", com.pockethub.ui.markdown.LinkKind.GITHUB_USER) },
-                    ) {
+                    // Owner row — tap to open the profile. Trailing pill copies
+                    // the repo URL to the clipboard (card top-right corner).
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { onLinkClick(data.owner.htmlUrl ?: "https://github.com/${data.owner.login}", com.pockethub.ui.markdown.LinkKind.GITHUB_USER) },
+                        ) {
                         PhAsyncImage(
                             model = data.owner.avatarUrl,
                             contentDescription = data.owner.login,
@@ -181,6 +185,27 @@ internal fun OverviewTab(
                             )
                             Text(
                                 text = data.owner.login,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        }
+                        val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+                        val copyContext = androidx.compose.ui.platform.LocalContext.current
+                        Box(
+                            modifier = Modifier
+                                .padding(start = 8.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f))
+                                .clickable {
+                                    val url = data.htmlUrl ?: "https://github.com/${data.fullName}"
+                                    clipboard.setText(androidx.compose.ui.text.AnnotatedString(url))
+                                    android.widget.Toast.makeText(copyContext, copyContext.getString(R.string.copied_toast), android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                                .padding(horizontal = 10.dp, vertical = 5.dp),
+                        ) {
+                            Text(
+                                stringResource(R.string.copy_address),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -363,12 +388,26 @@ internal fun OverviewTab(
                 // README content — show translated or original
                 val displayReadme = if (showTranslated && translatedReadme != null) translatedReadme else readme
                 if (displayReadme != null) {
+                    // Gallery of all image URLs in the rendered document — each
+                    // raw src resolved exactly like MarkdownText resolves it, so
+                    // the tapped URL matches an entry and the full-screen preview
+                    // can swipe between them.
+                    val imageResolver = com.pockethub.ui.markdown.rememberImageResolver("$owner/$repo", repoData?.defaultBranch)
+                    val imageGallery = remember(displayReadme, repoData?.defaultBranch) {
+                        Regex("""!\[[^\]]*\]\(\s*([^)\s]+)""")
+                            .findAll(displayReadme)
+                            .mapNotNull { m -> m.groupValues[1].takeIf { it.isNotBlank() } }
+                            .map { imageResolver(it) }
+                            .distinct()
+                            .toList()
+                    }
                     MarkdownText(
                         markdown = displayReadme,
                         modifier = Modifier.fillMaxWidth(),
                         repoContext = "$owner/$repo",
                         defaultBranch = repoData?.defaultBranch,
                         onLinkClick = onLinkClick,
+                        imageGallery = imageGallery,
                     )
                 } else if (isLoading) {
                     Row(verticalAlignment = Alignment.CenterVertically) {

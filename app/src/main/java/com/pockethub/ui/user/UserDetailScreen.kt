@@ -64,6 +64,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -91,11 +92,16 @@ fun UserDetailScreen(
     initialFollowTab: Int = -1,
     onNavigateToRepo: (String, String) -> Unit,
     onNavigateToUser: (String) -> Unit = {},
+    onNavigateToIssue: (String, String, Int) -> Unit = { _, _, _ -> },
+    onNavigateToPR: (String, String, Int) -> Unit = { _, _, _ -> },
+    onNavigateToCommit: (String, String, String) -> Unit = { _, _, _ -> },
     onBack: () -> Unit,
     vm: UserDetailViewModel = hiltViewModel(),
 ) {
     val user by vm.user.collectAsState()
     val repos by vm.repos.collectAsState()
+    // Belt-and-suspenders scroll restore (see ProfileScreen).
+    val listState = com.pockethub.ui.components.rememberRestorableListState(contentReady = user != null)
     val isLoading by vm.isLoading.collectAsState()
     val error by vm.error.collectAsState()
     val isFollowing by vm.isFollowing.collectAsState()
@@ -152,7 +158,8 @@ fun UserDetailScreen(
 
         val events by vm.events.collectAsState()
         val isLoadingEvents by vm.isLoadingEvents.collectAsState()
-        var sectionTab by remember { mutableIntStateOf(0) }
+    // rememberSaveable: survives navigate-away/back (see ProfileScreen).
+    var sectionTab by rememberSaveable { mutableIntStateOf(0) }
 
         com.pockethub.ui.components.RefreshContainer(
             isRefreshing = isLoading,
@@ -160,6 +167,7 @@ fun UserDetailScreen(
             modifier = Modifier.padding(padding),
         ) {
         LazyColumn(
+            state = listState,
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
@@ -256,10 +264,16 @@ fun UserDetailScreen(
                     }
                 } else {
                     items(events, key = { it.id }) { ev ->
-                        com.pockethub.ui.components.ActivityCard(event = ev, onNavigateToRepo = { full ->
-                            val (o, r) = full.split("/", limit = 2).let { it[0] to it.getOrElse(1) { "" } }
-                            if (r.isNotEmpty()) onNavigateToRepo(o, r)
-                        })
+                        com.pockethub.ui.components.ActivityCard(
+                            event = ev,
+                            onNavigateToRepo = { full ->
+                                val (o, r) = full.split("/", limit = 2).let { it[0] to it.getOrElse(1) { "" } }
+                                if (r.isNotEmpty()) onNavigateToRepo(o, r)
+                            },
+                            onNavigateToIssue = onNavigateToIssue,
+                            onNavigateToPR = onNavigateToPR,
+                            onNavigateToCommit = onNavigateToCommit,
+                        )
                     }
                 }
             }

@@ -89,8 +89,8 @@ class LoginViewModel @Inject constructor(
      * Initiate OAuth: build the authorization URL using either the built-in
      * default OAuth Client or a user-provided custom client (from Settings).
      */
-    fun loginFromHistory(id:Long) { viewModelScope.launch { _ui.update { it.copy(isLoading=true,error=null) }; if(accounts.loginStoredAccount(id)) _ui.update { it.copy(isLoading=false,success=true) } else _ui.update { it.copy(isLoading=false,error="Stored login is no longer valid.") } } }
-    private var oauthState:String?=null
+    fun loginFromHistory(id: Long) { viewModelScope.launch { _ui.update { it.copy(isLoading=true,error=null) }; if(accounts.loginStoredAccount(id)) _ui.update { it.copy(isLoading=false,success=true) } else _ui.update { it.copy(isLoading=false,error="Stored login is no longer valid.") } } }
+    private var oauthState: String? = null
     fun startOAuth() {
         viewModelScope.launch {
             val customId = settings.customClientId.first()
@@ -106,16 +106,12 @@ class LoginViewModel @Inject constructor(
                 }
                 return@launch
             }
-            val redirectUri = BuildConfig.GITHUB_OAUTH_REDIRECT_URI
-            val scope = "repo read:user user:email read:org read:notifications"
+            val redirectUri=BuildConfig.GITHUB_OAUTH_REDIRECT_URI
+            val scope="repo read:user user:email read:org read:notifications"
             val b=ByteArray(32).also{SecureRandom().nextBytes(it)}
             oauthState=Base64.encodeToString(b,Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
             settings.setPendingOAuthState(oauthState!!)
-            val url = "https://github.com/login/oauth/authorize" +
-                "?client_id=${java.net.URLEncoder.encode(clientId,"UTF-8")}" +
-                "&redirect_uri=${java.net.URLEncoder.encode(redirectUri,"UTF-8")}" +
-                "&scope=${java.net.URLEncoder.encode(scope,"UTF-8")}" +
-                "&state=${java.net.URLEncoder.encode(oauthState,"UTF-8")}"
+            val url="https://github.com/login/oauth/authorize"+"?client_id=${java.net.URLEncoder.encode(clientId,"UTF-8")}"+"&redirect_uri=${java.net.URLEncoder.encode(redirectUri,"UTF-8")}"+"&scope=${java.net.URLEncoder.encode(scope,"UTF-8")}"+"&state=${java.net.URLEncoder.encode(oauthState,"UTF-8")}"
             _ui.update { it.copy(oauthUrl = url) }
         }
     }
@@ -125,14 +121,13 @@ class LoginViewModel @Inject constructor(
      * for an access token. The deep link is handled by [MainActivity]; once it receives
      * `code=xxx`, it will call this function.
      */
-    fun exchangeOAuthCode(code: String, state: String?) {
+    fun exchangeOAuthCode(code: String, state: String?)
         viewModelScope.launch {
             _ui.update { it.copy(isLoading = true, error = null) }
             try {
-                val expectedState = oauthState ?: settings.consumePendingOAuthState()
-                if(expectedState==null || expectedState!=state){ _ui.update { it.copy(isLoading=false,error="OAuth callback verification failed.") }; return@launch }
-                settings.consumePendingOAuthState()
-                oauthState=null
+                val expected=oauthState?:settings.consumePendingOAuthState()
+                if(expected==null||expected!=state){_ui.update{it.copy(isLoading=false,error="OAuth callback verification failed.")};return@launch}
+                settings.consumePendingOAuthState();oauthState=null
                 val customId = settings.customClientId.first()
                 val customSecret = settings.customClientSecret.first()
                 val clientId = customId.ifBlank { BuildConfig.GITHUB_DEFAULT_CLIENT_ID }

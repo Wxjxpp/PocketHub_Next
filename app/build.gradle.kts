@@ -32,7 +32,7 @@ android {
 
         buildConfigField("String", "GITHUB_DEFAULT_CLIENT_ID", "\"\"")
         buildConfigField("String", "GITHUB_DEFAULT_CLIENT_SECRET", "\"\"")
-        buildConfigField("String", "GITHUB_OAUTH_REDIRECT_URI", "\"pockethub://oauth/callback\"")
+        buildConfigField("String", "GITHUB_OAUTH_REDIRECT_URI", "\"pockethub-next://oauth/callback\"")
         buildConfigField("String", "GITHUB_API_BASE_URL", "\"https://api.github.com/\"")
         buildConfigField("String", "GITHUB_WEB_BASE_URL", "\"https://github.com/\"")
 
@@ -59,6 +59,7 @@ android {
 
     buildTypes {
         debug {
+            buildConfigField("String", "GITHUB_OAUTH_REDIRECT_URI", "\"pockethub-next-debug://oauth/callback\"")
             isMinifyEnabled = false
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"

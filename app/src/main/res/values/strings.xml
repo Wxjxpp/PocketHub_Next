@@ -577,6 +577,8 @@
     <string name="branch_load_failed">Failed to load branches</string>
     <string name="action_copy">Copy</string>
     <string name="copied_toast">Copied to clipboard</string>
+    <string name="copy_address">Copy link</string>
+    <string name="queued_download">Added to downloads</string>
 
     <!-- Issue / PR state filter -->
     <string name="issue_state_all">All</string>

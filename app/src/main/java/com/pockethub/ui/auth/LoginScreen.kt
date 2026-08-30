@@ -97,7 +97,7 @@ fun LoginScreen(
     vm: LoginViewModel = hiltViewModel(),
 ) {
     val ui by vm.ui.collectAsState()
-    val loginHistory by vm.loginHistory.collectAsState(initial = emptyList())
+    val loginHistory by vm.loginHistory.collectAsState(initial=emptyList())
     val context = LocalContext.current
     var token by rememberSaveable { mutableStateOf("") }
     var showToken by rememberSaveable { mutableStateOf(false) }
@@ -170,7 +170,7 @@ fun LoginScreen(
             )
             Spacer(Modifier.height(32.dp))
 
-            if(loginHistory.isNotEmpty()) { Text("登录历史",style=MaterialTheme.typography.titleMedium); Spacer(Modifier.height(8.dp)); loginHistory.forEach { a -> Card(onClick={vm.loginFromHistory(a.id)},modifier=Modifier.fillMaxWidth().padding(vertical=3.dp)){Text(a.name?:a.login,modifier=Modifier.padding(16.dp))} }; Spacer(Modifier.height(16.dp)) }
+            if(loginHistory.isNotEmpty()){Text("登录历史",style=MaterialTheme.typography.titleMedium);Spacer(Modifier.height(8.dp));loginHistory.forEach{a->Card(onClick={vm.loginFromHistory(a.id)},modifier=Modifier.fillMaxWidth().padding(vertical=3.dp)){Text(a.name?:a.login,modifier=Modifier.padding(16.dp))}};Spacer(Modifier.height(16.dp))}
             // Token input
             OutlinedTextField(
                 value = token,

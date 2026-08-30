@@ -116,7 +116,12 @@ class UpdateViewModel @Inject constructor(
             val releaseNewSinceDismiss = parsePublishedEpochMs(info.publishedAt) > lastPromptMs
             if (forceShow || !suppressed || releaseNewSinceDismiss) {
                 settings.markUpdatePromptedNow()
-                _state.value = State.UpdateAvailable(info)
+                // Prefer the AI-authored changelog committed to the repo over
+                // the release body (see fetchChangelogNotes).
+                val notes = fetchChangelogNotes(info.latestVersionName)
+                _state.value = State.UpdateAvailable(
+                    if (notes != null) info.copy(releaseNotes = notes) else info
+                )
             } else {
                 // Still newer than installed, but user recently said "Later" — don't auto-pop.
                 _state.value = State.Idle
@@ -133,6 +138,41 @@ class UpdateViewModel @Inject constructor(
             java.time.OffsetDateTime.parse(iso).toInstant().toEpochMilli()
         }.getOrDefault(0L)
     }
+
+    /**
+     * Fetch the AI-authored bilingual changelog committed to the repo
+     * (changelog/latest.json — written before the build is triggered), and
+     * wrap it in the `<!--pockethub-changelog {json}-->` block the update
+     * dialog already parses. The dialog localizes summary/items on its own,
+     * so display language always follows the app setting.
+     *
+     * The file's `version` field must match the release tag — a stale file
+     * describing a different build is ignored and the release body is used.
+     * Raw GitHub is tried first, then the jsDelivr mirror (reachable when
+     * raw.githubusercontent.com is blocked).
+     */
+    private suspend fun fetchChangelogNotes(releaseVersion: String): String? =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val wanted = releaseVersion.removePrefix("v")
+            val urls = listOf(
+                "https://raw.githubusercontent.com/$owner/$repo/main/changelog/latest.json",
+                "https://cdn.jsdelivr.net/gh/$owner/$repo@main/changelog/latest.json",
+            )
+            for (url in urls) {
+                val body = runCatching {
+                    client.newCall(Request.Builder().url(url).build()).execute().use { resp ->
+                        if (!resp.isSuccessful) null else resp.body?.string()
+                    }
+                }.getOrNull() ?: continue
+                val obj = runCatching { org.json.JSONObject(body) }.getOrNull() ?: continue
+                val fileVersion = obj.optString("version").removePrefix("v")
+                val items = obj.optJSONArray("items") ?: continue
+                if (items.length() == 0) continue
+                if (fileVersion.isBlank() || !fileVersion.equals(wanted, ignoreCase = true)) continue
+                return@withContext "<!--pockethub-changelog $obj-->"
+            }
+            null
+        }
 
     fun ignoreVersion(version: String) {
         viewModelScope.launch {

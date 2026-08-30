@@ -72,6 +72,9 @@ fun MarkdownText(
      *  the (already-resolved) URL and its [LinkKind], so the caller can route downloads, in-app
      *  navigation, and external opens differently. */
     onLinkClick: ((url: String, kind: LinkKind) -> Unit)? = null,
+    /** All image URLs in this document, in render order — lets the full-screen
+     *  preview swipe between them (ViewPager-style). Empty = single image. */
+    imageGallery: List<String> = emptyList(),
 ) {
     val linkColor = MaterialTheme.colorScheme.primary
     val downloadColor = MaterialTheme.colorScheme.tertiary
@@ -97,7 +100,14 @@ fun MarkdownText(
             // inline image src with no wrapping link) — keeping wrapped-link cases
             // (an image wrapped around a click to another URL) routed through onLinkClick.
             (kind == LinkKind.IMAGE_URL || kind == LinkKind.IMAGE) && imagePreviewer != null -> {
-                imagePreviewer(url)
+                // Open the preview positioned at the tapped image, with the rest
+                // of the document's images swipeable (single-image fallback).
+                val idx = imageGallery.indexOf(url)
+                if (idx >= 0) {
+                    imagePreviewer(imageGallery, idx)
+                } else {
+                    imagePreviewer(listOf(url), 0)
+                }
             }
             onLinkClick != null -> onLinkClick(url, kind)
             else -> uriHandler.openUri(url)

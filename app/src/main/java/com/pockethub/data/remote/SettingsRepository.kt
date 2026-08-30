@@ -123,18 +123,8 @@ class SettingsRepository @Inject constructor(
         }
     }
 
-    suspend fun setPendingOAuthState(state: String) {
-        context.dataStore.edit { it[Keys.PENDING_OAUTH_STATE] = state }
-    }
-
-    suspend fun consumePendingOAuthState(): String? {
-        var state: String? = null
-        context.dataStore.edit { prefs ->
-            state = prefs[Keys.PENDING_OAUTH_STATE]
-            prefs.remove(Keys.PENDING_OAUTH_STATE)
-        }
-        return state
-    }
+    suspend fun setPendingOAuthState(state: String) { context.dataStore.edit { it[Keys.PENDING_OAUTH_STATE] = state } }
+    suspend fun consumePendingOAuthState(): String? { var value:String?=null; context.dataStore.edit { value=it[Keys.PENDING_OAUTH_STATE]; it.remove(Keys.PENDING_OAUTH_STATE) }; return value }
 
     // ── Translation ───────────────────────────────────────
     /** Target language for README translation: "zh", "en", or null (disabled). */

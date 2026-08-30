@@ -38,6 +38,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -342,4 +346,32 @@ fun EmptyStateV2(
             action()
         }
     }
+}
+
+/**
+ * [rememberLazyListState] with a belt-and-suspenders restore for the
+ * navigate-away-and-back case: the built-in saveable state can be clamped to
+ * the top when the list is (briefly) empty at restore time — e.g. a cold
+ * screen whose data is still arriving. The index/offset are mirrored into
+ * plain [rememberSaveable] ints and re-applied via [LazyListState.scrollToItem]
+ * once [contentReady] turns true, so the scroll position survives even that
+ * window. When the built-in restore already worked, the re-apply is a no-op.
+ */
+@Composable
+fun rememberRestorableListState(contentReady: Boolean): LazyListState {
+    val listState = rememberLazyListState()
+    var savedIndex by rememberSaveable { mutableIntStateOf(0) }
+    var savedOffset by rememberSaveable { mutableIntStateOf(0) }
+    // Mirror the live position continuously.
+    LaunchedEffect(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset) {
+        savedIndex = listState.firstVisibleItemIndex
+        savedOffset = listState.firstVisibleItemScrollOffset
+    }
+    // Re-apply once content exists AND the built-in restore was clamped away.
+    LaunchedEffect(contentReady) {
+        if (contentReady && savedIndex > 0 && listState.firstVisibleItemIndex == 0) {
+            listState.scrollToItem(savedIndex, savedOffset)
+        }
+    }
+    return listState
 }

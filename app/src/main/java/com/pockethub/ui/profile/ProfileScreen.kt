@@ -57,6 +57,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -83,6 +84,7 @@ fun ProfileScreen(
     onNavigateToRepo: (String, String) -> Unit,
     onNavigateToIssue: (String, String, Int) -> Unit = { _, _, _ -> },
     onNavigateToPR: (String, String, Int) -> Unit = { _, _, _ -> },
+    onNavigateToCommit: (String, String, String) -> Unit = { _, _, _ -> },
     onNavigateToUser: (String, Int) -> Unit = { _, _ -> },
     onBack: () -> Unit,
     showTopBar: Boolean = true,
@@ -90,6 +92,10 @@ fun ProfileScreen(
 ) {
     val user by vm.user.collectAsState()
     val isRefreshing by vm.isLoading.collectAsState()
+    // Belt-and-suspenders scroll restore: re-applies the saved position once
+    // content exists, covering cases where the saveable state was clamped to
+    // the top while the list was briefly empty at restore time.
+    val listState = com.pockethub.ui.components.rememberRestorableListState(contentReady = user != null)
     val allAccounts by vm.allAccounts.collectAsState()
     val activeAccount by vm.activeAccount.collectAsState()
     val topRepos by vm.topRepos.collectAsState()
@@ -106,7 +112,9 @@ fun ProfileScreen(
 
     // 0 = repos, 1 = activity — mirrors UserDetailScreen so the layout & toggle UX
     // is identical when moving between your own profile and another user's.
-    var sectionTab by remember { mutableIntStateOf(0) }
+    // rememberSaveable: survives navigate-away/back (A → B → A restores the
+    // segmented tab the user was on when they left this page).
+    var sectionTab by rememberSaveable { mutableIntStateOf(0) }
 
     Scaffold(
         topBar = {
@@ -136,6 +144,7 @@ fun ProfileScreen(
             modifier = modifier.padding(padding),
         ) {
         LazyColumn(
+            state = listState,
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
@@ -258,6 +267,9 @@ fun ProfileScreen(
                                 val parts = full.split("/", limit = 2)
                                 if (parts.size == 2) onNavigateToRepo(parts[0], parts[1])
                             },
+                            onNavigateToIssue = onNavigateToIssue,
+                            onNavigateToPR = onNavigateToPR,
+                            onNavigateToCommit = { o, r, sha -> onNavigateToCommit(o, r, sha) },
                         )
                     }
                 }

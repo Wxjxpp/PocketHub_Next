@@ -59,11 +59,14 @@ object Routes {
     const val USER_DETAIL = "user/{login}?followTab={followTab}"
     const val HISTORY = "history"
     const val DOWNLOADS = "downloads?tab={tab}"
-    const val IMAGE_PREVIEW = "image_preview?url={url}"
+    const val IMAGE_PREVIEW = "image_preview?url={url}&gallery={gallery}&index={index}"
     const val FILE_VIEWER = "repo/{owner}/{repo}/file?path={path}&ref={ref}"
 
     fun downloads(tab: String = "active") = "downloads?tab=$tab"
-    fun imagePreview(url: String) = "image_preview?url=" + java.net.URLEncoder.encode(url, "UTF-8")
+    fun imagePreview(url: String, gallery: List<String> = emptyList(), startIndex: Int = 0) =
+        "image_preview?url=" + java.net.URLEncoder.encode(url, "UTF-8") +
+            "&gallery=" + java.net.URLEncoder.encode(gallery.joinToString("\n"), "UTF-8") +
+            "&index=$startIndex"
 
     fun repoDetail(owner: String, repo: String, tab: String? = null) =
         if (tab.isNullOrBlank()) "repo/$owner/$repo" else "repo/$owner/$repo?tab=$tab"
@@ -184,8 +187,13 @@ fun PocketHubApp(
     }
 
     PocketHubTheme(mode = themeMode, styleOverride = appStyle, forceDark = forceDark) {
-        val imagePreviewOpener = remember<(String) -> Unit> {
-            { url -> navController.navigate(Routes.imagePreview(url)) }
+        val imagePreviewOpener = remember<(List<String>, Int) -> Unit> {
+            { urls, start ->
+                val first = urls.getOrNull(start) ?: urls.firstOrNull()
+                if (first != null) {
+                    navController.navigate(Routes.imagePreview(first, urls, start))
+                }
+            }
         }
         CompositionLocalProvider(
             com.pockethub.ui.components.LocalImagePreviewer provides imagePreviewOpener,
@@ -230,6 +238,7 @@ fun PocketHubApp(
                         onNavigateToRepo = { owner, repo -> navController.navigate(Routes.repoDetail(owner, repo)) },
                         onNavigateToIssue = { owner, repo, number -> navController.navigate(Routes.issueDetail(owner, repo, number)) },
                         onNavigateToPR = { owner, repo, number -> navController.navigate(Routes.prDetail(owner, repo, number)) },
+                        onNavigateToCommit = { o, r, sha -> navController.navigate(Routes.commitDetail(o, r, sha)) },
                         onNavigateToUser = { login -> navController.navigate(Routes.userDetail(login)) },
                         onNavigateToHistory = { navController.navigate(Routes.HISTORY) },
                         onNavigateToDownloads = { navController.navigate(Routes.downloads("done")) },
@@ -244,6 +253,7 @@ fun PocketHubApp(
                         onNavigateToRepo = { owner, repo -> navController.navigate(Routes.repoDetail(owner, repo)) },
                         onNavigateToIssue = { o, r, n -> navController.navigate(Routes.issueDetail(o, r, n)) },
                         onNavigateToPR = { o, r, n -> navController.navigate(Routes.prDetail(o, r, n)) },
+                        onNavigateToCommit = { o, r, sha -> navController.navigate(Routes.commitDetail(o, r, sha)) },
                         onNavigateToUser = { login, followTab -> navController.navigate(Routes.userDetail(login, followTab)) },
                         onBack = { navController.popBackStack() },
                     )
@@ -512,17 +522,29 @@ fun PocketHubApp(
                         initialFollowTab = initialFollowTab,
                         onNavigateToRepo = { owner, repo -> navController.navigate(Routes.repoDetail(owner, repo)) },
                         onNavigateToUser = { l -> navController.navigate(Routes.userDetail(l)) },
+                        onNavigateToIssue = { o, r, n -> navController.navigate(Routes.issueDetail(o, r, n)) },
+                        onNavigateToPR = { o, r, n -> navController.navigate(Routes.prDetail(o, r, n)) },
+                        onNavigateToCommit = { o, r, sha -> navController.navigate(Routes.commitDetail(o, r, sha)) },
                         onBack = { navController.popBackStack() },
                     )
                 }
 
                 composable(
                     Routes.IMAGE_PREVIEW,
-                    arguments = listOf(navArgument("url") { type = NavType.StringType }),
+                    arguments = listOf(
+                        navArgument("url") { type = NavType.StringType },
+                        navArgument("gallery") { type = NavType.StringType; defaultValue = "" },
+                        navArgument("index") { type = NavType.IntType; defaultValue = 0 },
+                    ),
                 ) { backStackEntry ->
                     val url = backStackEntry.arguments?.getString("url") ?: return@composable
+                    val gallery = backStackEntry.arguments?.getString("gallery")
+                        ?.split("\n")?.filter { it.isNotBlank() }
+                        ?.takeIf { it.isNotEmpty() } ?: listOf(url)
+                    val index = backStackEntry.arguments?.getInt("index") ?: 0
                     com.pockethub.ui.components.ImagePreviewScreen(
-                        imageUrl = url,
+                        imageUrls = gallery,
+                        initialIndex = index,
                         onBack = { navController.popBackStack() },
                     )
                 }
