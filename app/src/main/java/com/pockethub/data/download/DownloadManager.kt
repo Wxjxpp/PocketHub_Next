@@ -228,7 +228,7 @@ class DownloadManager @Inject constructor(
      */
     private fun openDownload(url: String, rangeHeader: String? = null): Pair<Call, Response> {
         var call = client.newBuilder().followRedirects(false).build()
-            .newCall(Request.Builder().url(url).apply { rangeHeader?.let(::header) }.build())
+            .newCall(Request.Builder().url(url).apply { rangeHeader?.let { header(it) } }.build())
         currentCall = call
         var response = call.execute()
         var hops = 0
@@ -236,7 +236,7 @@ class DownloadManager @Inject constructor(
             val nextUrl = response.header("Location")?.let { response.request.url.resolve(it) }
             response.close()
             if (nextUrl == null) throw IOException("Redirect missing Location header")
-            call = redirectClient.newCall(Request.Builder().url(nextUrl).apply { rangeHeader?.let(::header) }.build())
+            call = redirectClient.newCall(Request.Builder().url(nextUrl).apply { rangeHeader?.let { header(it) } }.build())
             currentCall = call
             response = call.execute()
             hops++
@@ -293,7 +293,7 @@ class DownloadManager @Inject constructor(
                         dao.upsert(entity.copy(status = "IN_PROGRESS", sizeBytes = totalBytes, updatedAt = System.currentTimeMillis()))
 
                         body.byteStream().use { input ->
-                            destFile.outputStream(append = resume).use { output ->
+                            java.io.FileOutputStream(destFile, resume).use { output ->
                                 val buffer = ByteArray(16 * 1024)
                                 var read = 0L
                                 var lastReported = 0L
