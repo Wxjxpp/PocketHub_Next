@@ -206,6 +206,9 @@ class RepoDetailViewModel @Inject constructor(
     internal val _isTranslating = MutableStateFlow(false)
     val isTranslating: StateFlow<Boolean> = _isTranslating.asStateFlow()
 
+    /** README content auto-translation already ran for (see [maybeAutoTranslate]). */
+    internal val _autoTranslateFingerprint = MutableStateFlow<String?>(null)
+
     /** One-shot translate failure message, surfaced as a Snackbar. */
     internal val _translateMessage = MutableStateFlow<String?>(null)
     val translateMessage: StateFlow<String?> = _translateMessage.asStateFlow()
@@ -369,6 +372,9 @@ class RepoDetailViewModel @Inject constructor(
             _readme.update { markdown }
             _readmeMissing.update { markdown.isNullOrBlank() }
             readmeRef = ref
+            // Settings enabled a target language → translate the freshly loaded
+            // README automatically so the 译文 state matches the user's choice.
+            maybeAutoTranslate()
         } catch (_: Exception) {
             _readme.update { null }
             _readmeMissing.update { true }
