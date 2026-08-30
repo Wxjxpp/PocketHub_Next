@@ -110,6 +110,7 @@ class LoginViewModel @Inject constructor(
             val scope = "repo read:user user:email read:org read:notifications"
             val b=ByteArray(32).also{SecureRandom().nextBytes(it)}
             oauthState=Base64.encodeToString(b,Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
+            settings.setPendingOAuthState(oauthState!!)
             val url = "https://github.com/login/oauth/authorize" +
                 "?client_id=${java.net.URLEncoder.encode(clientId,"UTF-8")}" +
                 "&redirect_uri=${java.net.URLEncoder.encode(redirectUri,"UTF-8")}" +
@@ -128,7 +129,9 @@ class LoginViewModel @Inject constructor(
         viewModelScope.launch {
             _ui.update { it.copy(isLoading = true, error = null) }
             try {
-                if(oauthState==null || oauthState!=state){ _ui.update { it.copy(isLoading=false,error="OAuth callback verification failed.") }; return@launch }
+                val expectedState = oauthState ?: settings.consumePendingOAuthState()
+                if(expectedState==null || expectedState!=state){ _ui.update { it.copy(isLoading=false,error="OAuth callback verification failed.") }; return@launch }
+                settings.consumePendingOAuthState()
                 oauthState=null
                 val customId = settings.customClientId.first()
                 val customSecret = settings.customClientSecret.first()

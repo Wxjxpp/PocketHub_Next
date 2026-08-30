@@ -39,6 +39,7 @@ class SettingsRepository @Inject constructor(
         val APP_LOCALE = stringPreferencesKey("app_locale")
         val CUSTOM_CLIENT_ID = stringPreferencesKey("custom_client_id")
         val CUSTOM_CLIENT_SECRET = stringPreferencesKey("custom_client_secret")
+        val PENDING_OAUTH_STATE = stringPreferencesKey("pending_oauth_state")
         val NOTIF_POLL_MINUTES = intPreferencesKey("notif_poll_minutes")
         val NOTIFIED_IDS = stringPreferencesKey("notified_ids")
         val TRANSLATE_TARGET = stringPreferencesKey("translate_target")
@@ -120,6 +121,19 @@ class SettingsRepository @Inject constructor(
             prefs[Keys.CUSTOM_CLIENT_ID] = id
             prefs[Keys.CUSTOM_CLIENT_SECRET] = cipher.encrypt(secret)
         }
+    }
+
+    suspend fun setPendingOAuthState(state: String) {
+        context.dataStore.edit { it[Keys.PENDING_OAUTH_STATE] = state }
+    }
+
+    suspend fun consumePendingOAuthState(): String? {
+        var state: String? = null
+        context.dataStore.edit { prefs ->
+            state = prefs[Keys.PENDING_OAUTH_STATE]
+            prefs.remove(Keys.PENDING_OAUTH_STATE)
+        }
+        return state
     }
 
     // ── Translation ───────────────────────────────────────

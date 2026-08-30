@@ -72,6 +72,7 @@ class MainActivity : AppCompatActivity() {
                 // Process OAuth callback if launched via the pockethub://oauth/callback deep link,
                 // or other deep links (pockethub://notifications, etc.) that should land on the
                 // matching Compose destination.
+                val oauthError = remember { mutableStateOf<String?>(null) }
                 val oauthCode = remember { mutableStateOf<String?>(null) }
                 val oauthState = remember { mutableStateOf<String?>(null) }
                 val deepLinkUri = remember { mutableStateOf<Uri?>(null) }
