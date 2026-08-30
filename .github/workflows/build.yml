@@ -35,6 +35,20 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Restore release signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: |
+          test -n "$KEYSTORE_BASE64"
+          test -n "$KEYSTORE_PASSWORD"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > release-signing.p12
+          cat > signing.properties <<EOF
+          STORE_FILE=release-signing.p12
+          STORE_PASSWORD=$KEYSTORE_PASSWORD
+          KEY_ALIAS=pockethub
+          KEY_PASSWORD=$KEYSTORE_PASSWORD
+          EOF
       - name: Build release APK (auto-bump version)
         run: |
           chmod +x build.sh
