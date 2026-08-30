@@ -72,8 +72,8 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import coil.compose.AsyncImage
 import com.pockethub.data.remote.GitHubApi
+import com.pockethub.ui.components.PhAsyncImage
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
@@ -85,8 +85,16 @@ fun CommitDetailScreen(
     repo: String,
     sha: String,
     onNavigateToUser: (String) -> Unit = {},
+    /** GitHub 站内链接跳转(commit message 引用 issue/PR/其他仓库)。 */
+    onNavigateToRepo: (String, String) -> Unit = { _, _ -> },
+    onNavigateToFile: (String, String, String, String?) -> Unit = { o, r, _, _ -> onNavigateToRepo(o, r) },
+    onNavigateToRepoTab: (String, String, String?) -> Unit = { o, r, _ -> onNavigateToRepo(o, r) },
+    onNavigateToIssue: (String, String, Int) -> Unit = { _, _, _ -> },
+    onNavigateToPR: (String, String, Int) -> Unit = { _, _, _ -> },
+    onNavigateToCommit: (String, String, String) -> Unit = { _, _, _ -> },
     onBack: () -> Unit,
     vm: CommitDetailViewModel = hiltViewModel(),
+    downloadVm: com.pockethub.ui.download.DownloadViewModel = hiltViewModel(),
 ) {
     val commit by vm.commit.collectAsState()
     val isLoading by vm.isLoading.collectAsState()
@@ -131,13 +139,25 @@ fun CommitDetailScreen(
     }
 
     if (showRevertDialog) {
+        // Show exactly where the branch will land: the parent commit's short SHA.
+        val parentSha = commit?.parents?.firstOrNull()?.sha.orEmpty()
         AlertDialog(
             onDismissRequest = { if (!isReverting) showRevertDialog = false },
             title = { Text(stringResource(R.string.cd_revert_title)) },
-            text = { Text(stringResource(R.string.cd_revert_message)) },
+            text = {
+                Column {
+                    Text(stringResource(R.string.cd_revert_message))
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        stringResource(R.string.cd_revert_target, sha.take(7), parentSha.take(7).ifEmpty { "?" }),
+                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            },
             confirmButton = {
                 TextButton(
-                    enabled = !isReverting,
+                    enabled = !isReverting && parentSha.isNotEmpty(),
                     onClick = {
                         // Fire the revert from a coroutine scoped to this composable;
                         // dialog stays open showing the disabled confirm button
@@ -205,9 +225,7 @@ fun CommitDetailScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
         if (isLoading && commit == null) {
-            Box(Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
+            com.pockethub.ui.components.SkeletonList(Modifier.padding(padding).fillMaxSize(), rows = 8, topPadding = 8.dp)
             return@Scaffold
         }
 
@@ -250,7 +268,7 @@ fun CommitDetailScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         val login = data.author?.login
                         if (data.author?.avatarUrl != null) {
-                            AsyncImage(
+                            PhAsyncImage(
                                 model = data.author.avatarUrl,
                                 contentDescription = null,
                                 modifier = Modifier
@@ -366,7 +384,31 @@ fun CommitDetailScreen(
                 }
             } else {
                 items(comments, key = { it.id }) { comment ->
-                    CommitCommentItem(comment, dateFmt, owner, repo, onNavigateToUser)
+                    val commentLinkHandler = com.pockethub.ui.markdown.rememberGitHubLinkHandler(
+                com.pockethub.ui.markdown.GitHubLinkNav(
+                    owner = owner,
+                    repo = repo,
+                    onRepo = onNavigateToRepoTab,
+                    onFile = onNavigateToFile,
+                    onIssue = onNavigateToIssue,
+                    onPull = onNavigateToPR,
+                    onCommit = onNavigateToCommit,
+                    onUser = onNavigateToUser,
+                    onDownload = { url, fileName ->
+                        downloadVm.enqueue(
+                            com.pockethub.data.download.DownloadManager.EnqueueRequest(
+                                url = url,
+                                fileName = fileName,
+                                contentType = guessAssetMime(fileName),
+                                sizeBytes = 0L,
+                                repoKey = "$owner/$repo",
+                                releaseTag = "",
+                            )
+                        )
+                    },
+                ),
+            )
+            CommitCommentItem(comment, dateFmt, owner, repo, onNavigateToUser, onLinkClick = commentLinkHandler)
                 }
             }
 
@@ -575,6 +617,7 @@ private fun CommitCommentItem(
     owner: String,
     repo: String,
     onNavigateToUser: (String) -> Unit,
+    onLinkClick: (String, com.pockethub.ui.markdown.LinkKind) -> Unit,
 ) {
     Column(
         Modifier
@@ -587,7 +630,7 @@ private fun CommitCommentItem(
         Row(verticalAlignment = Alignment.CenterVertically) {
             val login = comment.user?.login
             if (comment.user?.avatarUrl != null) {
-                AsyncImage(
+                PhAsyncImage(
                     model = comment.user.avatarUrl,
                     contentDescription = null,
                     modifier = Modifier
@@ -616,6 +659,7 @@ private fun CommitCommentItem(
         markdown = comment.body,
         modifier = Modifier.fillMaxWidth(),
         repoContext = "$owner/$repo",
+        onLinkClick = onLinkClick,
     )
 }
 }

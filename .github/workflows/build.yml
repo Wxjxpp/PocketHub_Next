@@ -2,7 +2,7 @@ name: Build Release APK
 
 on:
   push:
-    branches: [main]
+    branches: [main, ui-redesign]
   workflow_dispatch:
 
 # Never let two release jobs race over version.properties, APKs and tags.
@@ -21,9 +21,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           # Full history made checkout grow to ~1 GB because every release APK
-          # used to be committed. The build only needs the current tree.
-          fetch-depth: 1
-          fetch-tags: false
+          # used to be committed. 50 commits is plenty for changelog generation
+          # (we tag every build) while keeping the checkout small.
+          fetch-depth: 50
+          fetch-tags: true
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -39,6 +40,27 @@ jobs:
           chmod +x build.sh
           ./build.sh
 
+      - name: Generate bilingual changelog (AI when LLM_API_KEY is set, deterministic fallback)
+        run: |
+          mapfile -t LOG_LINES < <(
+            git log --pretty=format:'%s' -n 40 \
+              --grep='chore: release' --invert-grep \
+              --grep='\[skip ci\]' --invert-grep
+          )
+          printf '%s\n' "${LOG_LINES[@]}" > /tmp/commits.txt
+          python3 scripts/gen_changelog.py /tmp/commits.txt > /tmp/changelog.json \
+            || echo '{"items":[]}' > /tmp/changelog.json
+          echo "changelog: $(cat /tmp/changelog.json)"
+
+      # Expose the built APK as a workflow artifact so the run detail page
+      # (GitHub web + PocketHub app) shows it under "Artifacts" per run.
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pockethub-apk
+          path: apk/*.apk
+          if-no-files-found: error
+
       - name: Commit version bump + archived APK
         run: |
           git config user.name "github-actions[bot]"
@@ -50,39 +72,22 @@ jobs:
       - name: Create GitHub Release with APK asset
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_BASE_URL: ${{ vars.LLM_BASE_URL }}
+          LLM_MODEL: ${{ vars.LLM_MODEL }}
         run: |
           VERSION_NAME=$(grep '^versionName=' version.properties | cut -d= -f2)
           APK=$(ls apk/pockethub-${VERSION_NAME}.apk 2>/dev/null | head -1)
           [ -z "$APK" ] && { echo "No APK found, skipping release"; exit 0; }
 
-          # Build changelog from recent commits —
-          # Exclude the version-bump commit itself and any other chore:[skip ci] noise
-          # so the release notes surface feature / fix commits since the last release.
-          mapfile -t LOG_LINES < <(
-            git log --pretty=format:'%s' -n 60 \
-              --grep='chore: release' --invert-grep
-          )
-          CHANGELOG=""
-          for line in "${LOG_LINES[@]}"; do
-            # Skip merge commits and blank lines
-            [[ "$line" =~ ^Merge\  ]] && continue
-            [[ -z "$line" ]] && continue
-            CHANGELOG+="- $line
-          "
-          done
-          # Cap the changelog to keep release notes skimmable on the in-app update dialog.
-          CHANGELOG=$(printf '%s' "$CHANGELOG" | head -c 1800)
-
+          # Structured bilingual changelog (generated in the earlier step).
+          # Body layout: human-readable zh/en sections for the GitHub web page,
+          # plus a single-line <!--pockethub-changelog {json}--> block that the
+          # in-app update dialog reads directly (locale-matched, no runtime
+          # translation). JSON is emitted on ONE line by design.
+          CHANGELOG_JSON=$(cat /tmp/changelog.json 2>/dev/null || echo '{"items":[]}')
           NOTES_FILE=$(mktemp)
-          {
-            echo "## PocketHub v${VERSION_NAME}"
-            echo
-            if [ -n "$CHANGELOG" ]; then
-              echo "$CHANGELOG" | head -40
-            else
-              echo "Auto-built release APK for PocketHub v${VERSION_NAME}."
-            fi
-          } > "$NOTES_FILE"
+          python3 scripts/format_notes.py "${VERSION_NAME}" /tmp/changelog.json > "$NOTES_FILE"
 
           # Replace existing release/tag if re-running on the same version.
           gh release delete "v${VERSION_NAME}" --yes --cleanup-tag 2>/dev/null || true

@@ -5,6 +5,7 @@ import com.pockethub.R
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -22,6 +23,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.CircleNotifications
 import androidx.compose.material.icons.outlined.Done
@@ -65,9 +67,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import coil.compose.AsyncImage
 import com.pockethub.data.model.GitHubNotification
 import com.pockethub.data.model.NotificationReason
+import com.pockethub.ui.components.PhAsyncImage
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -166,7 +168,7 @@ fun NotificationsScreen(
             }
 
             if (isLoading && notifications.isEmpty()) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                com.pockethub.ui.components.SkeletonList(Modifier.fillMaxSize(), rows = 8)
                 return@Column
             }
 
@@ -176,9 +178,10 @@ fun NotificationsScreen(
             }
 
             if (notifications.isEmpty()) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(stringResource(R.string.no_notifications), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
+                com.pockethub.ui.components.EmptyStateV2(
+                    icon = Icons.Outlined.Notifications,
+                    title = stringResource(R.string.no_notifications),
+                )
                 return@Column
             }
 
@@ -191,7 +194,7 @@ fun NotificationsScreen(
                         val avatarUrl = items.firstOrNull { it.repository?.owner?.avatarUrl != null }?.repository?.owner?.avatarUrl
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { onNavigateToRepo(owner, repoName) }.padding(vertical = 4.dp)) {
                             if (avatarUrl != null) {
-                                AsyncImage(model = avatarUrl, contentDescription = null, modifier = Modifier.size(14.dp).clip(CircleShape))
+                                PhAsyncImage(model = avatarUrl, contentDescription = null, modifier = Modifier.size(14.dp).clip(CircleShape))
                                 Spacer(Modifier.width(6.dp))
                             }
                             Text(
@@ -207,11 +210,6 @@ fun NotificationsScreen(
                             notif = notif,
                             onMarkRead = { vm.markRead(notif.id) },
                             onUnsubscribe = { pendingUnsubId = notif.id },
-                            onCopy = {
-                                val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                cm.setPrimaryClip(ClipData.newPlainText("notification", notif.subject.title))
-                                scope.launch { snackbarHostState.showSnackbar("Copied") }
-                            },
                             onClick = {
                                 val owner = repoFullName.substringBefore('/')
                                 val repo = repoFullName.substringAfter('/')
@@ -269,14 +267,33 @@ private fun NotificationItem(
     notif: GitHubNotification,
     onMarkRead: () -> Unit,
     onUnsubscribe: () -> Unit,
-    onCopy: () -> Unit,
     onClick: () -> Unit,
 ) {
-    var menuOpen by remember { mutableStateOf(false) }
-    Row(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 10.dp),
-        verticalAlignment = Alignment.Top,
+    com.pockethub.ui.components.PhCard(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        onClick = onClick,
+        cornerRadius = 16.dp,
+        container = if (notif.unread)
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.07f)
+        else MaterialTheme.colorScheme.surface,
     ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+        // Unread dot
+        Box(Modifier.width(14.dp)) {
+            if (notif.unread) {
+                Box(
+                    Modifier
+                        .padding(top = 6.dp)
+                        .size(8.dp)
+                        .clip(androidx.compose.foundation.shape.CircleShape)
+                        .background(MaterialTheme.colorScheme.primary)
+                )
+            }
+        }
+        Spacer(Modifier.width(4.dp))
         // Type icon
         val icon = when (notif.subject.type) {
             "PullRequest" -> Icons.Outlined.Merge
@@ -284,7 +301,12 @@ private fun NotificationItem(
             "Issue"       -> Icons.Outlined.Email
             else          -> Icons.Outlined.CircleNotifications
         }
-        Icon(icon, contentDescription = notif.subject.type, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Icon(
+            icon, contentDescription = notif.subject.type,
+            modifier = Modifier.size(18.dp),
+            tint = if (notif.unread) MaterialTheme.colorScheme.primary
+                   else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Spacer(Modifier.width(10.dp))
 
         Column(Modifier.weight(1f)) {
@@ -303,29 +325,34 @@ private fun NotificationItem(
             }
         }
 
-        // Overflow menu
-        IconButton(onClick = { menuOpen = true }) {
-            Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.cd_notif_actions), tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
-        }
-        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+        // Inline action buttons — replaced the overflow popup, which anchored
+        // to a row that moved and rendered in a drifting position.
+        Column(
+            horizontalAlignment = androidx.compose.ui.Alignment.End,
+            verticalArrangement = Arrangement.spacedBy(0.dp),
+        ) {
             if (notif.unread) {
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.action_mark_read)) },
-                    leadingIcon = { Icon(Icons.Outlined.Done, null, modifier = Modifier.size(18.dp)) },
-                    onClick = { menuOpen = false; onMarkRead() },
-                )
+                ActionTextButton(stringResource(R.string.action_mark_read), MaterialTheme.colorScheme.primary, onMarkRead)
             }
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.action_unsubscribe)) },
-                leadingIcon = { Icon(Icons.Outlined.Unsubscribe, null, modifier = Modifier.size(18.dp)) },
-                onClick = { menuOpen = false; onUnsubscribe() },
-            )
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.action_copy)) },
-                onClick = { menuOpen = false; onCopy() },
-            )
+            ActionTextButton(stringResource(R.string.action_unsubscribe), MaterialTheme.colorScheme.onSurfaceVariant, onUnsubscribe)
+        }
         }
     }
+}
+
+/** Tiny text-only action button used in notification rows. */
+@Composable
+private fun ActionTextButton(label: String, tint: androidx.compose.ui.graphics.Color, onClick: () -> Unit) {
+    Text(
+        label,
+        style = MaterialTheme.typography.labelSmall,
+        color = tint,
+        fontWeight = FontWeight.Medium,
+        modifier = Modifier
+            .clip(MaterialTheme.shapes.small)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+    )
 }
 
 @Composable

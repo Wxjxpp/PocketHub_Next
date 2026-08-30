@@ -20,6 +20,7 @@ data class User(
     val location: String? = null,
     val email: String? = null,
     @SerialName("public_repos") val publicRepos: Int? = null,
+    @SerialName("total_private_repos") val totalPrivateRepos: Int? = null,
     val followers: Int? = null,
     val following: Int? = null,
 )

@@ -1,6 +1,7 @@
 package com.pockethub.ui.profile
 
 import androidx.lifecycle.ViewModel
+import com.pockethub.util.userMessage
 import androidx.lifecycle.viewModelScope
 import com.pockethub.data.local.AccountEntity
 import com.pockethub.data.model.Repository
@@ -20,6 +21,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class ProfileViewModel @Inject constructor(
+    private val issueReporter: com.pockethub.data.reporting.IssueReporter,
     private val api: GitHubApi,
     private val cache: CachedRepository,
     private val accounts: AccountRepository,
@@ -89,12 +91,18 @@ class ProfileViewModel @Inject constructor(
     private var loadedWorkLogin: String? = null
     private var loadedWorkTab: WorkTab? = null
 
+    /** Set during force refresh so nested repo loads bypass the TTL cache —
+     *  pull-to-refresh must actually hit the network, not re-serve a fresh
+     *  cache blob (fake-refresh bug). */
+    private var forceRefreshInFlight = false
+
     init { loadProfile() }
 
     fun loadProfile(force: Boolean = false) {
         viewModelScope.launch {
             _isLoading.update { true }
             _error.update { null }
+            forceRefreshInFlight = force
             try {
                 val token = accounts.getActiveToken()
                 if (token.isNotBlank()) authInterceptor.token = token
@@ -118,8 +126,10 @@ class ProfileViewModel @Inject constructor(
                 // Auto-load the default work tab once we know the active login.
                 loadWorkList(_workTab.value, force = false)
             } catch (e: Exception) {
-                _error.update { e.localizedMessage ?: "Failed to load profile" }
+                issueReporter.reportError("Profile", "loadProfile", e)
+                _error.update { e.userMessage("Failed to load profile") }
             } finally {
+                forceRefreshInFlight = false
                 _isLoading.update { false }
             }
         }
@@ -145,7 +155,9 @@ class ProfileViewModel @Inject constructor(
             }
             val nextPage = if (reset) 1 else _reposPage.value + 1
             try {
-                val chunk = cache.getMyRepositories(page = nextPage, sort = "pushed")
+                // During a forced refresh bypass the TTL cache so the pull-to-refresh
+                // result reflects the network, not a just-cached blob.
+                val chunk = cache.getMyRepositories(page = nextPage, sort = "pushed", forceFresh = forceRefreshInFlight && reset)
                 if (reset) _topRepos.value = chunk
                 else _topRepos.value = _topRepos.value + chunk
                 _reposPage.value = nextPage
@@ -184,7 +196,8 @@ class ProfileViewModel @Inject constructor(
                 val result = api.searchIssues(q, sort = "updated", order = "desc", perPage = 30)
                 _workItems.value = result.items
             } catch (e: Exception) {
-                _workError.value = e.localizedMessage ?: "Failed to load work list"
+                issueReporter.reportError("Profile", "loadWorkList", e)
+                _workError.value = e.userMessage("Failed to load work list")
                 _workItems.value = emptyList()
             } finally {
                 _isLoadingWork.update { false }

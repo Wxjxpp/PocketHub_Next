@@ -8,6 +8,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -43,12 +44,20 @@ class FeedSourceService @Inject constructor(
     private val api: GitHubApi, // reserved for direct-search variants; unused on the current path
     private val httpClient: OkHttpClient,
     private val json: Json,
+    dns: okhttp3.Dns,
 ) {
     private val bareClient: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(20, TimeUnit.SECONDS)
         .writeTimeout(15, TimeUnit.SECONDS)
+        .dns(dns)
         .build()
+
+    /** Max wait for a third-party "primary" host before switching to mirrors.
+     *  CDN-backed primaries normally answer <1s; on censored networks the TCP
+     *  connection just hangs, and the full OkHttp timeout (15-20s) is what
+     *  users perceive as a slow source. */
+    private val PRIMARY_DEADLINE_MS = 3_500L
 
     /**
      * Effective base URL for [source], with custom-URL override honoured,
@@ -76,6 +85,8 @@ class FeedSourceService @Inject constructor(
                 else fetchGitHubTrendingApi(cfg, forceFresh)
             }
             FeedSourceOption.OSS_INSIGHT -> fetchOssInsight(cfg, forceFresh)
+            FeedSourceOption.KOMI_TOP_CHARTS -> fetchKomiTopCharts(cfg, forceFresh)
+            FeedSourceOption.KOMI_DISCOVER -> fetchKomiDiscoverFeed(cfg, forceFresh)
             // The official GitHub REST search path is the stable zero-config
             // fallback for old or malformed saved source ids.
             else -> searchGitHub(cfg, forceFresh)
@@ -96,16 +107,19 @@ class FeedSourceService @Inject constructor(
                 if (!isConfigured(FeedSourceOption.REDDIT_TOP, cfg.customBaseUrl)) emptyList()
                 else fetchRedditTop(cfg, forceFresh)
             // Following-only sources are safely mapped to the official feed if
-            // an old install somehow persisted them under Featured.
+            // an old install somehow persisted them under Featured. Komi charts
+            // are a Trending-source, same treatment on the Featured tab.
             FeedSourceOption.GITHUB_EVENTS,
-            FeedSourceOption.GITHUB_TRENDING_API -> searchGitHub(cfg, forceFresh)
+            FeedSourceOption.GITHUB_TRENDING_API,
+            FeedSourceOption.KOMI_TOP_CHARTS,
+            FeedSourceOption.KOMI_DISCOVER -> searchGitHub(cfg, forceFresh)
         }
     }
 
     // ── Following (handled separately — returns GitHub events, not repos) ──
-    suspend fun loadFollowing(activeLogin: String, perPage: Int = 30): List<com.pockethub.data.model.FeedEvent> {
+    suspend fun loadFollowing(activeLogin: String, perPage: Int = 30, forceFresh: Boolean = false): List<com.pockethub.data.model.FeedEvent> {
         if (activeLogin.isBlank()) return emptyList()
-        return cache.getReceivedEvents(activeLogin, perPage = perPage)
+        return cache.getReceivedEvents(activeLogin, perPage = perPage, forceFresh = forceFresh)
     }
 
     // ── GitHub Search (canonical Repository → DiscoverItem) ────────────────
@@ -439,6 +453,150 @@ class FeedSourceService @Inject constructor(
 
     private fun JsonObject.rowStr(key: String): String =
         (this[key] as? JsonPrimitive)?.contentOrNull.orEmpty()
+
+    // ── Komi Store top charts — github-store.org /v1/categories ────────────
+    //
+    // GET {base}categories/{category}/{platform} → BackendRepoResponse[]
+    // (notes: /var/minis/shared/komi-store/api-notes.md, verified 2026-08-26).
+    // Falls back to the project's offline GitHub-raw mirror
+    // cached-data/{category}/{platform}.json whose envelope is
+    // { category, platform, lastUpdated, totalCount, repositories: [...] }.
+
+    private suspend fun fetchKomiTopCharts(cfg: FeedSourceConfig, forceFresh: Boolean): List<DiscoverItem> {
+        val source = FeedSourceOption.KOMI_TOP_CHARTS
+        val base = baseUrlFor(source, cfg.customBaseUrl)
+        val category = cfg.komiCategory.ifBlank { "trending" }
+        val platform = cfg.komiPlatform.ifBlank { "android" }
+
+        val primaryUrl = base.ifEmpty { "https://api.github-store.org/v1/" } + "categories/$category/$platform"
+        // Offline mirrors (same items, wrapped in a { repositories: [...] }
+        // envelope): the project's GitHub-raw dump first, then the jsDelivr CDN
+        // copy — jsDelivr is usually reachable where raw.githubusercontent.com
+        // is blocked.
+        val mirrorUrls = listOf(
+            "https://raw.githubusercontent.com/kurikomi-labs/komi-store-backend-data/main" +
+                "/cached-data/$category/$platform.json",
+            "https://cdn.jsdelivr.net/gh/kurikomi-labs/komi-store-backend-data@main" +
+                "/cached-data/$category/$platform.json",
+        )
+
+        // Primary first, but with a tight deadline: the backend is CDN-cached
+        // and normally answers in well under a second. On censored networks the
+        // connection just hangs until OkHttp's full 20s timeout — users perceive
+        // that as "the source is very slow" — so we cap the wait and move on to
+        // the mirrors quickly. (Verified: api.github-store.org gets
+        // ERR_CONNECTION_CLOSED on mainland networks; raw.githubusercontent.com
+        // is also unreliable; jsDelivr is the reliable last resort.)
+        return coroutineScope {
+            val primaryJob = async { runCatching { requestText(primaryUrl, forceFresh) }.getOrNull() }
+            val primaryBody = withTimeoutOrNull(PRIMARY_DEADLINE_MS) { primaryJob.await() }
+            if (primaryBody == null) {
+                primaryJob.cancel()
+                null
+            } else {
+                parseKomiItems(primaryBody, source)
+            }?.takeIf { it.isNotEmpty() } ?: run {
+                for (mirror in mirrorUrls) {
+                    val body = runCatching { requestText(mirror, forceFresh) }.getOrNull() ?: continue
+                    val env = runCatching { json.parseToJsonElement(body) as? JsonObject }.getOrNull()
+                    val items = (env?.get("repositories") as? JsonArray)?.toString() ?: body
+                    val parsed = parseKomiItems(items, source)
+                    if (parsed.isNotEmpty()) return@coroutineScope parsed
+                }
+                emptyList()
+            }
+        }
+    }
+
+    /** Decode a bare JSON array of BackendRepoResponse into [DiscoverItem]s. */
+    private fun parseKomiItems(body: String, source: FeedSourceOption): List<DiscoverItem> {
+        val arr = runCatching {
+            json.parseToJsonElement(body) as? JsonArray
+        }.getOrNull() ?: return emptyList()
+        return arr.mapNotNull { el ->
+            val row = el as? JsonObject ?: return@mapNotNull null
+            val fullName = row.rowStr("fullName").ifBlank { row.rowStr("full_name") }
+            if (!fullName.contains('/')) return@mapNotNull null
+            val owner = fullName.substringBefore('/')
+            val repo = fullName.substringAfter('/')
+            val ownerObj = row["owner"] as? JsonObject
+            val stars = row.rowStr("stargazersCount").extractInt()
+            val forks = row.rowStr("forksCount").extractInt()
+            val daily = row.rowStr("dailyStars").extractInt()
+            val topicsArr = row["topics"] as? JsonArray
+            DiscoverItem(
+                id = DiscoverItem.stableId(owner, repo),
+                source = source,
+                owner = owner,
+                repo = repo,
+                htmlUrl = row.rowStr("htmlUrl").ifBlank { "https://github.com/$owner/$repo" },
+                description = row.rowStr("description").takeIf { it.isNotBlank() },
+                language = row.rowStr("language").takeIf { it.isNotBlank() },
+                stars = stars,
+                forks = forks,
+                topics = topicsArr?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
+                    ?.filter { it.isNotBlank() } ?: emptyList(),
+                ownerAvatarUrl = ownerObj?.rowStr("avatarUrl")?.ifBlank { null }
+                    ?: "https://avatars.githubusercontent.com/$owner",
+                // dailyStars is the chart's momentum metric — surface it the same
+                // way OSS Insight's score is surfaced on the Explore card.
+                starDelta = if (daily > 0) StarDelta(daily, "day") else null,
+            )
+        }
+    }
+
+    // ── Komi Store discovery feed — /v1/feed?platform=… ───────────────────
+    //
+    // GET {base}feed?platform={android|windows|macos|linux} → { "items": […], … }
+    // A MISSING platform param means "all platforms" — a literal "all" value is
+    // rejected by the backend. Daily-rotating picks. Offline mirror (page 1
+    // only): cached-data/feed/{platform|all}.json — same {repositories:[…]} envelope.
+
+    private suspend fun fetchKomiDiscoverFeed(cfg: FeedSourceConfig, forceFresh: Boolean): List<DiscoverItem> {
+        val source = FeedSourceOption.KOMI_DISCOVER
+        val base = baseUrlFor(source, cfg.customBaseUrl).ifEmpty { "https://api.github-store.org/v1/" }
+        val platform = cfg.komiPlatform.ifBlank { "android" }
+        // The backend treats a MISSING platform param as "all platforms"; a
+        // literal "all" (or empty value) is rejected with "Invalid platform".
+        val primaryUrl = if (platform == "all") {
+            base.trimEnd('/') + "/feed?limit=30"
+        } else {
+            base.trimEnd('/') + "/feed?platform=$platform&limit=30"
+        }
+
+        val primaryBody = withTimeoutOrNull(PRIMARY_DEADLINE_MS) {
+            coroutineScope {
+                val job = async { runCatching { requestText(primaryUrl, forceFresh) }.getOrNull() }
+                val body = job.await()
+                if (body == null) { job.cancel(); null } else body
+            }
+        }
+        parseKomiEnvelope(primaryBody, source)?.takeIf { it.isNotEmpty() }?.let { return it }
+
+        // Offline mirror for any platform — all.json exists and uses the same
+        // {repositories:[…]} envelope the parser already accepts.
+        val mirrors = listOf(
+            "https://raw.githubusercontent.com/kurikomi-labs/komi-store-backend-data/main" +
+                "/cached-data/feed/$platform.json",
+            "https://cdn.jsdelivr.net/gh/kurikomi-labs/komi-store-backend-data@main" +
+                "/cached-data/feed/$platform.json",
+        )
+        for (mirror in mirrors) {
+            val body = runCatching { requestText(mirror, forceFresh) }.getOrNull() ?: continue
+            parseKomiEnvelope(body, source)?.takeIf { it.isNotEmpty() }?.let { return it }
+        }
+        return emptyList()
+    }
+
+    /** Accepts {items:[…]} / {repositories:[…]} / a bare array; reuses the charts row parser. */
+    private fun parseKomiEnvelope(body: String?, source: FeedSourceOption): List<DiscoverItem>? {
+        if (body.isNullOrBlank()) return null
+        val env = runCatching { json.parseToJsonElement(body) as? JsonObject }.getOrNull()
+            ?: return parseKomiItems(body, source).takeIf { it.isNotEmpty() } // bare array
+        val items = (env["items"] ?: env["repositories"]) as? JsonArray
+            ?: return null
+        return parseKomiItems(items.toString(), source).takeIf { it.isNotEmpty() }
+    }
 
     // ── Hacker News: showstories → filter GitHub links → top N ──────────────
 

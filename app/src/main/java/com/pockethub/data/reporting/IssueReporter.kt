@@ -49,6 +49,20 @@ class IssueReporter @Inject constructor(
     val events: SharedFlow<IssueEvent> = _events.asSharedFlow()
     private val mutex = Mutex()
     private val installedCrashHook = AtomicBoolean(false)
+
+    /** What the user was doing right before the event: screens visited and
+     *  network calls made, newest last. Kept in memory only; attached to
+     *  crash/ANR events so each digest entry answers "where did this happen
+     *  and what had the app just done?". */
+    private val breadcrumbs = java.util.concurrent.CopyOnWriteArrayList<String>()
+
+    fun breadcrumb(message: String) {
+        val ts = formatter.format(Date())
+        breadcrumbs.add("$ts $message")
+        while (breadcrumbs.size > MAX_BREADCRUMBS) breadcrumbs.removeAt(0)
+    }
+
+    private fun breadcrumbsSnapshot(): String = breadcrumbs.joinToString("\n")
     private val watchDogRunning = AtomicBoolean(false)
     private val heartbeatMs = AtomicLong(System.currentTimeMillis())
     private val formatter = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ", Locale.US)
@@ -59,10 +73,46 @@ class IssueReporter @Inject constructor(
      * Install the global uncaught-exception handler and ANR watch-dog.
      * Safe to call multiple times — guards prevent double-install. Should
      * be called once from [com.pockethub.PocketHubApp.onCreate].
+     *
+     * Also prunes any legacy `error`-kind entries from earlier builds (the
+     * digest now only carries crash/ANR), so the settings counter reflects
+     * the current policy after upgrade.
      */
     fun install() {
+        pruneLegacyErrors()
         installCrashHook()
         installAnrWatchDog()
+    }
+
+    /**
+     * Diagnostic hook from catch blocks. By default it does NOT record
+     * anything — the severe-issues digest only carries crashes and ANRs.
+     * Expected failures (offline, 404, rate limits…) were flooding the
+     * digest and drowned the signal, so regular exceptions are logged to
+     * logcat only. Pass [severe] = true for a failure that genuinely
+     * corrupts app state and cannot be surfaced in the UI.
+     */
+    fun reportError(
+        screen: String,
+        where: String,
+        error: Throwable?,
+        extra: Map<String, String> = emptyMap(),
+        severe: Boolean = false,
+    ) {
+        if (!severe) {
+            android.util.Log.d("IssueReporter", "non-severe $screen/$where: $error")
+            return
+        }
+        reporterScope.launch {
+            runCatching {
+                report(
+                    kind = IssueKind.ERROR,
+                    subject = "[$screen] $where: ${error?.javaClass?.simpleName ?: "Error"}${error?.message?.let { ": $it" } ?: ""}",
+                    stackTrace = error?.stackTraceToString() ?: "",
+                    extra = extra,
+                )
+            }
+        }
     }
 
     /**
@@ -156,7 +206,7 @@ class IssueReporter @Inject constructor(
                     subject = "${e.javaClass.name}: ${e.message ?: "<no message>"}",
                     stackTrace = stack.take(MAX_STACK),
                     threadName = t.name,
-                    extra = emptyMap(),
+                    extra = mapOf(BKEY_BREADCRUMBS to breadcrumbsSnapshot()),
                 )
                 appendToFileSync(event)
             } catch (_: Throwable) { /* never let the hook throw while already crashing */ }
@@ -193,7 +243,11 @@ class IssueReporter @Inject constructor(
                         subject = "Main thread blocked for ${lag}ms (threshold ${ANR_THRESHOLD_MS}ms)",
                         stackTrace = mainStack,
                         threadName = mainThread.name,
-                        extra = mapOf("threadState" to mainThread.state.name, "lagMs" to lag.toString()),
+                        extra = mapOf(
+                            "threadState" to mainThread.state.name,
+                            "lagMs" to lag.toString(),
+                            BKEY_BREADCRUMBS to breadcrumbsSnapshot(),
+                        ),
                     )
                     // Back-off so we don't emit a flood of dupes for the same stall.
                     kotlinx.coroutines.delay(ANR_COOLDOWN_MS)
@@ -205,6 +259,27 @@ class IssueReporter @Inject constructor(
 
     private val mainThreadHandler by lazy {
         android.os.Handler(Looper.getMainLooper())
+    }
+
+    /** Drop pre-policy `error` entries so the digest is crash/ANR-only. */
+    private fun pruneLegacyErrors() {
+        reporterScope.launch {
+            runCatching {
+                mutex.withLock {
+                    if (!logFile.exists()) return@withLock
+                    val lines = logFile.readLines()
+                    val kept = lines.filter { line ->
+                        line.isBlank() || runCatching {
+                            JSONObject(line).optString("kind") != IssueKind.ERROR.id
+                        }.getOrDefault(true)
+                    }
+                    when {
+                        kept.isEmpty() -> logFile.delete()
+                        kept.size != lines.size -> logFile.writeText(kept.joinToString("\n") + "\n")
+                    }
+                }
+            }
+        }
     }
 
     private suspend fun appendToLogFile(event: IssueEvent) = mutex.withLock {
@@ -245,6 +320,9 @@ class IssueReporter @Inject constructor(
     }
 
     companion object {
+        /** extra[] key carrying the breadcrumb trail of a crash/ANR event. */
+        const val BKEY_BREADCRUMBS = "breadcrumbs"
+        private const val MAX_BREADCRUMBS = 20
         private const val MAX_EVENTS = 200
         private const val MAX_SUBJECT = 400
         private const val MAX_STACK = 8_000

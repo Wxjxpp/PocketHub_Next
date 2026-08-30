@@ -1,6 +1,7 @@
 package com.pockethub.ui.repo
 
 import androidx.lifecycle.ViewModel
+import com.pockethub.util.userMessage
 import androidx.lifecycle.viewModelScope
 import com.pockethub.data.remote.GitHubApi
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -14,6 +15,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class CommitsViewModel @Inject constructor(
+    private val issueReporter: com.pockethub.data.reporting.IssueReporter,
     private val api: GitHubApi,
 ) : ViewModel() {
 
@@ -30,43 +32,46 @@ class CommitsViewModel @Inject constructor(
     private var canLoadMore = true
     private var loadedOwner: String? = null
     private var loadedRepo: String? = null
+    /** Branch/SHA the current commit list was fetched for (null = default branch). */
+    private var loadedRef: String? = null
     private var loadJob: Job? = null
     private var loadRequestId = 0
 
-    fun loadCommits(owner: String, repo: String) {
-        if (loadedOwner == owner && loadedRepo == repo && _commits.value.isNotEmpty()) return
-        loadedOwner = owner; loadedRepo = repo
+    fun loadCommits(owner: String, repo: String, ref: String? = null) {
+        if (loadedOwner == owner && loadedRepo == repo && loadedRef == ref && _commits.value.isNotEmpty()) return
+        loadedOwner = owner; loadedRepo = repo; loadedRef = ref
         currentPage = 1
         canLoadMore = true
-        fetchCommits(owner, repo, append = false)
+        fetchCommits(owner, repo, append = false, ref = ref)
     }
 
     fun loadMore(owner: String, repo: String) {
         if (!canLoadMore || _isLoading.value) return
         currentPage++
-        fetchCommits(owner, repo, append = true)
+        fetchCommits(owner, repo, append = true, ref = loadedRef)
     }
 
-    fun refresh(owner: String, repo: String) {
+    fun refresh(owner: String, repo: String, ref: String? = null) {
         currentPage = 1
         canLoadMore = true
-        fetchCommits(owner, repo, append = false)
+        fetchCommits(owner, repo, append = false, ref = ref)
     }
 
-    private fun fetchCommits(owner: String, repo: String, append: Boolean) {
+    private fun fetchCommits(owner: String, repo: String, append: Boolean, ref: String? = null) {
         if (!append) loadJob?.cancel()
         val requestId = ++loadRequestId
         loadJob = viewModelScope.launch {
             _isLoading.update { true }
             _error.update { null }
             try {
-                val result = api.getCommits(owner, repo, page = currentPage, perPage = 30)
+                val result = api.getCommits(owner, repo, page = currentPage, perPage = 30, sha = ref)
                 if (requestId != loadRequestId) return@launch
                 _commits.update { if (append) it + result else result }
                 canLoadMore = result.size >= 30
             } catch (e: Exception) {
+                issueReporter.reportError("Commits", "fetchCommits", e)
                 if (requestId != loadRequestId) return@launch
-                _error.update { e.localizedMessage ?: "Failed to load commits" }
+                _error.update { e.userMessage("Failed to load commits") }
                 if (!append) _commits.update { emptyList() }
             } finally {
                 if (requestId == loadRequestId) _isLoading.update { false }

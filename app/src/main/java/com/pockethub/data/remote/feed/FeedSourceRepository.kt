@@ -83,6 +83,12 @@ class FeedSourceRepository @Inject constructor(
         )
     }
 
+    /** Persist category/platform for the Komi top charts source on a tab. */
+    suspend fun setKomiOptions(tab: FeedTab, category: String, platform: String) {
+        val current = getConfig(tab)
+        setConfig(tab, current.copy(komiCategory = category, komiPlatform = platform))
+    }
+
     private fun readConfig(prefs: Preferences, tab: FeedTab): FeedSourceConfig {
         val default = FeedSourceConfig(
             sourceId = FeedSourceOption.defaultsFor(tab).id,
@@ -91,7 +97,12 @@ class FeedSourceRepository @Inject constructor(
             trendingRange = "Daily",
         )
         val raw = prefs[keyFor(tab)] ?: return default
-        return runCatching { json.decodeFromString<FeedSourceConfig>(raw) }.getOrDefault(default)
+        val decoded = runCatching { json.decodeFromString<FeedSourceConfig>(raw) }.getOrDefault(default)
+        // Sources pruned from a tab's option list (e.g. old installs that had
+        // OSS Insight on Trending) fall back to the tab default so users are
+        // never stuck on a source the settings screen no longer shows.
+        return if (FeedSourceOption.optionsFor(tab).any { it.id == decoded.sourceId }) decoded
+        else decoded.copy(sourceId = default.sourceId, customBaseUrl = "")
     }
 
     private fun keyFor(tab: FeedTab): Preferences.Key<String> = when (tab) {

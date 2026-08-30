@@ -5,32 +5,17 @@ import com.pockethub.R
 
 import androidx.compose.ui.res.stringResource
 
-import androidx.compose.foundation.background
-import androidx.compose.ui.graphics.Color
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Campaign
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Lock
@@ -39,32 +24,26 @@ import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.NotificationsOff
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Share
-import androidx.compose.material.icons.outlined.ForkRight
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.PushPin
-import androidx.compose.material.icons.outlined.Star
-import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.remember
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
+import androidx.compose.material3.Surface
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -77,21 +56,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.pockethub.data.remote.GitHubApi
+import com.pockethub.ui.markdown.RepoTabTarget
 import androidx.hilt.navigation.compose.hiltViewModel
-import coil.compose.AsyncImage
-import com.pockethub.data.model.Issue
-import com.pockethub.data.model.Repository
-import com.pockethub.ui.markdown.MarkdownText
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.runtime.derivedStateOf
-import java.text.DateFormat
+import androidx.compose.animation.togetherWith
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -104,13 +75,29 @@ fun RepoDetailScreen(
     onNavigateToCommit: (String) -> Unit = { _ -> },
     onNavigateToCreateIssue: (String, String) -> Unit = { _, _ -> },
     onNavigateToRepo: (String, String) -> Unit = { _, _ -> },
+    /** 站内链接跳转:仓库指定 tab / 仓库内文件查看。 */
+    onNavigateToRepoTab: (String, String, String?) -> Unit = { o, r, tab -> onNavigateToRepo(o, r) },
+    onNavigateToFile: (String, String, String, String?) -> Unit = { o, r, _, _ -> onNavigateToRepo(o, r) },
     onNavigateToUser: (String) -> Unit = {},
+    // Cross-repo issue/PR links (README 引用其他仓库的 issue 等)。
+    // AppNavigation 必须传全局路由;默认降级为同仓库导航。
+    onNavigateToIssueFull: (String, String, Int) -> Unit = { o, r, n ->
+        if (o == owner && r == repo) onNavigateToIssue(n) else onNavigateToRepo(o, r)
+    },
+    onNavigateToPRFull: (String, String, Int) -> Unit = { o, r, n ->
+        if (o == owner && r == repo) onNavigateToPR(n) else onNavigateToRepo(o, r)
+    },
     onNavigateToSearch: (String) -> Unit = {},
+    /** 站内跳转携带的目标 tab("code"/"issues"/…),由路由参数决定。 */
+    initialTab: String? = null,
     onNavigateToDownloads: (tab: String) -> Unit = { _ -> },
     onNavigateToWorkflowRun: (Long) -> Unit = {},
     onBack: () -> Unit,
     vm: RepoDetailViewModel = hiltViewModel(),
     downloadVm: com.pockethub.ui.download.DownloadViewModel = hiltViewModel(),
+    // Shared with CodeTab below: hoisted here so the branch selected in the
+    // Code tab is observable even while another tab is on screen.
+    codeBrowserVm: CodeBrowserViewModel = hiltViewModel(),
 ) {
     val repoData by vm.repo.collectAsState()
     val issues by vm.issues.collectAsState()
@@ -118,6 +105,7 @@ fun RepoDetailScreen(
     val releases by vm.releases.collectAsState()
     val workflowRuns by vm.workflowRuns.collectAsState()
     val readme by vm.readme.collectAsState()
+    val readmeMissing by vm.readmeMissing.collectAsState()
     val isLoading by vm.isLoading.collectAsState()
     val isRefreshing by vm.isRefreshing.collectAsState()
     val isStarred by vm.isStarred.collectAsState()
@@ -138,14 +126,26 @@ fun RepoDetailScreen(
     val workflows by vm.workflows.collectAsState()
     val isLoadingWorkflows by vm.isLoadingWorkflows.collectAsState()
     val isLoadingWorkflowRuns by vm.isLoadingWorkflowRuns.collectAsState()
+    val commitsRefreshTick by vm.commitsRefreshTick.collectAsState()
+    // Branch picked in the Code tab. Falls back to the repo default branch so
+    // the Commits tab follows the Code tab's selection; null until loaded.
+    val codeBrowserState by codeBrowserVm.state.collectAsState()
+    // Derive the live ref from codeBrowserState so Compose recomputes when the
+    // branch changes (plain val would only be evaluated once per recomposition).
+    val codeBrowserRef = codeBrowserState.ref ?: repoData?.defaultBranch
     val isDispatching by vm.isDispatching.collectAsState()
     val dispatchMessage by vm.dispatchMessage.collectAsState()
+    val branches by vm.branches.collectAsState()
+    val isLoadingBranches by vm.isLoadingBranches.collectAsState()
     val translatedReadme by vm.translatedReadme.collectAsState()
     val showTranslated by vm.showTranslated.collectAsState()
     val isTranslating by vm.isTranslating.collectAsState()
     val translateTarget by vm.translateTarget.collectAsState()
     val translateMessage by vm.translateMessage.collectAsState()
     val issueStateFilter by vm.issueStateFilter.collectAsState()
+    val prStateFilter by vm.prStateFilter.collectAsState()
+    val isLoadingPulls by vm.isLoadingPulls.collectAsState()
+    val isLoadingMorePulls by vm.isLoadingMorePulls.collectAsState()
     val isLoadingMoreIssues by vm.isLoadingMoreIssues.collectAsState()
     val isLoadingIssues by vm.isLoadingIssues.collectAsState()
     val isLoadingReleases by vm.isLoadingReleases.collectAsState()
@@ -158,11 +158,32 @@ fun RepoDetailScreen(
     var showActionsMenu by remember { mutableStateOf(false) }
     var deleteInput by remember { mutableStateOf("") }
 
-    LaunchedEffect(owner, repo) { vm.loadRepo(owner, repo) }
+    LaunchedEffect(owner, repo) {
+        vm.loadRepo(owner, repo)
+        vm.resetWorkflowBranch()
+        // Deep-link / in-app link routing: open the repo on the tab the URL
+        // asked for (e.g. github.com/o/r/issues → Issues tab).
+        initialTab?.let { requested ->
+            RepoTabTarget.fromWire(requested)?.let { target ->
+                RepoTab.entries.firstOrNull { it.name.equals(target.name, ignoreCase = true) }
+                    ?.let { vm.currentTab.value = it }
+            }
+        }
+    }
+    // When the Code tab changes branch, mirror it to the workflows tab so the
+    // workflow run list & dispatch dialog follow the current branch automatically.
+    // CodeBrowserViewModel itself doesn't need resetting here — its ref is scoped
+    // to the repo and gets cleared on navigation via the Compose nav graph.
+    LaunchedEffect(owner, repo, codeBrowserRef) {
+        if (repoData != null) vm.onBranchChanged(owner, repo, codeBrowserRef)
+    }
     LaunchedEffect(owner, repo, tab) {
         if (tab == RepoTab.ISSUES) vm.loadIssues(owner, repo)
         if (tab == RepoTab.PRS) vm.loadPulls(owner, repo)
         if (tab == RepoTab.RELEASES) vm.loadReleases(owner, repo)
+        // Run list intentionally ignores the Code tab branch — show ALL workflow
+        // runs regardless of which branch is being browsed. (The dispatch dialog
+        // still uses the branch for choosing where to run a workflow.)
         if (tab == RepoTab.WORKFLOWS) vm.loadWorkflowRuns(owner, repo)
     }
     LaunchedEffect(forkMessage) {
@@ -208,9 +229,16 @@ fun RepoDetailScreen(
         }
     }
 
-    // Load workflow list when the dispatch dialog opens (lazy load).
-    LaunchedEffect(showDispatchDialog, owner, repo) {
-        if (showDispatchDialog) vm.loadWorkflows(owner, repo)
+    // Load workflow list when the dispatch dialog opens (lazy load). Sync
+    // with the current workflow branch (mirrored from the Code tab by default).
+    // React to branch changes even while the dialog is open so the user sees the
+    // updated workflow list without having to close and reopen the dialog.
+    LaunchedEffect(showDispatchDialog, owner, repo, vm.workflowBranch.value) {
+        if (showDispatchDialog) {
+            val branch = vm.workflowBranch.value ?: repoData?.defaultBranch ?: "main"
+            vm.loadWorkflows(owner, repo, branch)
+            vm.loadBranches(owner, repo)
+        }
     }
 
     // Surface dispatch results via Snackbar. On success, close the dialog and refresh runs.
@@ -380,6 +408,20 @@ fun RepoDetailScreen(
                 onRefresh = { vm.refreshCurrentTab(owner, repo) },
                 modifier = Modifier.weight(1f),
             ) {
+            androidx.compose.animation.AnimatedContent(
+                targetState = tab,
+                transitionSpec = {
+                    val forward = targetState.ordinal >= initialState.ordinal
+                    (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(200)) +
+                        androidx.compose.animation.slideInHorizontally(androidx.compose.animation.core.tween(260, easing = androidx.compose.animation.core.FastOutSlowInEasing)) {
+                            if (forward) it / 8 else -it / 8
+                        })
+                        .togetherWith(
+                            androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(140))
+                        )
+                },
+                label = "repo_tab_content",
+            ) { tab ->
             when (tab) {
                 RepoTab.OVERVIEW -> OverviewTab(
                     owner,
@@ -387,6 +429,7 @@ fun RepoDetailScreen(
                     repoData,
                     readme,
                     isLoading,
+                    readmeMissing = readmeMissing,
                     translatedReadme = translatedReadme,
                     showTranslated = showTranslated,
                     isTranslating = isTranslating,
@@ -394,12 +437,15 @@ fun RepoDetailScreen(
                     onToggleTranslation = { vm.toggleTranslation() },
                     onTopicClick = { topic -> onNavigateToSearch(topic) },
                     onNavigateToRepo = onNavigateToRepo,
-                    onLinkClick = rememberMarkdownLinkHandler(owner, repo, onNavigateToRepo, onNavigateToUser, onNavigateToIssue, downloadVm = downloadVm, onNavigateToDownloads = onNavigateToDownloads),
+                    onLinkClick = rememberMarkdownLinkHandler(owner, repo, onNavigateToRepo, onNavigateToRepoTab, onNavigateToFile, onNavigateToUser, onNavigateToIssue, onNavigateToIssueFull, onNavigateToPRFull, onNavigateToCommit, onNavigateToWorkflowRun, onNavigateToCreateIssue, downloadVm = downloadVm, onNavigateToDownloads = onNavigateToDownloads, onSameRepoTab = { target ->
+                        RepoTab.entries.firstOrNull { it.name.equals(target.name, ignoreCase = true) }?.let { vm.currentTab.value = it }
+                    }),
                 )
                 RepoTab.CODE -> CodeTab(
                     owner = owner,
                     repo = repo,
                     defaultBranch = repoData?.defaultBranch,
+                    vm = codeBrowserVm,
                     onOpenInBrowser = {
                         val url = "https://github.com/$owner/$repo/tree/${repoData?.defaultBranch ?: "main"}"
                         runCatching { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))) }
@@ -419,11 +465,11 @@ fun RepoDetailScreen(
                 )
                 RepoTab.PRS -> PullsTab(
                     pulls,
-                    stateFilter = issueStateFilter,
-                    isLoading = isLoadingIssues,
-                    isLoadingMore = isLoadingMoreIssues,
-                    onSelectFilter = { filter -> vm.setIssueStateFilter(owner, repo, filter) },
-                    onLoadMore = { vm.loadMoreIssues(owner, repo) },
+                    stateFilter = prStateFilter,
+                    isLoading = isLoadingPulls,
+                    isLoadingMore = isLoadingMorePulls,
+                    onSelectFilter = { filter -> vm.setPrStateFilter(owner, repo, filter) },
+                    onLoadMore = { vm.loadMorePulls(owner, repo) },
                     onClick = onNavigateToPR,
                     onNavigateToUser = onNavigateToUser,
                 )
@@ -434,7 +480,9 @@ fun RepoDetailScreen(
                     canDelete = canManageReleases,
                     isDeletingRelease = isDeletingRelease,
                     isLoading = isLoadingReleases,
-                    onLinkClick = rememberMarkdownLinkHandler(owner, repo, onNavigateToRepo, onNavigateToUser, onNavigateToIssue, downloadVm = downloadVm, onNavigateToDownloads = onNavigateToDownloads),
+                    onLinkClick = rememberMarkdownLinkHandler(owner, repo, onNavigateToRepo, onNavigateToRepoTab, onNavigateToFile, onNavigateToUser, onNavigateToIssue, onNavigateToIssueFull, onNavigateToPRFull, onNavigateToCommit, onNavigateToWorkflowRun, onNavigateToCreateIssue, downloadVm = downloadVm, onNavigateToDownloads = onNavigateToDownloads, onSameRepoTab = { target ->
+                        RepoTab.entries.firstOrNull { it.name.equals(target.name, ignoreCase = true) }?.let { vm.currentTab.value = it }
+                    }),
                     onNavigateToUser = onNavigateToUser,
                     onDownloadAsset = { asset ->
                         downloadVm.enqueue(
@@ -454,6 +502,9 @@ fun RepoDetailScreen(
                 RepoTab.COMMITS -> CommitsTab(
                     owner = owner,
                     repo = repo,
+                    refreshTick = commitsRefreshTick,
+                    // Follow the branch selected in the Code tab; null = default.
+                    ref = codeBrowserRef,
                     onNavigateToUser = onNavigateToUser,
                     onCommitClick = onNavigateToCommit,
                 )
@@ -465,24 +516,53 @@ fun RepoDetailScreen(
                 )
             }
             }
+            }
         }
     }
 
     if (showForkDialog) {
+        // Pre-fill with the source repo name — GitHub forks default to the same
+        // name, and the user can edit it to rename the fork at creation time.
+        var forkName by remember { mutableStateOf(repo) }
         AlertDialog(
-            onDismissRequest = { showForkDialog = false },
+            onDismissRequest = { if (!isForking) showForkDialog = false },
             title = { Text(stringResource(R.string.fork_dialog_title)) },
-            text = { Text(stringResource(R.string.fork_dialog_message, "$owner/$repo")) },
+            text = {
+                Column {
+                    Text(stringResource(R.string.fork_dialog_message, "$owner/$repo"))
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = forkName,
+                        onValueChange = { forkName = it },
+                        singleLine = true,
+                        enabled = !isForking,
+                        label = { Text(stringResource(R.string.fork_dialog_name_label)) },
+                        isError = forkName.trim().isEmpty(),
+                        supportingText = {
+                            if (forkName.trim().isEmpty()) {
+                                Text(stringResource(R.string.fork_dialog_name_required))
+                            }
+                        },
+                    )
+                }
+            },
             confirmButton = {
                 TextButton(
                     onClick = {
                         showForkDialog = false
-                        vm.fork(owner, repo)
+                        vm.fork(owner, repo, newName = forkName)
                     },
-                ) { Text(stringResource(R.string.action_fork)) }
+                    enabled = !isForking && forkName.trim().isNotEmpty(),
+                ) {
+                    if (isForking) {
+                        CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 1.5.dp)
+                    } else {
+                        Text(stringResource(R.string.action_fork))
+                    }
+                }
             },
             dismissButton = {
-                TextButton(onClick = { showForkDialog = false }) {
+                TextButton(onClick = { showForkDialog = false }, enabled = !isForking) {
                     Text(stringResource(R.string.action_cancel))
                 }
             },
@@ -571,9 +651,12 @@ fun RepoDetailScreen(
     if (showDispatchDialog) {
         WorkflowDispatchDialog(
             workflows = workflows,
-            defaultBranch = repoData?.defaultBranch,
+            branches = branches,
             isLoading = isLoadingWorkflows,
+            isLoadingBranches = isLoadingBranches,
+            defaultBranch = repoData?.defaultBranch,
             isDispatching = isDispatching,
+            currentBranch = vm.workflowBranch.value,
             onDismiss = { if (!isDispatching) showDispatchDialog = false },
             onDispatch = { workflowId, ref ->
                 vm.dispatchWorkflow(owner, repo, workflowId, ref)
@@ -582,921 +665,69 @@ fun RepoDetailScreen(
     }
 }
 
-@Composable
-private fun StatsRow(
-    data: Repository,
-    onNavigateToUser: (String) -> Unit = {},
-    isStarred: Boolean = false,
-    isForking: Boolean = false,
-    onToggleStar: () -> Unit = {},
-    onFork: () -> Unit = {},
-) {
-    val userClickModifier = Modifier.clickable { onNavigateToUser(data.owner.login) }
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        AsyncImage(
-            model = data.owner.avatarUrl,
-            contentDescription = null,
-            modifier = Modifier.size(28.dp).clip(CircleShape).then(userClickModifier),
-        )
-        Spacer(Modifier.width(8.dp))
-        Text(
-            stringResource(R.string.stats_by, data.owner.login),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = userClickModifier,
-        )
-        Spacer(Modifier.weight(1f))
-        // Star chip — tappable to toggle star. Filled star when starred.
-        Row(
-            modifier = Modifier
-                .clip(MaterialTheme.shapes.small)
-                .clickable(onClick = onToggleStar)
-                .padding(horizontal = 10.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                if (isStarred) Icons.Outlined.Star else Icons.Outlined.StarBorder,
-                contentDescription = if (isStarred) stringResource(R.string.cd_unstar) else stringResource(R.string.cd_star),
-                modifier = Modifier.size(20.dp),
-                tint = if (isStarred) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.width(4.dp))
-            Text(data.stars.toString(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Spacer(Modifier.width(10.dp))
-        // Fork chip — tappable to fork. Shows loading state while forking.
-        Row(
-            modifier = Modifier
-                .clip(MaterialTheme.shapes.small)
-                .clickable(onClick = onFork, enabled = !isForking)
-                .padding(horizontal = 10.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                if (isForking) Icons.Outlined.ForkRight else Icons.Outlined.ForkRight,
-                contentDescription = stringResource(R.string.action_fork),
-                modifier = Modifier.size(20.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.width(4.dp))
-            Text(
-                "${data.forks} ${stringResource(R.string.stat_forks)}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun OverviewTab(
-    owner: String,
-    repo: String,
-    repoData: Repository?,
-    readme: String?,
-    isLoading: Boolean,
-    translatedReadme: String? = null,
-    showTranslated: Boolean = false,
-    isTranslating: Boolean = false,
-    translateTarget: String? = null,
-    onToggleTranslation: () -> Unit = {},
-    onTopicClick: (String) -> Unit = {},
-    onNavigateToRepo: (String, String) -> Unit = { _, _ -> },
-    onLinkClick: (String, com.pockethub.ui.markdown.LinkKind) -> Unit,
-) {
-    if (isLoading && repoData == null) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-        return
-    }
-    repoData?.let { data ->
-        Column(
-            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            if (!data.description.isNullOrBlank()) {
-                Text(data.description, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-            }
-            // Fork source chip — shown only when this repo is itself a fork and
-            // the upstream parent slug is available, matching GitHub's
-            // "forked from owner/repo" affordance. Tapping navigates into the
-            // parent detail screen within the app (not an external browser), so
-            // users can keep browsing without losing context.
-            if (data.fork && data.parent != null) {
-                val p = data.parent
-                val parentOwner = p.owner.login
-                val parentName = p.name
-                Box(
-                    modifier = Modifier
-                        .clip(MaterialTheme.shapes.small)
-                        .background(MaterialTheme.colorScheme.secondaryContainer)
-                        .clickable { onNavigateToRepo(parentOwner, parentName) },
-                ) {
-                    Row(
-                        Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            Icons.Outlined.ForkRight,
-                            null,
-                            modifier = Modifier.size(13.dp),
-                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            stringResource(R.string.repo_forked_from, "$parentOwner/$parentName"),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        )
-                    }
-                }
-            }
-            if (!data.homepage.isNullOrBlank()) {
-                Text(
-                    data.homepage,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-            if (data.topics.isNotEmpty()) {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    data.topics.forEach {
-                        AssistChip(
-                            onClick = { onTopicClick(it) },
-                            label = { Text(it, style = MaterialTheme.typography.labelSmall) },
-                            colors = AssistChipDefaults.assistChipColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
-                        )
-                    }
-                }
-            }
-            HorizontalDivider()
-            // README header with optional translation toggle — hidden entirely
-            // when there is no README and we're not still loading it, so empty
-            // repos don't show a dangling "README" title followed by "unavailable".
-            val showReadmeSection = readme != null || isLoading
-            if (showReadmeSection) {
-                Row(
-                Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text(stringResource(R.string.readme_title), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                if (readme != null && translateTarget != null) {
-                    // Capsule toggle: 原文 / 译文
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        if (isTranslating) {
-                            CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp)
-                            Spacer(Modifier.width(4.dp))
-                        }
-                        // 原文 button
-                        Box(
-                            modifier = Modifier
-                                .clip(MaterialTheme.shapes.small)
-                                .background(
-                                    if (!showTranslated) MaterialTheme.colorScheme.primaryContainer
-                                    else MaterialTheme.colorScheme.surfaceVariant
-                                )
-                                .clickable(enabled = !isTranslating) { if (showTranslated) onToggleTranslation() }
-                                .padding(horizontal = 10.dp, vertical = 4.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                stringResource(R.string.translate_original),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = if (!showTranslated) MaterialTheme.colorScheme.onPrimaryContainer
-                                else MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        // 译文 button
-                        Box(
-                            modifier = Modifier
-                                .clip(MaterialTheme.shapes.small)
-                                .background(
-                                    if (showTranslated) MaterialTheme.colorScheme.primaryContainer
-                                    else MaterialTheme.colorScheme.surfaceVariant
-                                )
-                                .clickable(enabled = !isTranslating) { if (!showTranslated) onToggleTranslation() }
-                                .padding(horizontal = 10.dp, vertical = 4.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                stringResource(R.string.translate_translated),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = if (showTranslated) MaterialTheme.colorScheme.onPrimaryContainer
-                                else MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
-            }
-            // README content — show translated or original
-            val displayReadme = if (showTranslated && translatedReadme != null) translatedReadme else readme
-            if (displayReadme != null) {
-                MarkdownText(
-                    markdown = displayReadme,
-                    modifier = Modifier.fillMaxWidth(),
-                    repoContext = "$owner/$repo",
-                    defaultBranch = repoData?.defaultBranch,
-                    onLinkClick = onLinkClick,
-                )
-            } else if (isLoading) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.readme_loading), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-            } // showReadmeSection
-            Spacer(Modifier.height(40.dp))
-        }
-    }
-}
-
-@Composable
-private fun IssueStateFilterChips(
-    selected: IssueStateFilter,
-    onSelect: (IssueStateFilter) -> Unit,
-) {
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        IssueStateFilter.entries.forEach { filter ->
-            val label = when (filter) {
-                IssueStateFilter.OPEN -> stringResource(R.string.issue_state_open)
-                IssueStateFilter.CLOSED -> stringResource(R.string.issue_state_closed)
-                IssueStateFilter.ALL -> stringResource(R.string.issue_state_all)
-            }
-            androidx.compose.material3.FilterChip(
-                selected = selected == filter,
-                onClick = { onSelect(filter) },
-                label = { Text(label, style = MaterialTheme.typography.labelSmall) },
-            )
-        }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun IssuesTab(
-    issues: List<Issue>,
-    stateFilter: IssueStateFilter,
-    isLoading: Boolean,
-    isLoadingMore: Boolean,
-    onSelectFilter: (IssueStateFilter) -> Unit,
-    onLoadMore: () -> Unit,
-    onClick: (Int) -> Unit,
-    onNavigateToUser: (String) -> Unit = {},
-) {
-    val listState = rememberLazyListState()
-    val shouldLoadMore by remember {
-        derivedStateOf {
-            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-            lastVisible >= listState.layoutInfo.totalItemsCount - 3
-        }
-    }
-    LaunchedEffect(shouldLoadMore) {
-        if (shouldLoadMore && issues.isNotEmpty()) onLoadMore()
-    }
-
-    Column(Modifier.fillMaxSize()) {
-        IssueStateFilterChips(selected = stateFilter, onSelect = onSelectFilter)
-
-        if (isLoading && issues.isEmpty()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
-            return@Column
-        }
-        if (issues.isEmpty()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                val emptyText = when (stateFilter) {
-                    IssueStateFilter.OPEN -> stringResource(R.string.no_open_issues)
-                    IssueStateFilter.CLOSED -> stringResource(R.string.no_closed_issues)
-                    IssueStateFilter.ALL -> stringResource(R.string.no_issues)
-                }
-                Text(emptyText, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            return@Column
-        }
-        LazyColumn(state = listState, modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
-            items(issues, key = { it.id }) { issue ->
-            Row(
-                Modifier.fillMaxWidth().clickable { onClick(issue.number) }.padding(vertical = 10.dp),
-                verticalAlignment = Alignment.Top,
-            ) {
-                // State indicator dot — green for open, purple for closed
-                Box(
-                    Modifier
-                        .size(8.dp)
-                        .clip(CircleShape)
-                        .background(if (issue.state == "open") Color(0xFF2EA043) else Color(0xFF8957E5)),
-                )
-                Spacer(Modifier.width(10.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        issue.title,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        val user = issue.user
-                        if (user != null) {
-                            AsyncImage(
-                                model = user.avatarUrl,
-                                contentDescription = null,
-                                modifier = Modifier.size(14.dp).clip(CircleShape)
-                                    .clickable { onNavigateToUser(user.login) },
-                            )
-                            Spacer(Modifier.width(4.dp))
-                            Text(
-                                user.login,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.clickable { onNavigateToUser(user.login) },
-                            )
-                            Spacer(Modifier.width(4.dp))
-                        }
-                        Text(
-                            stringResource(R.string.issue_meta, issue.number, issue.comments),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    if (issue.labels.isNotEmpty()) {
-                        Spacer(Modifier.height(4.dp))
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            issue.labels.take(5).forEach { label ->
-                                AssistChip(
-                                    onClick = {},
-                                    label = { Text(label.name, style = MaterialTheme.typography.labelSmall) },
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-            HorizontalDivider()
-            }
-            if (isLoadingMore) {
-                item {
-                    Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(Modifier.size(24.dp))
-                    }
-                }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun PullsTab(
-    pulls: List<Issue>,
-    stateFilter: IssueStateFilter,
-    isLoading: Boolean,
-    isLoadingMore: Boolean,
-    onSelectFilter: (IssueStateFilter) -> Unit,
-    onLoadMore: () -> Unit,
-    onClick: (Int) -> Unit,
-    onNavigateToUser: (String) -> Unit = {},
-) {
-    val listState = rememberLazyListState()
-    val shouldLoadMore by remember {
-        derivedStateOf {
-            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-            lastVisible >= listState.layoutInfo.totalItemsCount - 3
-        }
-    }
-    LaunchedEffect(shouldLoadMore) {
-        if (shouldLoadMore && pulls.isNotEmpty()) onLoadMore()
-    }
-
-    Column(Modifier.fillMaxSize()) {
-        IssueStateFilterChips(selected = stateFilter, onSelect = onSelectFilter)
-
-        if (isLoading && pulls.isEmpty()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
-            return@Column
-        }
-        if (pulls.isEmpty()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                val emptyText = when (stateFilter) {
-                    IssueStateFilter.OPEN -> stringResource(R.string.no_open_prs)
-                    IssueStateFilter.CLOSED -> stringResource(R.string.no_closed_prs)
-                    IssueStateFilter.ALL -> stringResource(R.string.no_prs)
-                }
-                Text(emptyText, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            return@Column
-        }
-        LazyColumn(state = listState, modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
-            items(pulls, key = { it.id }) { pr ->
-            Row(
-                Modifier.fillMaxWidth().clickable { onClick(pr.number) }.padding(vertical = 10.dp),
-                verticalAlignment = Alignment.Top,
-            ) {
-                // State indicator dot — green=open, purple=closed, violet-red=merged
-                val prColor = when {
-                    pr.state == "open" -> Color(0xFF2EA043)
-                    pr.pullRequest != null && pr.stateReason == "completed" -> Color(0xFF8957E5)
-                    else -> Color(0xFFBD2C00)
-                }
-                Box(
-                    Modifier.size(8.dp).clip(CircleShape).background(prColor),
-                )
-                Spacer(Modifier.width(10.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        pr.title,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        val user = pr.user
-                        if (user != null) {
-                            AsyncImage(
-                                model = user.avatarUrl,
-                                contentDescription = null,
-                                modifier = Modifier.size(14.dp).clip(CircleShape)
-                                    .clickable { onNavigateToUser(user.login) },
-                            )
-                            Spacer(Modifier.width(4.dp))
-                            Text(
-                                user.login,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.clickable { onNavigateToUser(user.login) },
-                            )
-                            Spacer(Modifier.width(4.dp))
-                        }
-                        Text(
-                            stringResource(R.string.issue_meta, pr.number, pr.comments),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
-            HorizontalDivider()
-            }
-            if (isLoadingMore) {
-                item {
-                    Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(Modifier.size(24.dp))
-                    }
-                }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun ReleasesTab(
-    releases: List<GitHubApi.Release>,
-    repoContext: String,
-    defaultBranch: String? = null,
-    canDelete: Boolean = false,
-    isDeletingRelease: Boolean = false,
-    isLoading: Boolean = false,
-    onLinkClick: (String, com.pockethub.ui.markdown.LinkKind) -> Unit,
-    onNavigateToUser: (String) -> Unit = {},
-    onDownloadAsset: (GitHubApi.Release.ReleaseAsset) -> Unit = {},
-    onDeleteRelease: (Long) -> Unit = {},
-) {
-    if (isLoading && releases.isEmpty()) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
-        }
-        return
-    }
-    if (releases.isEmpty()) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(
-                    Icons.Outlined.Campaign,
-                    null,
-                    modifier = Modifier.size(32.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(8.dp))
-                Text(stringResource(R.string.no_releases_yet), color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-        return
-    }
-    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
-        items(releases, key = { it.id }) { release ->
-            var showDeleteConfirm by remember { mutableStateOf(false) }
-            Column(Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(release.tagName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    if (release.prerelease) {
-                        Spacer(Modifier.width(8.dp))
-                        AssistChip(
-                            onClick = {},
-                            label = { Text(stringResource(R.string.pre_release), style = MaterialTheme.typography.labelSmall) },
-                            colors = AssistChipDefaults.assistChipColors(containerColor = MaterialTheme.colorScheme.errorContainer),
-                        )
-                    }
-                    Spacer(Modifier.weight(1f))
-                    if (canDelete) {
-                        IconButton(
-                            onClick = { showDeleteConfirm = true },
-                            enabled = !isDeletingRelease,
-                            modifier = Modifier.size(28.dp),
-                        ) {
-                            Icon(
-                                Icons.Outlined.Delete,
-                                contentDescription = stringResource(R.string.delete_release),
-                                modifier = Modifier.size(18.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
-                release.name?.let { if (it != release.tagName) Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                release.publishedAt?.let {
-                    Text(
-                        stringResource(R.string.released_at, formatDate(it)),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                if (release.author != null) {
-                    val author = release.author
-                    val authorClick = Modifier.clickable { onNavigateToUser(author.login) }
-                    Spacer(Modifier.height(4.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        AsyncImage(
-                            model = author.avatarUrl,
-                            contentDescription = null,
-                            modifier = Modifier.size(14.dp).clip(CircleShape).then(authorClick),
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        Text(
-                            stringResource(R.string.by_author, author.login),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = authorClick,
-                        )
-                    }
-                }
-                if (!release.body.isNullOrBlank()) {
-                    Spacer(Modifier.height(8.dp))
-                    MarkdownText(
-                        markdown = release.body.take(2000),
-                        modifier = Modifier.fillMaxWidth(),
-                        repoContext = repoContext,
-                        defaultBranch = defaultBranch,
-                        onLinkClick = onLinkClick,
-                    )
-                }
-                if (release.assets.isNotEmpty()) {
-                    Spacer(Modifier.height(6.dp))
-                    release.assets.forEach { asset ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth()
-                                .clickable { onDownloadAsset(asset) }
-                                .padding(vertical = 6.dp, horizontal = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(
-                                Icons.Outlined.Download,
-                                contentDescription = null,
-                                modifier = Modifier.size(14.dp),
-                                tint = MaterialTheme.colorScheme.primary,
-                            )
-                            Spacer(Modifier.width(6.dp))
-                            Text(
-                                stringResource(R.string.asset_download, asset.name, humanReadableSize(asset.size), asset.downloadCount),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.primary,
-                            )
-                        }
-                    }
-                }
-            }
-            HorizontalDivider()
-
-            if (showDeleteConfirm) {
-                AlertDialog(
-                    onDismissRequest = { if (!isDeletingRelease) showDeleteConfirm = false },
-                    title = { Text(stringResource(R.string.delete_release_title)) },
-                    text = {
-                        Column {
-                            Text(
-                                stringResource(R.string.delete_release_warning, release.tagName),
-                                color = MaterialTheme.colorScheme.error,
-                            )
-                        }
-                    },
-                    confirmButton = {
-                        TextButton(
-                            onClick = {
-                                showDeleteConfirm = false
-                                onDeleteRelease(release.id)
-                            },
-                            enabled = !isDeletingRelease,
-                        ) { Text(stringResource(R.string.delete_release_confirm), color = MaterialTheme.colorScheme.error) }
-                    },
-                    dismissButton = {
-                        TextButton(
-                            onClick = { showDeleteConfirm = false },
-                            enabled = !isDeletingRelease,
-                        ) { Text(stringResource(R.string.action_cancel)) }
-                    },
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun WorkflowsTab(
-    runs: List<GitHubApi.WorkflowRun>,
-    isLoading: Boolean = false,
-    onNavigateToUser: (String) -> Unit = {},
-    onNavigateToWorkflowRun: (Long) -> Unit = {},
-) {
-    if (isLoading && runs.isEmpty()) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
-        }
-        return
-    }
-    if (runs.isEmpty()) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(stringResource(R.string.no_workflow_runs), color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        return
-    }
-    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
-        items(runs, key = { it.id }) { run ->
-            Row(
-                Modifier.fillMaxWidth()
-                    .clickable { onNavigateToWorkflowRun(run.id) }
-                    .padding(vertical = 10.dp),
-                verticalAlignment = Alignment.Top,
-            ) {
-                // Status dot
-                val statusColor = when (run.conclusion) {
-                    "success" -> androidx.compose.ui.graphics.Color(0xFF2EA043)
-                    "failure", "cancelled" -> MaterialTheme.colorScheme.error
-                    else -> MaterialTheme.colorScheme.primary
-                }
-                Box(
-                    Modifier.size(8.dp).clip(CircleShape)
-                        .background(statusColor),
-                )
-                Spacer(Modifier.width(10.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        run.name.ifBlank { run.event ?: "" },
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Spacer(Modifier.height(2.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            stringResource(R.string.workflow_run_status, run.runNumber, run.headBranch ?: "—", run.status ?: "—"),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Spacer(Modifier.height(2.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        val actor = run.actor
-                        if (actor != null) {
-                            AsyncImage(
-                                model = actor.avatarUrl,
-                                contentDescription = null,
-                                modifier = Modifier.size(14.dp).clip(CircleShape)
-                                    .clickable { onNavigateToUser(actor.login) },
-                            )
-                            Spacer(Modifier.width(4.dp))
-                            Text(
-                                actor.login,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.clickable { onNavigateToUser(actor.login) },
-                            )
-                            Spacer(Modifier.width(6.dp))
-                        }
-                        run.createdAt?.let {
-                            Text(
-                                formatDate(it),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
-            }
-            HorizontalDivider()
-        }
-    }
-}
-
-/**
- * Dialog for manually running a workflow (`workflow_dispatch`).
- *
- * Lists all active workflows in the repo and lets the user pick one + enter the
- * branch/tag ref to run on. GitHub doesn't expose which workflows declare
- * `on: workflow_dispatch` in the list endpoint, so on failure (HTTP 422) we
- * surface a helpful message instead.
- */
-@Composable
-private fun WorkflowDispatchDialog(
-    workflows: List<GitHubApi.Workflow>,
-    defaultBranch: String?,
-    isLoading: Boolean,
-    isDispatching: Boolean,
-    onDismiss: () -> Unit,
-    onDispatch: (workflowId: Long, ref: String) -> Unit,
-) {
-    var selectedId by remember(workflows.size) {
-        mutableStateOf(workflows.firstOrNull()?.id)
-    }
-    var ref by remember(defaultBranch) {
-        mutableStateOf(defaultBranch ?: "main")
-    }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.workflow_dispatch_title)) },
-        text = {
-            Column(Modifier.fillMaxWidth()) {
-                if (isLoading) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                        CircularProgressIndicator()
-                    }
-                } else if (workflows.isEmpty()) {
-                    Text(
-                        stringResource(R.string.workflow_dispatch_empty),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                } else {
-                    Text(
-                        stringResource(R.string.workflow_dispatch_select),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    val scrollState = rememberScrollState()
-                    Column(Modifier.heightIn(max = 240.dp).verticalScroll(scrollState)) {
-                        workflows.forEach { wf ->
-                            Row(
-                                Modifier.fillMaxWidth()
-                                    .clickable(enabled = !isDispatching) { selectedId = wf.id }
-                                    .padding(vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                RadioButton(
-                                    selected = selectedId == wf.id,
-                                    onClick = { selectedId = wf.id },
-                                    enabled = !isDispatching,
-                                )
-                                Spacer(Modifier.width(8.dp))
-                                Column(Modifier.weight(1f)) {
-                                    Text(
-                                        wf.name,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.SemiBold,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                    Text(
-                                        wf.path,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    Spacer(Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = ref,
-                        onValueChange = { ref = it },
-                        label = { Text(stringResource(R.string.workflow_dispatch_ref_label)) },
-                        singleLine = true,
-                        enabled = !isDispatching,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Text(
-                        stringResource(R.string.workflow_dispatch_ref_hint),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                enabled = !isDispatching && selectedId != null && ref.isNotBlank(),
-                onClick = { selectedId?.let { onDispatch(it, ref.trim()) } },
-            ) {
-                if (isDispatching) {
-                    CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                } else {
-                    Text(stringResource(R.string.action_dispatch_workflow))
-                }
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !isDispatching) {
-                Text(stringResource(R.string.action_cancel))
-            }
-        },
-    )
-}
 
 @Composable
 private fun rememberMarkdownLinkHandler(
     owner: String,
     repo: String,
     onNavigateToRepo: (String, String) -> Unit,
+    onNavigateToRepoTab: (String, String, String?) -> Unit,
+    onNavigateToFile: (String, String, String, String?) -> Unit,
     onNavigateToUser: (String) -> Unit,
     onNavigateToIssue: (Int) -> Unit,
+    onNavigateToIssueFull: (String, String, Int) -> Unit,
+    onNavigateToPRFull: (String, String, Int) -> Unit,
+    onNavigateToCommit: (String) -> Unit,
+    onNavigateToWorkflowRun: (Long) -> Unit,
+    onNavigateToCreateIssue: (String, String) -> Unit,
     downloadVm: com.pockethub.ui.download.DownloadViewModel,
     onNavigateToDownloads: (tab: String) -> Unit,
+    /** Same-repo tab links switch tabs in place (no nav churn). */
+    onSameRepoTab: (com.pockethub.ui.markdown.RepoTabTarget) -> Unit,
 ): (String, com.pockethub.ui.markdown.LinkKind) -> Unit {
-    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
-    return link@{ url, kind ->
-        // DOWNLOADABLE — enqueue into the in-app download manager (CDN raw / release assets / etc.)
-        if (kind == com.pockethub.ui.markdown.LinkKind.DOWNLOADABLE) {
-            val display = url.substringAfterLast('/').ifBlank { "download.bin" }
-            downloadVm.enqueue(
-                com.pockethub.data.download.DownloadManager.EnqueueRequest(
-                    url = url,
-                    fileName = display,
-                    contentType = guessAssetMime(display),
-                    sizeBytes = 0L,
-                    repoKey = "$owner/$repo",
-                    releaseTag = "",
+    // Unified GitHub in-app router — README / release notes links resolve to
+    // the right screen (issue vs PR vs commit vs workflow run vs repo file),
+    // non-GitHub URLs and marketing pages fall through to the system browser.
+    // Same-repo tab/file targets switch tabs / open the viewer in place.
+    return com.pockethub.ui.markdown.rememberGitHubLinkHandler(
+        com.pockethub.ui.markdown.GitHubLinkNav(
+            owner = owner,
+            repo = repo,
+            onRepo = { o, r, tab ->
+                val target = tab?.let { RepoTabTarget.fromWire(it) }
+                if (o == owner && r == repo && target != null) {
+                    onSameRepoTab(target)
+                } else {
+                    onNavigateToRepoTab(o, r, tab)
+                }
+            },
+            onFile = { o, r, path, ref ->
+                if (o == owner && r == repo) onNavigateToFile(o, r, path, ref)
+                else onNavigateToRepoTab(o, r, null)
+            },
+            onIssue = onNavigateToIssueFull,
+            onPull = onNavigateToPRFull,
+            onCommit = { _, _, sha -> onNavigateToCommit(sha) },
+            onUser = onNavigateToUser,
+            onWorkflowRun = { runId -> onNavigateToWorkflowRun(runId) },
+            onCreateIssue = onNavigateToCreateIssue,
+            onDownload = { url, fileName ->
+                downloadVm.enqueue(
+                    com.pockethub.data.download.DownloadManager.EnqueueRequest(
+                        url = url,
+                        fileName = fileName,
+                        contentType = guessAssetMime(fileName),
+                        sizeBytes = 0L,
+                        repoKey = "$owner/$repo",
+                        releaseTag = "",
+                    )
                 )
-            )
-            onNavigateToDownloads("active")
-            return@link
-        }
-        // IMAGE_URL — open in browser so the user can see full-res image
-        if (kind == com.pockethub.ui.markdown.LinkKind.IMAGE_URL) {
-            runCatching { uriHandler.openUri(url) }
-            return@link
-        }
-        // IMAGE (wrapped) — fall through to the wrap target's classification
-        if (kind == com.pockethub.ui.markdown.LinkKind.IMAGE) {
-            runCatching { uriHandler.openUri(url) }
-            return@link
-        }
-        // GitHub issues / PRs
-        Regex("^https://github\\.com/[^/]+/[^/]+/(?:issues|pull)/(\\d+)$").matchEntire(url)?.let {
-            it.groupValues[1].toIntOrNull()?.let { n -> onNavigateToIssue(n) }
-            return@link
-        }
-        // Repo URLs (must come after issue/pull matcher)
-        Regex("^https://github\\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)(?:/.*)?$").matchEntire(url)?.let {
-            onNavigateToRepo(it.groupValues[1], it.groupValues[2])
-            return@link
-        }
-        // User/profile URLs (single segment)
-        Regex("^https://github\\.com/([A-Za-z0-9_.-]+)/?$").matchEntire(url)?.let {
-            onNavigateToUser(it.groupValues[1])
-            return@link
-        }
-        // External links — open in system browser
-        runCatching { uriHandler.openUri(url) }
-    }
+                onNavigateToDownloads("active")
+            },
+        ),
+    )
 }
 
-private fun formatDate(s: String): String = try {
-    DateFormat.getDateInstance(DateFormat.MEDIUM).format(java.time.OffsetDateTime.parse(s))
-} catch (_: Exception) { s.take(10) }
-private fun humanReadableSize(bytes: Long): String = when {
-    bytes >= 1_048_576 -> "%.1f MB".format(bytes / 1_048_576.0)
-    bytes >= 1024 -> "%.1f KB".format(bytes / 1024.0)
-    else -> "$bytes B"
-}
 
 internal fun guessAssetMime(name: String): String {
     val ext = name.substringAfterLast('.', "").lowercase(Locale.ROOT)

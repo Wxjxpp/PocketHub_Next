@@ -1,8 +1,16 @@
 # PocketHub
 
+<p align="center">
+  <a href="README_zh.md"><img src="https://img.shields.io/badge/%E4%B8%AD%E6%96%87%E7%89%88%E6%9C%AC-README_zh.md-blue" alt="Chinese Version"></a>
+</p>
+
 A well-crafted open-source GitHub client for Android, built with Kotlin + Jetpack Compose + Material 3.
 
 > Status: **Work in progress** (V1 — core client).
+
+**[中文文档](README_zh.md)** · **[GitHub Releases](https://github.com/wochatchat/PocketHub/releases)**
+
+---
 
 ## Features
 
@@ -55,9 +63,24 @@ Tabs: Overview (README) · Code (file tree) · Issues · PRs · Commits · Relea
 Apache 2.0 (see [LICENSE](LICENSE)).
 
 ## Contributing
-- 发现 bug 或有想法？直接 [提 issue](https://github.com/wochatchat/PocketHub/issues/new/choose)，已内置如下模板帮你把话讲清楚：
-  - 🐛 **Bug 报告** — 仓库详情/下载/通知等任何模块炸了或显示乱码，选这个
-  - ✨ **功能建议** — 想加的能力或改进，选这个
-  - 📱 **兼容性 / 设备问题** — 在你的机型/ROM 上的诡异表现，选这个
-- 想直接贡献代码？先 fork → branch → PR，PR 模板里也列了自查清单。
-- 详细约定见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+- Found a bug or have an idea? Open an [issue](https://github.com/wochatchat/PocketHub/issues/new/choose) — templates are built-in.
+- Want to contribute code? Fork → branch → PR.
+- See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+
+---
+
+## ☕ Support / 打赏支持
+
+If PocketHub helps you, consider buying me a cup of coffee!
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/wochatchat/PocketHub/main/.github/donate.png" alt="Buy me a coffee QR" width="240" />
+</p>
+
+<p align="center">
+  <strong>Thanks for your support!</strong> 💖
+</p>
+
+<p align="center">
+  <a href="README.md">English</a> · <a href="README_zh.md">中文</a>
+</p>

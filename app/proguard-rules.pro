@@ -29,3 +29,7 @@
 # Room
 -keep class * extends androidx.room.RoomDatabase { <init>(); }
 -dontwarn androidx.room.paging.**
+
+# Keep SnakeYAML (GitHub issue form templates) - it reflects during YAML load
+-keep class org.yaml.snakeyaml.** { *; }
+-dontwarn org.yaml.snakeyaml.**

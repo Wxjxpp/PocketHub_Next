@@ -161,7 +161,16 @@ private fun forestShapes() = Shapes(
 
 // ── Style registry ───────────────────────────────────────────────────────────
 
-fun styleDef(style: AppStyle): AppStyleDef = when (style) {
+/**
+ * Public entry point. Wraps the raw palette with derived surface-container
+ * colors so every themed surface (dialogs, sheets, menus) matches the style.
+ */
+fun styleDef(style: AppStyle): AppStyleDef {
+    val def = baseStyleDef(style)
+    return def.copy(colors = deriveSurfaceContainers(def.colors, def.isDark))
+}
+
+private fun baseStyleDef(style: AppStyle): AppStyleDef = when (style) {
     AppStyle.LinearDark -> AppStyleDef(
         style, isDark = true, colors = LinearDarkColors, typography = linearTypography(),
         shapes = linearShapes(),
@@ -195,24 +204,61 @@ fun styleDef(style: AppStyle): AppStyleDef = when (style) {
 }
 
 /** Resolve the active style: explicit override wins, else map from legacy [mode]. */
-fun resolveStyle(styleOverride: AppStyle?, mode: ThemeMode, systemDark: Boolean): AppStyle =
+private fun resolveStyle(styleOverride: AppStyle?, mode: ThemeMode, systemDark: Boolean): AppStyle =
     styleOverride ?: when (mode) {
         ThemeMode.Dark -> AppStyle.LinearDark
         ThemeMode.Light -> AppStyle.PrimerLight
         ThemeMode.System -> if (systemDark) AppStyle.LinearDark else AppStyle.PrimerLight
     }
 
+/**
+ * Built-in dark style forced on when "follow system dark mode" is enabled and
+ * the system is currently in night mode. [styleOverride] stays untouched — it
+ * is the user's chosen baseline and is restored as soon as the system leaves
+ * night mode.
+ */
+private val FORCE_DARK_STYLE = AppStyle.LinearDark
+
 /** Color used for the status / navigation bars. Default dark — matches Linear dark theme. */
 private val LocalSystemBarsDark = compositionLocalOf { true }
+
+/**
+ * Derive the M3 "surface container" family from the palette's own surface /
+ * surfaceVariant colors. The custom palettes only define the base roles, which
+ * left surfaceContainer* at the static M3 defaults (neutral gray) — that's why
+ * AlertDialogs / bottom sheets / menus looked jarring against every style.
+ * Blending from the palette's own tones keeps every themed surface consistent.
+ */
+private fun deriveSurfaceContainers(s: ColorScheme, isDark: Boolean): ColorScheme {
+    fun blend(a: Color, b: Color, f: Float) = androidx.compose.ui.graphics.lerp(a, b, f)
+    val surface = s.surface
+    val variant = s.surfaceVariant
+    val onSurface = s.onSurface
+    return s.copy(
+        surfaceContainerLowest = blend(surface, if (isDark) Color.Black else Color.White, 0.04f),
+        surfaceContainerLow = blend(surface, variant, 0.45f),
+        surfaceContainer = blend(surface, variant, 0.75f),
+        surfaceContainerHigh = variant,
+        surfaceContainerHighest = blend(variant, onSurface, 0.08f),
+        surfaceDim = blend(surface, Color.Black, if (isDark) 0.08f else 0.10f),
+        surfaceBright = blend(surface, Color.White, if (isDark) 0.06f else 0.05f),
+    )
+}
 
 @Composable
 fun PocketHubTheme(
     mode: ThemeMode = ThemeMode.Dark,
     styleOverride: AppStyle? = null,
+    forceDark: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val systemDark = isSystemInDarkTheme()
-    val style = resolveStyle(styleOverride, mode, systemDark)
+    // "Follow system" night mode: while the OS is in dark mode the built-in
+    // dark style is forced on regardless of the user's chosen style; once the
+    // system leaves night mode the chosen style takes effect again. Applied on
+    // top of styleOverride so the persisted preference is never mutated.
+    val effectiveOverride = if (forceDark && systemDark) FORCE_DARK_STYLE else styleOverride
+    val style = resolveStyle(effectiveOverride, mode, systemDark)
     val def = styleDef(style)
     val view = androidx.compose.ui.platform.LocalView.current
     if (!view.isInEditMode) {

@@ -2,7 +2,6 @@ package com.pockethub.ui.settings
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,16 +17,16 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.CleaningServices
+import androidx.compose.material.icons.outlined.Explore
+import androidx.compose.material.icons.outlined.Leaderboard
 import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material.icons.outlined.Storage
-import androidx.compose.material.icons.outlined.Web
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -55,6 +54,7 @@ import com.pockethub.R
 import com.pockethub.data.remote.feed.FeedSourceConfig
 import com.pockethub.data.remote.feed.FeedSourceOption
 import com.pockethub.data.remote.feed.FeedTab
+import com.pockethub.ui.components.SectionHeader
 
 /**
  * Picks the data source backing each Explore tab and (when supported) the
@@ -69,7 +69,6 @@ fun FeedSourcesScreen(
 ) {
     val trendingCfg by vm.trendingConfig.collectAsState()
     val featuredCfg by vm.featuredConfig.collectAsState()
-    val followingCfg by vm.followingConfig.collectAsState()
 
     Scaffold(
         topBar = {
@@ -103,7 +102,6 @@ fun FeedSourcesScreen(
                 config = trendingCfg,
                 options = FeedSourceOption.optionsFor(FeedTab.TRENDING),
                 onSelect = { src -> vm.selectSource(FeedTab.TRENDING, src, "") },
-                onCustomUrlChange = { src, url -> vm.setCustomBaseUrl(FeedTab.TRENDING, src, url) },
                 onGithubOptionsChange = { sort, min, max, archived -> vm.setGithubOptions(FeedTab.TRENDING, sort, min, max, archived) },
                 onReset = { vm.resetTab(FeedTab.TRENDING) },
             )
@@ -115,46 +113,23 @@ fun FeedSourcesScreen(
                 config = featuredCfg,
                 options = FeedSourceOption.optionsFor(FeedTab.FEATURED),
                 onSelect = { src -> vm.selectSource(FeedTab.FEATURED, src, "") },
-                onCustomUrlChange = { src, url -> vm.setCustomBaseUrl(FeedTab.FEATURED, src, url) },
                 onGithubOptionsChange = { sort, min, max, archived -> vm.setGithubOptions(FeedTab.FEATURED, sort, min, max, archived) },
                 onReset = { vm.resetTab(FeedTab.FEATURED) },
             )
 
-            Spacer(Modifier.height(8.dp))
-            SectionHeader(stringResource(R.string.section_following))
-            SourceGroup(
-                tab = FeedTab.FOLLOWING,
-                config = followingCfg,
-                options = FeedSourceOption.optionsFor(FeedTab.FOLLOWING),
-                onSelect = { src -> vm.selectSource(FeedTab.FOLLOWING, src, "") },
-                onCustomUrlChange = { src, url -> vm.setCustomBaseUrl(FeedTab.FOLLOWING, src, url) },
-                onGithubOptionsChange = { sort, min, max, archived -> vm.setGithubOptions(FeedTab.FOLLOWING, sort, min, max, archived) },
-                onReset = { vm.resetTab(FeedTab.FOLLOWING) },
-            )
+            // The Following tab has exactly one practical public source
+            // (GitHub events), so it intentionally has no settings section here.
 
             Spacer(Modifier.height(80.dp))
         }
     }
 }
-
-@Composable
-private fun SectionHeader(text: String) {
-    Text(
-        text,
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.primary,
-        fontWeight = FontWeight.SemiBold,
-        modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp),
-    )
-}
-
 @Composable
 private fun SourceGroup(
     tab: FeedTab,
     config: FeedSourceConfig,
     options: List<FeedSourceOption>,
     onSelect: (FeedSourceOption) -> Unit,
-    onCustomUrlChange: (FeedSourceOption, String) -> Unit,
     onGithubOptionsChange: (String, Int, Int, Boolean) -> Unit,
     onReset: () -> Unit,
 ) {
@@ -176,6 +151,8 @@ private fun SourceGroup(
                 FeedSourceOption.LOBSTERS              -> Icons.Outlined.Public
                 FeedSourceOption.REDDIT_TOP           -> Icons.Outlined.Public
                 FeedSourceOption.GITHUB_EVENTS        -> Icons.Outlined.Storage
+                FeedSourceOption.KOMI_TOP_CHARTS      -> Icons.Outlined.Leaderboard
+                FeedSourceOption.KOMI_DISCOVER        -> Icons.Outlined.Explore
             }
             Card(
                 shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
@@ -216,12 +193,6 @@ private fun SourceGroup(
                     )
                 }
 
-                if (option.urlModifiable && isCurrent) {
-                    CustomBaseUrlField(
-                        initial = config.customBaseUrl,
-                        onDebouncedChange = { url -> onCustomUrlChange(option, url) },
-                    )
-                }
                 if (option == FeedSourceOption.GITHUB_SEARCH && isCurrent) {
                     GithubSourceOptions(
                         config = config,
@@ -352,59 +323,6 @@ private fun GithubSourceOptions(
 }
 
 @Composable
-private fun CustomBaseUrlField(
-    initial: String,
-    onDebouncedChange: (String) -> Unit,
-) {
-    // The editor stores the in-progress value locally so typing never round-trips a
-    // DataStore write on every keystroke. The Apply button commits; drafting in
-    // progress is also surfaced live for those who just want to type and switch
-    // tabs without tapping Apply.
-    var url by rememberSaveable(initial) { mutableStateOf(initial) }
-    var applied by remember { mutableStateOf(initial) }
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
-    ) {
-        Text(
-            stringResource(R.string.feed_source_custom_url),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(4.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(
-                value = url,
-                onValueChange = { url = it },
-                placeholder = { Text("https://your-trending-api.example/") },
-                leadingIcon = { Icon(Icons.Outlined.Web, null, modifier = Modifier.size(16.dp)) },
-                singleLine = true,
-                modifier = Modifier.weight(1f),
-            )
-            Spacer(Modifier.width(6.dp))
-            TextButton(
-                onClick = {
-                    applied = url
-                    onDebouncedChange(url.trim())
-                },
-                enabled = url != applied,
-            ) {
-                Text(stringResource(R.string.action_apply))
-            }
-        }
-        if (url != applied) {
-            Text(
-                stringResource(R.string.feed_source_custom_url_hint),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.outline,
-            )
-        }
-    }
-}
-
-@Composable
 private fun optionDisplayName(option: FeedSourceOption): String = when (option) {
     FeedSourceOption.GITHUB_SEARCH         -> stringResource(R.string.source_name_github_search)
     FeedSourceOption.GITHUB_TRENDING_API   -> stringResource(R.string.source_name_github_trending_api)
@@ -414,6 +332,8 @@ private fun optionDisplayName(option: FeedSourceOption): String = when (option) 
     FeedSourceOption.LOBSTERS              -> stringResource(R.string.source_name_lobsters)
     FeedSourceOption.REDDIT_TOP           -> stringResource(R.string.source_name_reddit_top)
     FeedSourceOption.GITHUB_EVENTS        -> stringResource(R.string.source_name_github_events)
+    FeedSourceOption.KOMI_TOP_CHARTS      -> stringResource(R.string.source_name_komi)
+    FeedSourceOption.KOMI_DISCOVER        -> stringResource(R.string.source_name_komi_feed)
 }
 
 @Composable
@@ -426,4 +346,6 @@ private fun optionDescription(option: FeedSourceOption): String = when (option) 
     FeedSourceOption.LOBSTERS              -> stringResource(R.string.source_desc_lobsters)
     FeedSourceOption.REDDIT_TOP           -> stringResource(R.string.source_desc_reddit_top)
     FeedSourceOption.GITHUB_EVENTS        -> stringResource(R.string.source_desc_github_events)
+    FeedSourceOption.KOMI_TOP_CHARTS      -> stringResource(R.string.source_desc_komi)
+    FeedSourceOption.KOMI_DISCOVER        -> stringResource(R.string.source_desc_komi_feed)
 }

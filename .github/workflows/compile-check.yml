@@ -1,0 +1,38 @@
+name: Compile Check
+on:
+  push:
+    branches:
+      - 'fix/**'
+      - 'refactor/**'
+      - net
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: compile-check-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          fetch-tags: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Compile release
+        run: ./gradlew :app:assembleRelease --no-daemon
+      - name: Upload release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: pockethub-release-apk-${{ github.sha }}
+          path: app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+          retention-days: 14

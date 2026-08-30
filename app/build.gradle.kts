@@ -92,6 +92,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.documentfile)
 
     // Compose (BOM-managed)
     implementation(platform(libs.androidx.compose.bom))
@@ -132,6 +133,7 @@ dependencies {
 
     // Networking
     implementation(libs.okhttp)
+    implementation(libs.okhttp.doh)
     implementation(libs.okhttp.logging)
     implementation(libs.retrofit)
     implementation(libs.retrofit.kotlinx.serialization)
@@ -143,4 +145,7 @@ dependencies {
 
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
+
+    // GitHub issue form templates (.github/ISSUE_TEMPLATE/*.yml)
+    implementation("org.yaml:snakeyaml:2.2")
 }

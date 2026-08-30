@@ -1,6 +1,7 @@
 package com.pockethub.ui.repo
 
 import android.util.Base64
+import com.pockethub.util.userMessage
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.pockethub.data.remote.GitHubApi
@@ -21,23 +22,24 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
-import kotlinx.serialization.json.jsonArray
 import retrofit2.HttpException
 import javax.inject.Inject
-import java.text.SimpleDateFormat
-import java.util.Locale
-import java.util.TimeZone
 
 /**
  * Simple file-tree browser backed by GitHub's Contents API.
  *
  * Maintains a path stack so users can navigate into directories and back out.
  */
+/** Max per-directory last-commit fetches in one pass (rate-limit guard).
+ *  Results are cached, so re-visits don't refetch — the cap only throttles
+ *  how quickly an unseen directory fills in its timestamps. */
+private const val MAX_LAST_COMMIT_FETCH = 60
+
 @HiltViewModel
 class CodeBrowserViewModel @Inject constructor(
     private val api: GitHubApi,
     private val json: Json,
-) : ViewModel() {
+    private val issueReporter: com.pockethub.data.reporting.IssueReporter,) : ViewModel() {
 
     /** Per-path last commit info (message + date), cached across navigations. */
     data class LastCommit(
@@ -61,6 +63,11 @@ class CodeBrowserViewModel @Inject constructor(
         val isLoadingBranches: Boolean = false,
         /** Map of entry.path → last commit for the currently visible directory. */
         val lastCommits: Map<String, LastCommit> = emptyMap(),
+        /** Full recursive file tree (for the full-screen viewer's tree panel). */
+        val fullTree: List<GitHubApi.GitTreeEntry> = emptyList(),
+        val isLoadingTree: Boolean = false,
+        /** GitHub caps the recursive tree at 100k entries / 7MB — flag it when hit. */
+        val treeTruncated: Boolean = false,
     )
 
     private val _state = MutableStateFlow(State())
@@ -77,6 +84,12 @@ class CodeBrowserViewModel @Inject constructor(
         }
         _state.update { State(owner = owner, repo = repo, ref = ref) }
         listDir("")
+    }
+
+    /** Called when the parent repo changes — resets Code tab branch to avoid
+     *  carrying over the previous repo's selection. */
+    fun resetRef() {
+        _state.update { it.copy(ref = null) }
     }
 
     private fun refreshCurrent() {
@@ -115,6 +128,7 @@ class CodeBrowserViewModel @Inject constructor(
                 // Fire-and-forget: concurrently fetch the last commit for each visible entry.
                 fetchLastCommits(sorted, s.owner, s.repo, s.ref)
             } catch (e: HttpException) {
+                if (e.code() != 409) issueReporter.reportError("Code", "loadDir", e)
                 // GitHub returns 409 ("Git Repository is empty") for the Contents
                 // API root of a newly-created repository. It is a valid empty
                 // directory, not an error placeholder.
@@ -130,10 +144,11 @@ class CodeBrowserViewModel @Inject constructor(
                         )
                     }
                 } else {
-                    _state.update { it.copy(isLoading = false, error = e.localizedMessage ?: "Failed to list contents") }
+                    _state.update { it.copy(isLoading = false, error = e.userMessage("Failed to list contents")) }
                 }
             } catch (e: Exception) {
-                _state.update { it.copy(isLoading = false, error = e.localizedMessage ?: "Failed to list contents") }
+                issueReporter.reportError("Code", "loadDir", e)
+                _state.update { it.copy(isLoading = false, error = e.userMessage("Failed to list contents")) }
             }
         }
     }
@@ -173,7 +188,8 @@ class CodeBrowserViewModel @Inject constructor(
                     _state.update { it.copy(isLoading = false) }
                 }
             } catch (e: Exception) {
-                _state.update { it.copy(isLoading = false, error = e.localizedMessage ?: "Failed to load file") }
+                issueReporter.reportError("Code", "loadFile", e)
+                _state.update { it.copy(isLoading = false, error = e.userMessage("Failed to load file")) }
             }
         }
     }
@@ -217,8 +233,33 @@ class CodeBrowserViewModel @Inject constructor(
         val s = _state.value
         if (s.ref == ref) return
         commitCache.clear() // ref changed → cached commit info is stale
-        _state.update { it.copy(ref = ref, viewingFile = null, fileContent = null, lastCommits = emptyMap()) }
+        _state.update { it.copy(ref = ref, viewingFile = null, fileContent = null, lastCommits = emptyMap(), fullTree = emptyList()) }
         listDir("")
+    }
+
+    /**
+     * Fetch the full recursive file tree once per ref (used by the full-screen
+     * viewer's file-tree panel). Cached in [State.fullTree] until the ref changes.
+     */
+    fun loadTree() {
+        val s = _state.value
+        if (s.fullTree.isNotEmpty() || s.isLoadingTree) return
+        viewModelScope.launch {
+            _state.update { it.copy(isLoadingTree = true) }
+            try {
+                val resp = api.getGitTree(s.owner, s.repo, s.ref ?: "HEAD")
+                _state.update {
+                    it.copy(
+                        fullTree = resp.tree.filter { e -> e.type == "blob" || e.type == "tree" },
+                        isLoadingTree = false,
+                        treeTruncated = resp.truncated,
+                    )
+                }
+            } catch (e: Exception) {
+                issueReporter.reportError("Code", "loadTree", e)
+                _state.update { it.copy(isLoadingTree = false) }
+            }
+        }
     }
 
     private fun buildPathStack(path: String): List<String> {
@@ -231,10 +272,6 @@ class CodeBrowserViewModel @Inject constructor(
             stack.add(acc)
         }
         return stack
-    }
-
-    private val isoParser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply {
-        timeZone = TimeZone.getTimeZone("UTC")
     }
 
     /**
@@ -258,7 +295,10 @@ class CodeBrowserViewModel @Inject constructor(
             _state.update { it.copy(lastCommits = it.lastCommits + cached) }
         }
         val toFetch = entries.filter { cacheKey(it.path) !in commitCache }
-            .take(15) // Cap at 15 to avoid burning the API rate limit on large directories.
+            // Cap protects the API rate limit on huge directories. Cached entries
+            // are excluded first, so re-visiting a directory costs nothing and the
+            // timestamps eventually cover the whole list across visits.
+            .take(MAX_LAST_COMMIT_FETCH)
         if (toFetch.isEmpty()) return
 
         viewModelScope.launch {

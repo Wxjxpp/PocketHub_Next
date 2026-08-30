@@ -1,7 +1,7 @@
 package com.pockethub.ui.repo
 
-import android.util.Base64
 import androidx.lifecycle.ViewModel
+import com.pockethub.util.userMessage
 import androidx.lifecycle.viewModelScope
 import com.pockethub.data.model.Issue
 import com.pockethub.data.remote.GitHubApi
@@ -11,6 +11,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import javax.inject.Inject
 
 /** A parsed GitHub issue template (an `.md` or `.yml` file under `.github/ISSUE_TEMPLATE`). */
@@ -24,9 +27,9 @@ data class IssueTemplate(
     /** Markdown body to prefill in the editor (front-matter stripped). */
     val body: String,
 )
-
 @HiltViewModel
 class CreateIssueViewModel @Inject constructor(
+    private val issueReporter: com.pockethub.data.reporting.IssueReporter,
     private val api: GitHubApi,
 ) : ViewModel() {
 
@@ -49,6 +52,32 @@ class CreateIssueViewModel @Inject constructor(
     private val _selectedTemplate = MutableStateFlow<IssueTemplate?>(null)
     val selectedTemplate: StateFlow<IssueTemplate?> = _selectedTemplate.asStateFlow()
 
+    // ── YAML issue-form support (new .yml templates) ────────────────────
+
+    /** Parsed `.yml` form templates, shown in the chooser alongside legacy ones. */
+    private val _forms = MutableStateFlow<List<IssueForm>>(emptyList())
+    val forms: StateFlow<List<IssueForm>> = _forms.asStateFlow()
+
+    /** The selected YAML form — null when a legacy template or blank issue is active. */
+    private val _selectedForm = MutableStateFlow<IssueForm?>(null)
+    val selectedForm: StateFlow<IssueForm?> = _selectedForm.asStateFlow()
+
+    /** Answers for the selected form, keyed by field index. */
+    private val _formAnswers = MutableStateFlow<Map<Int, IssueFormAnswer>>(emptyMap())
+    val formAnswers: StateFlow<Map<Int, IssueFormAnswer>> = _formAnswers.asStateFlow()
+
+    /** True once the user explicitly picked "Blank issue" (fixes chooser reopening). */
+    private val _blankSelected = MutableStateFlow(false)
+    val blankSelected: StateFlow<Boolean> = _blankSelected.asStateFlow()
+
+    /** contact_links from config.yml (external links shown in the chooser). */
+    private val _contactLinks = MutableStateFlow<List<IssueContactLink>>(emptyList())
+    val contactLinks: StateFlow<List<IssueContactLink>> = _contactLinks.asStateFlow()
+
+    /** Set once loading succeeded but no templates exist anywhere — skip chooser, go straight to editor. */
+    private val _noTemplatesFound = MutableStateFlow(false)
+    val noTemplatesFound: StateFlow<Boolean> = _noTemplatesFound.asStateFlow()
+
     /** Editor state — labels selected for the new issue. Prefilled from template front-matter. */
     private val _labels = MutableStateFlow<List<String>>(emptyList())
     val labels: StateFlow<List<String>> = _labels.asStateFlow()
@@ -57,111 +86,202 @@ class CreateIssueViewModel @Inject constructor(
     private val _assignees = MutableStateFlow<List<String>>(emptyList())
     val assignees: StateFlow<List<String>> = _assignees.asStateFlow()
 
+    private val _templatesFailed = MutableStateFlow(false)
+
+    /** True when template loading failed (network/API error) — chooser shows a retry. */
+    val templatesFailed: StateFlow<Boolean> = _templatesFailed.asStateFlow()
+
     fun loadTemplates(owner: String, repo: String) {
-        if (_templates.value.isNotEmpty() || _isLoadingTemplates.value) return
+        if (_templates.value.isNotEmpty() || _forms.value.isNotEmpty() || _isLoadingTemplates.value) return
         viewModelScope.launch {
             _isLoadingTemplates.update { true }
+            _templatesFailed.update { false }
             try {
-                val list = parseTemplates(owner, repo)
-                _templates.update { list }
-            } catch (_: Exception) {
-                // Non-fatal — fall back to blank form
+                val result = parseTemplateDir(owner, repo)
+                _forms.update { result.forms }
+                _templates.update { result.legacyTemplates }
+                _contactLinks.update { result.contactLinks }
+                // Nothing found at all — remember so the editor opens directly (not an error)
+                if (result.forms.isEmpty() && result.legacyTemplates.isEmpty()) {
+                    _noTemplatesFound.update { true }
+                }
+            } catch (e: Exception) {
+                issueReporter.reportError("CreateIssue", "loadTemplates", e)
+                _templatesFailed.update { true }
             } finally {
                 _isLoadingTemplates.update { false }
             }
         }
     }
 
-    private suspend fun parseTemplates(owner: String, repo: String): List<IssueTemplate> {
-        val arr = runCatching {
-            api.getContents(owner, repo, ".github/ISSUE_TEMPLATE")
-        }.getOrNull() ?: return emptyList()
-        // contents response for a directory is a JSON array
-        val els = runCatching {
-            kotlinx.serialization.json.Json.decodeFromJsonElement(
-                kotlinx.serialization.builtins.ListSerializer(GitHubApi.ContentEntry.serializer()),
-                arr,
-            )
-        }.getOrNull() ?: return emptyList()
-        // Only file entries with .md/.yaml/.yml extensions are templates
-        return els
-            .filter { it.type == "file" && (it.name.endsWith(".md") || it.name.endsWith(".yml") || it.name.endsWith(".yaml")) }
-            .filter { !it.name.equals("config.yml", ignoreCase = true) && !it.name.equals("config.yaml", ignoreCase = true) }
-            .map { parseOne(owner, repo, it) }
-    }
+    /**
+     * Fetch and classify every entry under `.github/ISSUE_TEMPLATE` (falling back to
+     * the repo root for legacy top-level `ISSUE_TEMPLATE*.md`):
+     *  - `config.yml` → contact links
+     *  - `.yml`/`.yaml` → structured issue forms
+     *  - `.md` → legacy free-text templates
+     */
+    /** Lenient JSON decoder — GitHub contents responses carry many extra fields. */
+    private val json = Json { ignoreUnknownKeys = true }
 
-    private suspend fun parseOne(owner: String, repo: String, entry: GitHubApi.ContentEntry): IssueTemplate {
-        // Fetch the full file (with encoded content)
-        val one = runCatching {
-            api.getContents(owner, repo, entry.path)
-        }.getOrNull() ?: return IssueTemplate(entry.name, entry.name, "", "", emptyList(), emptyList(), "")
-        val fileEntry = runCatching {
-            kotlinx.serialization.json.Json.decodeFromJsonElement(GitHubApi.ContentEntry.serializer(), one)
-        }.getOrNull() ?: return IssueTemplate(entry.name, entry.name, "", "", emptyList(), emptyList(), "")
-        val raw = if (fileEntry.encoding == "base64" && fileEntry.content.isNotBlank()) {
-            runCatching { Base64.decode(fileEntry.content, Base64.DEFAULT).toString(Charsets.UTF_8) }.getOrDefault("")
-        } else fileEntry.content
-        return parseFrontMatter(entry.name, raw)
-    }
+    private suspend fun parseTemplateDir(owner: String, repo: String): IssueFormParser.Result {
+        val entries = listTemplateEntries(owner, repo)
 
-    private fun parseFrontMatter(fileName: String, raw: String): IssueTemplate {
-        // Front matter is `---\n...\n---\n<rest>`. If absent, use the whole raw as body.
-        if (!raw.startsWith("---")) {
-            return IssueTemplate(fileName, fileName, "", "", emptyList(), emptyList(), raw)
-        }
-        val endIdx = raw.indexOf("\n---", 3)
-        if (endIdx < 0) return IssueTemplate(fileName, fileName, "", "", emptyList(), emptyList(), raw)
-        val fm = raw.substring(3, endIdx).trim()
-        val body = raw.substring(endIdx + 4).trimStart('-', '\n')
-        var name = ""
-        var about = ""
-        var title = ""
-        val labels = mutableListOf<String>()
-        val assigns = mutableListOf<String>()
-        // Very small YAML-front-matter parser: line-by-line `key: value` for scalars;
-        // `labels:` / `assignees:` are simple `["a","b"]` arrays.
-        fm.split("\n").forEach { line ->
-            val trimmed = line.trim()
-            if (trimmed.isEmpty() || trimmed.startsWith("#")) return@forEach
-            val colon = trimmed.indexOf(':')
-            if (colon < 0) return@forEach
-            val key = trimmed.substring(0, colon).trim()
-            val value = trimmed.substring(colon + 1).trim()
-            when (key) {
-                "name" -> name = value
-                "about", "description" -> about = value
-                "title" -> title = value
-                "labels" -> labels.addAll(parseYamlStringList(value))
-                "assignees", "assigns" -> assigns.addAll(parseYamlStringList(value))
+        var legacy = emptyList<IssueTemplate>()
+        var forms = emptyList<IssueForm>()
+        var contactLinks = emptyList<IssueContactLink>()
+        entries.forEach { entry ->
+            val raw = fetchRaw(owner, repo, entry.path)
+            when {
+                entry.name.equals("config.yml", true) || entry.name.equals("config.yaml", true) -> {
+                    if (raw.isNotEmpty()) contactLinks = IssueFormParser.parseConfigYaml(raw).second
+                }
+                entry.name.endsWith(".yml", true) || entry.name.endsWith(".yaml", true) ->
+                    IssueFormParser.parseFormYaml(raw)?.let { forms += it }
+                entry.name.endsWith(".md", true) ->
+                    legacy += IssueFormParser.parseLegacy(entry.name, raw)
             }
         }
-        return IssueTemplate(
-            fileName = fileName,
-            name = name.ifEmpty { fileName },
-            about = about,
-            title = title,
-            labels = labels,
-            assigns = assigns,
-            body = body,
-        )
+        return IssueFormParser.Result(forms, legacy, contactLinks)
     }
 
-    private fun parseYamlStringList(value: String): List<String> {
-        // Accepts `["a", "b"]`, `a,b`, `a`, or empty
-        if (value.isEmpty()) return emptyList()
-        if (value.startsWith("[") && value.endsWith("]")) {
-            return value.substring(1, value.length - 1)
-                .split(",")
-                .map { it.trim().trim('"', '\'') }
-                .filter { it.isNotEmpty() }
+    /**
+     * Enumerate candidate template files across all three layouts GitHub supports:
+     *  1. `.github/ISSUE_TEMPLATE/` directory (forms + legacy md + config.yml)
+     *  2. `.github/ISSUE_TEMPLATE.md` single file
+     *  3. top-level `ISSUE_TEMPLATE*.md` (oldest repos)
+     */
+    private suspend fun listTemplateEntries(owner: String, repo: String): List<GitHubApi.ContentEntry> {
+        val dir = decodeDirectory(runCatching {
+            api.getContents(owner, repo, ".github/ISSUE_TEMPLATE")
+        }.getOrNull())
+        if (dir.isNotEmpty()) {
+            return dir.filter { it.type == "file" }
         }
-        return value.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        // Layout 2: single .github/ISSUE_TEMPLATE.md — probe it directly
+        runCatching { api.getContents(owner, repo, ".github/ISSUE_TEMPLATE.md") }.getOrNull()?.let { el ->
+            decodeFile(el)?.let { return listOf(it) }
+        }
+        // Layout 3: top-level ISSUE_TEMPLATE*.md
+        val root = decodeDirectory(runCatching { api.getRootContents(owner, repo) }.getOrNull())
+        return root.filter {
+            it.type == "file" &&
+                it.name.startsWith("ISSUE_TEMPLATE", ignoreCase = true) &&
+                it.name.endsWith(".md", ignoreCase = true)
+        }
+    }
+
+    /** Decode a single-file contents response; null when the element is a directory listing. */
+    private fun decodeFile(el: JsonElement): GitHubApi.ContentEntry? =
+        runCatching {
+            json.decodeFromJsonElement(GitHubApi.ContentEntry.serializer(), el)
+        }.getOrNull()
+
+    private fun decodeDirectory(el: JsonElement?): List<GitHubApi.ContentEntry> {
+        if (el == null) return emptyList()
+        return runCatching {
+            json.decodeFromJsonElement(
+                ListSerializer(GitHubApi.ContentEntry.serializer()),
+                el,
+            )
+        }.getOrDefault(emptyList())
+    }
+
+    private suspend fun fetchRaw(owner: String, repo: String, path: String): String {
+        val one = runCatching { api.getContents(owner, repo, path) }.getOrNull() ?: return ""
+        val fileEntry = decodeFile(one) ?: return ""
+        return IssueFormParser.decodeContent(fileEntry.content, fileEntry.encoding)
     }
 
     fun selectTemplate(t: IssueTemplate?) {
+        // t == null only clears the selection (back to chooser); use [chooseBlank] for blank issues
         _selectedTemplate.update { t }
+        _selectedForm.update { null }
+        if (t == null) _blankSelected.update { false }
         _labels.update { t?.labels.orEmpty() }
         _assignees.update { t?.assigns.orEmpty() }
+        _formAnswers.update { emptyMap() }
+    }
+
+    /** User explicitly chose "Blank issue" — show the plain editor. */
+    fun chooseBlank() {
+        _selectedForm.update { null }
+        _selectedTemplate.update { null }
+        _blankSelected.update { true }
+        _labels.update { emptyList() }
+        _assignees.update { emptyList() }
+        _formAnswers.update { emptyMap() }
+    }
+
+    /** Return from any editor state to the template chooser. */
+    fun backToChooser() {
+        _selectedForm.update { null }
+        _selectedTemplate.update { null }
+        _blankSelected.update { false }
+    }
+
+    /** Retry after a failed load (clears the failure flag first so the guard passes). */
+    fun retryTemplates(owner: String, repo: String) {
+        _templatesFailed.update { false }
+        loadTemplates(owner, repo)
+    }
+
+    /** Select a parsed YAML issue form — the UI switches to the native form renderer. */
+    fun selectForm(form: IssueForm?) {
+        _selectedForm.update { form }
+        _selectedTemplate.update { null }
+        _blankSelected.update { false }
+        _labels.update { form?.labels.orEmpty() }
+        _assignees.update { form?.assignees.orEmpty() }
+        // Pre-seed answers with template default values so they're editable and included on submit
+        val seed = mutableMapOf<Int, IssueFormAnswer>()
+        form?.fields?.forEach { f ->
+            if (f is IssueFormField.TextInput && !f.defaultValue.isNullOrBlank()) {
+                seed[f.index] = IssueFormAnswer(text = f.defaultValue)
+            }
+        }
+        _formAnswers.update { seed }
+    }
+
+    /** Update one field's answer (text input / checkbox / dropdown all funnel through here). */
+    fun updateAnswer(index: Int, answer: IssueFormAnswer) {
+        _formAnswers.update { it + (index to answer) }
+    }
+
+    private val _validationError = MutableStateFlow<String?>(null)
+
+    /** First unanswered required prompt (label text) when submitting an incomplete form. */
+    val validationError: StateFlow<String?> = _validationError.asStateFlow()
+
+    fun clearValidationError() {
+        _validationError.value = null
+    }
+
+    /**
+     * Validate + submit a YAML form: builds GitHub-style markdown from the answers.
+     * [titleOverride] is the title edited on screen (may fall back to the template preset).
+     */
+    fun submitForm(owner: String, repo: String, titleOverride: String? = null) {
+        val form = _selectedForm.value ?: return
+        val missing = form.firstMissingRequired(_formAnswers.value)
+        if (missing != null) {
+            _validationError.update { missing }
+            return
+        }
+        val title = titleOverride?.takeIf { it.isNotBlank() } ?: effectiveTitle()
+        createIssue(owner, repo, title, IssueFormParser.buildBody(form, _formAnswers.value))
+    }
+
+    private fun effectiveTitle(): String {
+        val form = _selectedForm.value ?: return ""
+        return form.title.ifBlank {
+            // No title preset in the template: use the first short text answer as a hint
+            _formAnswers.value.entries.sortedBy { it.key }
+                .firstOrNull { (i, a) ->
+                    (form.fields.firstOrNull { it.index == i } as? IssueFormField.TextInput)?.multiline == false && a.text.isNotBlank()
+                }?.value?.text.orEmpty()
+                .take(80)
+        }
     }
 
     fun addLabel(value: String) {
@@ -205,8 +325,9 @@ class CreateIssueViewModel @Inject constructor(
                 )
                 _result.value = Result.success(issue)
             } catch (e: Exception) {
+                issueReporter.reportError("CreateIssue", "createIssue", e)
                 if (e is kotlinx.coroutines.CancellationException) throw e
-                _actionError.value = e.localizedMessage ?: "Failed to create"
+                _actionError.value = e.userMessage("Failed to create")
             } finally {
                 _isSending.value = false
             }

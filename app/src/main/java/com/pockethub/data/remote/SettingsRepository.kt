@@ -3,12 +3,14 @@ package com.pockethub.data.remote
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.pockethub.ui.theme.AppStyle
 import com.pockethub.ui.theme.ThemeMode
+import com.pockethub.data.local.TokenCipher
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -28,6 +30,7 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore("p
 @Singleton
 class SettingsRepository @Inject constructor(
     @ApplicationContext private val context: Context,
+    private val cipher: TokenCipher,
 ) {
     // ── Keys ──────────────────────────────────────────────
     private object Keys {
@@ -36,6 +39,7 @@ class SettingsRepository @Inject constructor(
         val APP_LOCALE = stringPreferencesKey("app_locale")
         val CUSTOM_CLIENT_ID = stringPreferencesKey("custom_client_id")
         val CUSTOM_CLIENT_SECRET = stringPreferencesKey("custom_client_secret")
+        val PENDING_OAUTH_STATE = stringPreferencesKey("pending_oauth_state")
         val NOTIF_POLL_MINUTES = intPreferencesKey("notif_poll_minutes")
         val NOTIFIED_IDS = stringPreferencesKey("notified_ids")
         val TRANSLATE_TARGET = stringPreferencesKey("translate_target")
@@ -44,11 +48,14 @@ class SettingsRepository @Inject constructor(
         val LAST_UPDATE_CHECK_MS = intPreferencesKey("last_update_check_epoch_ms")
         val LAST_UPDATE_PROMPT_MS = intPreferencesKey("last_update_prompt_epoch_ms")
         val PINNED_REPOS = stringPreferencesKey("pinned_repos_json")
+        val DOWNLOAD_FOLDER_URI = stringPreferencesKey("download_folder_tree_uri")
+        val DOWNLOAD_MIRROR_PREFIX = stringPreferencesKey("download_mirror_prefix")
         val ISSUE_REPORT_ENABLED = intPreferencesKey("issue_report_enabled")
         val ISSUE_REPORT_INTERVAL_DAYS = intPreferencesKey("issue_report_interval_days")
         val ISSUE_REPORT_EMAIL = stringPreferencesKey("issue_report_email")
         val ISSUE_REPORT_MODE = stringPreferencesKey("issue_report_mode")
         val ISSUE_REPORT_TARGET_REPO = stringPreferencesKey("issue_report_target_repo")
+        val FOLLOW_SYSTEM_THEME = booleanPreferencesKey("follow_system_theme")
     }
 
     // ── Theme ─────────────────────────────────────────────
@@ -78,6 +85,17 @@ class SettingsRepository @Inject constructor(
         }
     }
 
+    // ── Follow system dark mode ──────────────────────────
+    /** When on: system enters night mode → force the built-in dark style;
+     *  system leaves it → back to the user's chosen style. */
+    val followSystemTheme: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[Keys.FOLLOW_SYSTEM_THEME] ?: false
+    }
+
+    suspend fun setFollowSystemTheme(on: Boolean) {
+        context.dataStore.edit { prefs -> prefs[Keys.FOLLOW_SYSTEM_THEME] = on }
+    }
+
     // ── Language ──────────────────────────────────────────
     val appLocale: Flow<String> = context.dataStore.data.map { prefs ->
         prefs[Keys.APP_LOCALE] ?: com.pockethub.ui.settings.AppLocale.SYSTEM.key
@@ -95,14 +113,27 @@ class SettingsRepository @Inject constructor(
     }
 
     val customClientSecret: Flow<String> = context.dataStore.data.map {
-        it[Keys.CUSTOM_CLIENT_SECRET].orEmpty()
+        cipher.decrypt(it[Keys.CUSTOM_CLIENT_SECRET].orEmpty())
     }
 
     suspend fun setCustomOAuthClient(id: String, secret: String) {
         context.dataStore.edit { prefs ->
             prefs[Keys.CUSTOM_CLIENT_ID] = id
-            prefs[Keys.CUSTOM_CLIENT_SECRET] = secret
+            prefs[Keys.CUSTOM_CLIENT_SECRET] = cipher.encrypt(secret)
         }
+    }
+
+    suspend fun setPendingOAuthState(state: String) {
+        context.dataStore.edit { it[Keys.PENDING_OAUTH_STATE] = state }
+    }
+
+    suspend fun consumePendingOAuthState(): String? {
+        var state: String? = null
+        context.dataStore.edit { prefs ->
+            state = prefs[Keys.PENDING_OAUTH_STATE]
+            prefs.remove(Keys.PENDING_OAUTH_STATE)
+        }
+        return state
     }
 
     // ── Translation ───────────────────────────────────────
@@ -115,6 +146,38 @@ class SettingsRepository @Inject constructor(
         context.dataStore.edit { prefs ->
             if (target != null) prefs[Keys.TRANSLATE_TARGET] = target
             else prefs.remove(Keys.TRANSLATE_TARGET)
+        }
+    }
+
+    // ── Download folder ───────────────────────────────────
+    /**
+     * User-chosen download folder as a persisted SAF tree URI (from
+     * ACTION_OPEN_DOCUMENT_TREE). Null = app-private download dir (default).
+     * Completed downloads are mirrored into this folder when set.
+     */
+    val downloadFolderUri: Flow<String?> = context.dataStore.data.map { prefs ->
+        prefs[Keys.DOWNLOAD_FOLDER_URI]?.takeIf { it.isNotBlank() }
+    }
+
+    suspend fun setDownloadFolderUri(uri: String?) {
+        context.dataStore.edit { prefs ->
+            if (uri.isNullOrBlank()) prefs.remove(Keys.DOWNLOAD_FOLDER_URI)
+            else prefs[Keys.DOWNLOAD_FOLDER_URI] = uri
+        }
+    }
+
+    // ── Network acceleration (net branch experiment) ──────
+    /**
+     * User-provided accelerator prefix ("gh-proxy"-style), appended in front of
+     * GitHub FILE urls (releases / raw / codeload). Blank = direct connection.
+     */
+    val downloadMirrorPrefix: Flow<String> = context.dataStore.data.map { prefs ->
+        prefs[Keys.DOWNLOAD_MIRROR_PREFIX]?.trim().orEmpty()
+    }
+
+    suspend fun setDownloadMirrorPrefix(prefix: String) {
+        context.dataStore.edit { prefs ->
+            prefs[Keys.DOWNLOAD_MIRROR_PREFIX] = prefix.trim()
         }
     }
 
