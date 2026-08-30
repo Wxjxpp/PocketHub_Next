@@ -34,7 +34,7 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="${oauthScheme}" android:host="oauth" />
+                <data android:scheme="pockethub-next" android:host="oauth" />
             </intent-filter>
             <!-- App-internal deep links (pockethub://notifications, etc.) -->
             <intent-filter>
