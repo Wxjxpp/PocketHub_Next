@@ -216,7 +216,7 @@ fun FileViewerScreen(
                         Column(
                             Modifier
                                 .fillMaxSize()
-                                .verticalScroll(rememberScrollState()),
+                                .verticalScroll(com.pockethub.ui.components.rememberRestorableScrollState(contentReady = true)),
                         ) {
                             com.pockethub.ui.markdown.MarkdownText(
                                 markdown = content,

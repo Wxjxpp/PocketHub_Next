@@ -142,13 +142,22 @@ internal fun ReleasesTab(
                 }
                 if (!release.body.isNullOrBlank()) {
                     Spacer(Modifier.height(8.dp))
-                    MarkdownText(
-                        markdown = release.body.take(2000),
-                        modifier = Modifier.fillMaxWidth(),
-                        repoContext = repoContext,
-                        defaultBranch = defaultBranch,
-                        onLinkClick = onLinkClick,
-                    )
+                    // The embedded <!--pockethub-changelog…--> block is machine
+                    // data for the update dialog — never show it here. Strip it
+                    // BEFORE truncation: take(2000) can cut the closing "-->"
+                    // off, and an unterminated comment then leaks as raw text.
+                    val displayBody = release.body
+                        .replace(Regex("<!--pockethub-changelog[\\s\\S]*?-->"), "")
+                        .trim()
+                    if (displayBody.isNotEmpty()) {
+                        MarkdownText(
+                            markdown = displayBody.take(2000),
+                            modifier = Modifier.fillMaxWidth(),
+                            repoContext = repoContext,
+                            defaultBranch = defaultBranch,
+                            onLinkClick = onLinkClick,
+                        )
+                    }
                 }
                 if (release.assets.isNotEmpty()) {
                     Spacer(Modifier.height(6.dp))

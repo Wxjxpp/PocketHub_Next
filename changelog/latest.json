@@ -1,20 +1,12 @@
 {
-  "version": "0.3.61",
+  "version": "0.3.63",
   "summary": {
-    "zh": "本次更新聚焦动态列表跳转更精准、图片浏览支持多图切换与下载，以及多处体验修复。",
-    "en": "Sharper deep links from the activity feed, a multi-image viewer with download, and several experience fixes."
+    "zh": "本次更新修复页面返回后滚动位置丢失，并清理更新日志的重复显示。",
+    "en": "Scroll positions are kept when returning from a detail page, and duplicated release notes are cleaned up."
   },
   "items": [
-    { "type": "feat", "zh": "动态列表点击直达对应内容：推送进 commit、评论进 Issue/PR、Fork 进源仓库", "en": "Tap an activity entry to jump straight to its commit, issue/PR or forked repo" },
-    { "type": "feat", "zh": "README 图片全屏浏览支持左右滑动切换多图，并可一键下载当前图片", "en": "Full-screen image viewer now swipes between all README images and can download the current one" },
-    { "type": "feat", "zh": "仓库详情页双击标签页，直达对应的 GitHub 网页（带当前分支和筛选条件）", "en": "Double-tap a repo tab to open its GitHub web page with the current branch and filters" },
-    { "type": "feat", "zh": "仓库信息卡右上角新增\"复制地址\"按钮", "en": "New copy-link button on the repo info card" },
-    { "type": "fix", "zh": "设置目标语言后 README 自动翻译，与显示状态保持一致", "en": "README auto-translates to your chosen language, matching the toggle state" },
-    { "type": "fix", "zh": "更新日志改为打开弹框前读取仓库内文件，内容与本轮改动严格对应", "en": "Update notes now load from a repo file so they match exactly what changed" },
-    { "type": "fix", "zh": "从详情页返回后，\"我\"页与用户页保持离开时的仓库/动态切换", "en": "Returning to a profile keeps the repos/activity section you left it on" },
-    { "type": "fix", "zh": "版本更新下载支持断点续传，弱网下不再反复从头下载", "en": "In-app update download resumes after interruptions instead of restarting" },
-    { "type": "fix", "zh": "普通下载对网络波动自动续传重试，失败后重试也只拉取剩余部分", "en": "Downloads auto-resume on network hiccups; retries fetch only the missing tail" },
-    { "type": "fix", "zh": "修复发现页 Komi 源选\"全部\"平台时无数据的问题", "en": "Fixed the Komi discover feed showing no data for the All platform chip" },
-    { "type": "improve", "zh": "主题设置新增\"跟随系统夜间模式\"：系统切换深色时自动套用内置深色风格", "en": "New follow-system dark mode: the built-in dark style applies while the OS is in night mode" }
+    { "type": "fix", "zh": "概览页、Markdown 文件浏览、PR 详情页跳转后返回不再丢失滚动位置", "en": "Overview, markdown viewer and PR detail keep their scroll position after navigating back" },
+    { "type": "fix", "zh": "Releases 页不再显示混排的机器日志块，只保留可读的更新说明", "en": "The Releases tab no longer shows the raw machine changelog block, only readable notes" },
+    { "type": "fix", "zh": "更新日志只包含当前版本的变化，不再混入之前几轮的内容", "en": "Release notes cover only the current round of changes, not earlier ones" }
   ]
 }
