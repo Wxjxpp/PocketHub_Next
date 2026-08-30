@@ -39,6 +39,7 @@ class SettingsRepository @Inject constructor(
         val APP_LOCALE = stringPreferencesKey("app_locale")
         val CUSTOM_CLIENT_ID = stringPreferencesKey("custom_client_id")
         val CUSTOM_CLIENT_SECRET = stringPreferencesKey("custom_client_secret")
+        val OAUTH_BACKEND_URL = stringPreferencesKey("oauth_backend_url")
         val PENDING_OAUTH_STATE = stringPreferencesKey("pending_oauth_state")
         val NOTIF_POLL_MINUTES = intPreferencesKey("notif_poll_minutes")
         val NOTIFIED_IDS = stringPreferencesKey("notified_ids")
@@ -104,6 +105,15 @@ class SettingsRepository @Inject constructor(
     suspend fun setAppLocale(locale: String) {
         context.dataStore.edit { prefs ->
             prefs[Keys.APP_LOCALE] = locale
+        }
+    }
+
+    val oauthBackendUrl: Flow<String> = context.dataStore.data.map { it[Keys.OAUTH_BACKEND_URL].orEmpty() }
+
+    suspend fun setOAuthBackendUrl(url: String) {
+        context.dataStore.edit { prefs ->
+            val value = url.trim().removeSuffix("/")
+            if (value.isBlank()) prefs.remove(Keys.OAUTH_BACKEND_URL) else prefs[Keys.OAUTH_BACKEND_URL] = value
         }
     }
 

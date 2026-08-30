@@ -102,6 +102,7 @@ fun SettingsScreen(
     val customClientId by vm.customClientId.collectAsState()
     val downloadMirrorPrefix by vm.downloadMirrorPrefix.collectAsState()
     val customClientSecret by vm.customClientSecret.collectAsState()
+    val oauthBackendUrl by vm.oauthBackendUrl.collectAsState()
     val accountCount by vm.accountCount.collectAsState()
     val cacheSizeBytes by vm.cacheSizeBytes.collectAsState()
     val translateTarget by vm.translateTarget.collectAsState()
@@ -380,8 +381,9 @@ fun SettingsScreen(
         OAuthClientSheet(
             initialId = customClientId,
             initialSecret = customClientSecret,
+            initialBackendUrl = oauthBackendUrl,
             onDismiss = { showOAuthSheet = false },
-            onSave = { id, secret -> vm.setCustomOAuthClient(id, secret); showOAuthSheet = false },
+            onSave = { id, secret, backendUrl -> vm.setCustomOAuthClient(id, secret); vm.setOAuthBackendUrl(backendUrl); showOAuthSheet = false },
         )
     }
 
@@ -490,11 +492,13 @@ private fun MirrorPrefixSheet(
 private fun OAuthClientSheet(
     initialId: String,
     initialSecret: String,
+    initialBackendUrl: String,
     onDismiss: () -> Unit,
-    onSave: (String, String) -> Unit,
+    onSave: (String, String, String) -> Unit,
 ) {
     var id by rememberSaveable { mutableStateOf(initialId) }
     var secret by rememberSaveable { mutableStateOf(initialSecret) }
+    var backendUrl by rememberSaveable { mutableStateOf(initialBackendUrl) }
     var showSecret by rememberSaveable { mutableStateOf(false) }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState()) {
@@ -534,12 +538,20 @@ private fun OAuthClientSheet(
                     }
                 },
             )
+            OutlinedTextField(
+                value = backendUrl,
+                onValueChange = { backendUrl = it },
+                label = { Text("OAuth 后端地址") },
+                placeholder = { Text("https://你的-worker.workers.dev") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+            )
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
-                    onClick = { onSave(id.trim(), secret.trim()) },
-                    enabled = id.isNotBlank(),
+                    onClick = { onSave(id.trim(), secret.trim(), backendUrl.trim()) },
+                    enabled = backendUrl.trim().startsWith("https://"),
                 ) { Text(stringResource(R.string.action_save)) }
-                OutlinedButton(onClick = { onSave("", "") }) { Text(stringResource(R.string.action_clear)) }
+                OutlinedButton(onClick = { onSave("", "", "") }) { Text(stringResource(R.string.action_clear)) }
                 TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
             }
             Spacer(Modifier.height(24.dp))
