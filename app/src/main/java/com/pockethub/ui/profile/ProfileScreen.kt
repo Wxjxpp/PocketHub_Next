@@ -5,6 +5,7 @@ import com.pockethub.R
 import androidx.compose.ui.res.stringResource
 
 import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -68,10 +69,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import coil.compose.AsyncImage
 import com.pockethub.data.local.AccountEntity
 import com.pockethub.data.model.Repository
 import com.pockethub.data.model.User
+import com.pockethub.ui.components.PhAsyncImage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -161,7 +162,7 @@ fun ProfileScreen(
             // identical to UserDetailScreen so toggling between "all repos" and "feed"
             // lives behind one control instead of being a long scroll.
             item {
-                Column(Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
+                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
                     SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                         listOf(R.string.user_repos_chip, R.string.user_activity_chip).forEachIndexed { idx, label ->
                             SegmentedButton(
@@ -174,7 +175,7 @@ fun ProfileScreen(
                         }
                     }
                     Spacer(Modifier.height(8.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             if (sectionTab == 0) Icons.Outlined.Folder else Icons.Outlined.History,
                             null,
@@ -195,9 +196,7 @@ fun ProfileScreen(
             if (sectionTab == 0) {
                 if (isLoadingRepos && topRepos.isEmpty()) {
                     item {
-                        Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator()
-                        }
+                        com.pockethub.ui.components.SkeletonList(Modifier.fillMaxWidth(), rows = 4, topPadding = 0.dp)
                     }
                 } else if (topRepos.isEmpty()) {
                     item {
@@ -210,9 +209,14 @@ fun ProfileScreen(
                     }
                 } else {
                     items(topRepos, key = { it.id }) { repo ->
-                        RepoMiniCard(
+                        // Same rich row as the Repos tab (仓库) list — one visual
+                        // language for repo cards app-wide. 16dp side padding keeps
+                        // the card aligned with every other section on this page.
+                        com.pockethub.ui.repos.RepositoryRow(
                             repo = repo,
-                            onClick = { onNavigateToRepo(repo.owner.login, repo.name) },
+                            onOpen = { onNavigateToRepo(repo.owner.login, repo.name) },
+                            onOpenOwner = { onNavigateToUserDetail(repo.owner.login) },
+                            modifier = Modifier.padding(horizontal = 16.dp),
                         )
                     }
                     if (isLoadingMoreRepos) {
@@ -223,7 +227,7 @@ fun ProfileScreen(
                         }
                     } else if (hasMoreRepos) {
                         item {
-                            Row(Modifier.fillMaxWidth().padding(8.dp), horizontalArrangement = Arrangement.Center) {
+                            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.Center) {
                                 TextButton(onClick = { vm.loadMoreRepos() }) {
                                     Text(stringResource(R.string.load_more_repos))
                                 }
@@ -235,9 +239,7 @@ fun ProfileScreen(
                 // Activity (segmented 1) — recent public events from the signed-in user.
                 if (isLoadingEvents && events.isEmpty()) {
                     item {
-                        Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator()
-                        }
+                        com.pockethub.ui.components.SkeletonList(Modifier.fillMaxWidth(), rows = 4, topPadding = 0.dp)
                     }
                 } else if (events.isEmpty()) {
                     item {
@@ -296,17 +298,27 @@ private fun ProfileHeader(user: User?, activeAccount: AccountEntity?) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
         elevation = CardDefaults.cardElevation(0.dp),
     ) {
         Column(
-            Modifier.fillMaxWidth().padding(20.dp),
+            Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
+                            androidx.compose.ui.graphics.Color.Transparent,
+                        )
+                    )
+                )
+                .padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             // Round avatar with a neutral surface placeholder so the circle is
             // visible even before the asynchronous image resolves.
-            AsyncImage(
+            PhAsyncImage(
                 model = user?.avatarUrl ?: activeAccount?.avatarUrl,
                 contentDescription = null,
                 contentScale = androidx.compose.ui.layout.ContentScale.Crop,
@@ -359,7 +371,7 @@ private fun StatsRow(
     ) {
         StatPill(stringResource(R.string.followers), user?.followers ?: 0, onClick = onFollowersClick)
         StatPill(stringResource(R.string.following), user?.following ?: 0, onClick = onFollowingClick)
-        StatPill(stringResource(R.string.repos), user?.publicRepos ?: 0)
+        StatPill(stringResource(R.string.repos), (user?.publicRepos ?: 0) + (user?.totalPrivateRepos ?: 0))
         StatPill(stringResource(R.string.starred), starredTotal)
     }
 }
@@ -411,47 +423,6 @@ private fun AdditionalInfo(user: User?) {
 }
 
 @Composable
-private fun RepoMiniCard(repo: Repository, onClick: () -> Unit) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
-        elevation = CardDefaults.cardElevation(0.dp),
-    ) {
-        Column(Modifier.padding(14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                AsyncImage(
-                    model = repo.owner.avatarUrl,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp).clip(CircleShape),
-                )
-                Spacer(Modifier.width(6.dp))
-                Text(repo.owner.login, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(" / ", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(repo.name, style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold))
-            }
-            if (!repo.description.isNullOrBlank()) {
-                Spacer(Modifier.height(4.dp))
-                Text(repo.description!!, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            }
-            Spacer(Modifier.height(6.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                repo.language?.let {
-                    Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.width(12.dp))
-                }
-                Text("★ ${repo.stars}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.width(12.dp))
-                Text("⑂ ${repo.forks}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-    }
-}
-
-@Composable
 private fun AccountRow(
     account: AccountEntity,
     isActive: Boolean,
@@ -462,7 +433,7 @@ private fun AccountRow(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        AsyncImage(
+        PhAsyncImage(
             model = account.avatarUrl,
             contentDescription = null,
             modifier = Modifier.size(28.dp).clip(CircleShape),

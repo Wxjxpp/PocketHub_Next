@@ -21,6 +21,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.ListAlt
 import androidx.compose.material.icons.outlined.Commit
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -41,8 +42,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import coil.compose.AsyncImage
 import com.pockethub.data.remote.GitHubApi
+import com.pockethub.ui.components.PhAsyncImage
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
@@ -51,6 +52,8 @@ import java.util.Locale
 fun CommitsTab(
     owner: String,
     repo: String,
+    refreshTick: Int = 0,
+    ref: String? = null,
     onNavigateToUser: (String) -> Unit = {},
     onCommitClick: (String) -> Unit = {},
     vm: CommitsViewModel = hiltViewModel(),
@@ -60,7 +63,11 @@ fun CommitsTab(
     val error by vm.error.collectAsState()
     val listState = rememberLazyListState()
 
-    LaunchedEffect(owner, repo) { vm.loadCommits(owner, repo) }
+    LaunchedEffect(owner, repo, ref) { vm.loadCommits(owner, repo, ref) }
+    // Pull-to-refresh on the repo detail screen bumps [refreshTick]; re-fetch so
+    // the commit list actually updates (previously the spinner spun but this
+    // list never reloaded — fake refresh).
+    LaunchedEffect(refreshTick) { if (refreshTick > 0 && owner.isNotBlank()) vm.refresh(owner, repo, ref) }
 
     // Infinite scroll
     val shouldLoadMore by remember {
@@ -75,10 +82,9 @@ fun CommitsTab(
 
     Column(Modifier.fillMaxSize()) {
         when {
-            isLoading && commits.isEmpty() -> Box(
-                Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center,
-            ) { CircularProgressIndicator() }
+            isLoading && commits.isEmpty() -> com.pockethub.ui.components.SkeletonList(
+                Modifier.fillMaxSize(), rows = 9, topPadding = 8.dp,
+            )
 
             error != null && commits.isEmpty() -> Column(
                 Modifier.fillMaxSize(),
@@ -92,9 +98,10 @@ fun CommitsTab(
                 }
             }
 
-            commits.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(stringResource(R.string.commit_no_more), color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
+            commits.isEmpty() -> com.pockethub.ui.components.EmptyStateV2(
+                icon = Icons.Outlined.ListAlt,
+                title = stringResource(R.string.commit_no_more),
+            )
 
             else -> LazyColumn(state = listState, modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
                 items(commits, key = { it.sha }) { commit ->
@@ -122,12 +129,12 @@ private fun CommitRow(
     val authorLogin = commit.author?.login
     val authorClick = authorLogin?.let { Modifier.clickable { onNavigateToUser(it) } } ?: Modifier
 
-    Column(
-        Modifier.fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 10.dp),
+    com.pockethub.ui.components.PhCard(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        onClick = onClick,
+        cornerRadius = 14.dp,
     ) {
-        Row(verticalAlignment = Alignment.Top) {
+        Row(verticalAlignment = Alignment.Top, modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
             // SHA short
             Text(
                 text = commit.sha.take(7),
@@ -150,7 +157,7 @@ private fun CommitRow(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     val avatarUrl = commit.author?.avatarUrl
                     if (avatarUrl != null) {
-                        AsyncImage(
+                        PhAsyncImage(
                             model = avatarUrl,
                             contentDescription = null,
                             modifier = Modifier.size(14.dp).clip(CircleShape).then(authorClick),
@@ -174,7 +181,6 @@ private fun CommitRow(
                 }
             }
         }
-        androidx.compose.material3.HorizontalDivider()
     }
 }
 

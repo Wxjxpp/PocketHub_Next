@@ -1,22 +1,10 @@
 package com.pockethub.data.remote
 
-import com.pockethub.data.model.GitHubNotification
 import com.pockethub.data.model.Issue
 import com.pockethub.data.model.Repository
 import com.pockethub.data.model.User
-import retrofit2.Response
 import retrofit2.http.Body
-import retrofit2.http.DELETE
-import retrofit2.http.Field
-import retrofit2.http.FormUrlEncoded
-import retrofit2.http.GET
-import retrofit2.http.Headers
-import retrofit2.http.PATCH
 import retrofit2.http.POST
-import retrofit2.http.PUT
-import retrofit2.http.Path
-import retrofit2.http.Query
-import retrofit2.http.Url
 
 /**
  * GitHub REST API v3 interface.
@@ -24,90 +12,33 @@ import retrofit2.http.Url
  * All endpoints require an authenticated token (set via [AuthInterceptor]).
  * See https://docs.github.com/en/rest for the full reference.
  */
-interface GitHubApi {
+interface GitHubApi :
+    UserEndpoints,
+    FollowEndpoints,
+    RepoEndpoints,
+    ContentEndpoints,
+    IssueEndpoints,
+    ReactionEndpoints,
+    PullRequestEndpoints,
+    CommitEndpoints,
+    BranchEndpoints,
+    ReleaseEndpoints,
+    ActionEndpoints,
+    NotificationEndpoints,
+    EventEndpoints,
+    SearchEndpoints,
+    OAuthEndpoints,
+    GraphQLEndpoints {
+
+    @kotlinx.serialization.Serializable
+    data class GitHubErrorBody(
+        val message: String? = null,
+        val documentation_url: String? = null,
+    )
 
     // ──────────────────────────────────────────────
-    //  Auth / User
+    //  File browsing (content API)
     // ──────────────────────────────────────────────
-
-    /** Validate the current token and return the authenticated user. */
-    @GET("user")
-    suspend fun getAuthenticatedUser(): User
-
-    /** User profile by login. */
-    @GET("users/{login}")
-    suspend fun getUser(@Path("login") login: String): User
-
-    // ──────────────────────────────────────────────
-    //  User following
-    // ──────────────────────────────────────────────
-
-    /** Check whether the authenticated user follows [login]. 204 = yes, 404 = no. */
-    @GET("user/following/{login}")
-    suspend fun checkFollowing(@Path("login") login: String): Response<Unit>
-
-    /** Follow a user. */
-    @PUT("user/following/{login}")
-    suspend fun followUser(@Path("login") login: String): Response<Unit>
-
-    /** Unfollow a user. */
-    @DELETE("user/following/{login}")
-    suspend fun unfollowUser(@Path("login") login: String): Response<Unit>
-
-    /** Followers of a user. */
-    @GET("users/{login}/followers")
-    suspend fun getFollowers(
-        @Path("login") login: String,
-        @Query("page") page: Int = 1,
-        @Query("per_page") perPage: Int = 50,
-    ): List<User>
-
-    /** Users the given user follows. */
-    @GET("users/{login}/following")
-    suspend fun getFollowing(
-        @Path("login") login: String,
-        @Query("page") page: Int = 1,
-        @Query("per_page") perPage: Int = 50,
-    ): List<User>
-
-    // ──────────────────────────────────────────────
-    //  Repositories
-    // ──────────────────────────────────────────────
-
-    /** Your repositories (paginated). */
-    @GET("user/repos")
-    suspend fun getMyRepositories(
-        @Query("page") page: Int = 1,
-        @Query("per_page") perPage: Int = 30,
-        @Query("sort") sort: String = "pushed",       // pushed | updated | created
-        @Query("direction") direction: String = "desc",
-        @Query("type") type: String? = null,           // owner | collaborator | member
-        @Query("visibility") visibility: String? = null, // public | private
-    ): List<Repository>
-
-    /** Starred repositories. Returns a Response so the caller can read the
-     *  `link` header to count total pages (the endpoint has no total_count). */
-    @GET("user/starred")
-    suspend fun getStarredRepositories(
-        @Query("page") page: Int = 1,
-        @Query("per_page") perPage: Int = 30,
-        @Query("sort") sort: String = "created",
-        @Query("direction") direction: String = "desc",
-    ): Response<List<Repository>>
-
-    /** Repository by full name. */
-    @GET("repos/{owner}/{repo}")
-    suspend fun getRepository(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-    ): Repository
-
-    /** README — returns base64 content + download_url. Parsed into [ReadmeResponse]. */
-    @GET("repos/{owner}/{repo}/readme")
-    suspend fun getReadme(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-    ): ReadmeResponse
 
     @kotlinx.serialization.Serializable
     data class ReadmeResponse(
@@ -119,53 +50,6 @@ interface GitHubApi {
         @kotlinx.serialization.SerialName("html_url") val htmlUrl: String? = null,
         val size: Long = 0,
     )
-
-    /** Toggle star — PUT with no body stars the repo. */
-    @PUT("user/starred/{owner}/{repo}")
-    suspend fun star(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-    ): Response<Unit>
-
-    /** Check if the current user has starred the repo — 204 starred, 404 not. */
-    @GET("user/starred/{owner}/{repo}")
-    suspend fun checkStarred(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-    ): Response<Unit>
-
-    @DELETE("user/starred/{owner}/{repo}")
-    suspend fun unstar(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-    ): Response<Unit>
-
-    /**
-     * Watch the repo — sets the current user as subscribed (will receive notifications
-     * for releases / discussions / issue/PR activity depending on the `subscribed` flag).
-     * `ignored=true` mutes the repo entirely. Default [payload] leaves both flags
-     * untouched, which on GitHub means "watch all repo activity".
-     */
-    @PUT("repos/{owner}/{repo}/subscription")
-    suspend fun watch(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-        @Body payload: WatchSubscriptionRequest = WatchSubscriptionRequest(),
-    ): Response<WatchSubscription>
-
-    /** Check if currently watched — 200 + subscription JSON or 404 when not subscribed. */
-    @GET("repos/{owner}/{repo}/subscription")
-    suspend fun getSubscription(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-    ): Response<WatchSubscription>
-
-    /** Unwatch — DELETE the subscription. */
-    @DELETE("repos/{owner}/{repo}/subscription")
-    suspend fun unwatch(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-    ): Response<Unit>
 
     @kotlinx.serialization.Serializable
     data class WatchSubscription(
@@ -184,36 +68,12 @@ interface GitHubApi {
         val ignored: Boolean = false,
     )
 
-    /** Fork a repository — 202 Accepted, repo object returned when complete. */
-    @POST("repos/{owner}/{repo}/forks")
-    suspend fun forkRepository(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-    ): Response<Repository>
-
-    /**
-     * Delete a repository. Requires the authenticated user to be the owner (or an
-     * org admin) AND the token to carry the `delete_repo` scope.
-     * Returns 204 on success; 403 when missing rights/scope; 404 if not found.
-     */
-    @DELETE("repos/{owner}/{repo}")
-    suspend fun deleteRepository(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-    ): Response<Unit>
-
-    /**
-     * Update repository settings — used here for toggling visibility
-     * (private/public). Requires admin permission on the repo.
-     * PUT-style update of the repo; returns the updated [Repository].
-     * Docs: https://docs.github.com/en/rest/repos/repos#update-a-repository
-     */
-    @PATCH("repos/{owner}/{repo}")
-    suspend fun updateRepository(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-        @Body body: RepoUpdateRequest,
-    ): Response<Repository>
+    /** GitHub accepts `name` (and optional `default_branch_only`) on fork creation. */
+    @kotlinx.serialization.Serializable
+    data class ForkRequest(
+        val name: String? = null,
+        @kotlinx.serialization.SerialName("default_branch_only") val defaultBranchOnly: Boolean = false,
+    )
 
     @kotlinx.serialization.Serializable
     data class RepoUpdateRequest(
@@ -233,40 +93,6 @@ interface GitHubApi {
     )
 
     @kotlinx.serialization.Serializable
-    data class GitHubErrorBody(
-        val message: String? = null,
-        val documentation_url: String? = null,
-    )
-
-    // ──────────────────────────────────────────────
-    //  File browsing (content API)
-    // ──────────────────────────────────────────────
-
-    /**
-     * List contents of a directory or fetch a single file.
-     *
-     * The API returns either a [ContentEntry] (when `path` points to a file) or
-     * a JSON array of [ContentEntry] (when it points to a directory). We declare the
-     * return as [kotlinx.serialization.json.JsonElement] and decode in the caller via
-     * [kotlinx.serialization.json.Json], so one method covers both cases.
-     */
-    @GET("repos/{owner}/{repo}/contents/{path}")
-    suspend fun getContents(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-        @Path("path", encoded = true) path: String = "",
-        @Query("ref") ref: String? = null,
-    ): kotlinx.serialization.json.JsonElement
-
-    /** Contents of the root of the repo's default branch (no path). */
-    @GET("repos/{owner}/{repo}/contents")
-    suspend fun getRootContents(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-        @Query("ref") ref: String? = null,
-    ): kotlinx.serialization.json.JsonElement
-
-    @kotlinx.serialization.Serializable
     data class ContentEntry(
         val name: String = "",
         val path: String = "",
@@ -278,30 +104,27 @@ interface GitHubApi {
         val encoding: String = "none",
     )
 
+    /** Response of the recursive git/trees endpoint. */
+    @kotlinx.serialization.Serializable
+    data class GitTreeResponse(
+        val sha: String = "",
+        val truncated: Boolean = false,
+        val tree: List<GitTreeEntry> = emptyList(),
+    )
+
+    /** One entry of a git tree: blob (file) or tree (directory). */
+    @kotlinx.serialization.Serializable
+    data class GitTreeEntry(
+        val path: String = "",
+        val mode: String = "",
+        val type: String = "blob", // "blob" | "tree" | "commit"
+        val sha: String = "",
+        val size: Long = 0,
+    )
+
     // ──────────────────────────────────────────────
     //  Issues & Pull Requests
     // ──────────────────────────────────────────────
-
-    /** Issues for a repo. (PRs are also returned by this endpoint.) */
-    @GET("repos/{owner}/{repo}/issues")
-    suspend fun getIssues(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-        @Query("state") state: String = "open",
-        @Query("page") page: Int = 1,
-        @Query("per_page") perPage: Int = 30,
-        @Query("sort") sort: String = "created",
-        @Query("direction") direction: String = "desc",
-    ): List<Issue>
-
-    /** Create a new issue. */
-    @POST("repos/{owner}/{repo}/issues")
-    suspend fun createIssue(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-        @Body body: IssueCreateRequest,
-    ): Issue
-
     @kotlinx.serialization.Serializable
     data class IssueCreateRequest(
         val title: String,
@@ -310,58 +133,6 @@ interface GitHubApi {
         val assignees: List<String> = emptyList(),
         val milestone: Int? = null,
     )
-
-    /** Single issue detail. */
-    @GET("repos/{owner}/{repo}/issues/{number}")
-    suspend fun getIssue(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-        @Path("number") number: Int,
-    ): Issue
-
-    /** Lock conversation on an issue or PR. Server returns 200 with empty body. */
-    @Headers("Accept: application/vnd.github+json")
-    @PUT("repos/{owner}/{repo}/issues/{number}/lock")
-    suspend fun lockIssue(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-        @Path("number") number: Int,
-    ): Response<Unit>
-
-    /** Unlock conversation on an issue or PR. Server returns 204 with empty body. */
-    @Headers("Accept: application/vnd.github+json")
-    @DELETE("repos/{owner}/{repo}/issues/{number}/lock")
-    suspend fun unlockIssue(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-        @Path("number") number: Int,
-    ): Response<Unit>
-
-    /** Comments on an issue or PR. Returns a Response so callers can read the
-     *  `link` header to detect whether more pages exist (the GitHub API doesn't
-     *  return total_count for this endpoint). */
-    @GET("repos/{owner}/{repo}/issues/{number}/comments")
-    suspend fun getIssueComments(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-        @Path("number") number: Int,
-        @Query("per_page") perPage: Int = 50,
-        @Query("page") page: Int = 1,
-    ): Response<List<IssueComment>>
-
-    /**
-     * Timeline events for an issue / PR — labeled, assigned, closed, reopened,
-     * referenced, cross-referenced, milestoned, locked, unlocked, etc. Used to
-     * render a chronological event stream interleaved with comments.
-     */
-    @GET("repos/{owner}/{repo}/issues/{number}/events")
-    suspend fun getIssueEvents(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-        @Path("number") number: Int,
-        @Query("per_page") perPage: Int = 100,
-        @Query("page") page: Int = 1,
-    ): Response<List<IssueEvent>>
 
     @kotlinx.serialization.Serializable
     data class IssueEvent(
@@ -409,146 +180,15 @@ interface GitHubApi {
         @kotlinx.serialization.SerialName("created_at") val createdAt: String? = null,
     )
 
-    /** Add a reaction to an issue / PR comment (issue-PR comments share the same endpoint). */
-    @POST("repos/{owner}/{repo}/issues/comments/{comment_id}/reactions")
-    suspend fun createIssueCommentReaction(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-        @Path("comment_id") commentId: Long,
-        @Body content: ReactionRequest,
-    ): ReactionResponse
-
-    /**
-     * List reactions on an issue / PR comment. We use the IDs returned here to
-     * delete reactions the current viewer has previously added (the GitHub API
-     * needs a specific reaction_id, not just a content type).
-     */
-    @GET("repos/{owner}/{repo}/issues/comments/{comment_id}/reactions")
-    suspend fun listIssueCommentReactions(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-        @Path("comment_id") commentId: Long,
-        @Query("per_page") perPage: Int = 100,
-    ): List<ReactionResponse>
-
-    /** Delete a reaction on an issue / PR comment. */
-    @DELETE("repos/{owner}/{repo}/issues/comments/{comment_id}/reactions/{reaction_id}")
-    suspend fun deleteIssueCommentReaction(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-        @Path("comment_id") commentId: Long,
-        @Path("reaction_id") reactionId: Long,
-    ): Response<Unit>
-
     @kotlinx.serialization.Serializable
     data class ReactionRequest(val content: String)
 
     // ── Pull Requests (dedicated PR endpoints) ──────────
 
-    /** Get a single pull request (includes merge info, diff stats, reviewers). */
-    @GET("repos/{owner}/{repo}/pulls/{pull_number}")
-    suspend fun getPullRequest(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-        @Path("pull_number") pullNumber: Int,
-    ): PullRequest
-
-    /** Add requested reviewers to a pull request. */
-    @POST("repos/{owner}/{repo}/pulls/{pull_number}/requested_reviewers")
-    suspend fun requestReviewers(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-        @Path("pull_number") pullNumber: Int,
-        @Body body: RequestedReviewersBody,
-    ): PullRequest
-
-    /** Remove requested reviewers from a pull request. */
-    @DELETE("repos/{owner}/{repo}/pulls/{pull_number}/requested_reviewers")
-    suspend fun removeReviewers(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-        @Path("pull_number") pullNumber: Int,
-        @Body body: RequestedReviewersBody,
-    ): Response<Unit>
-
-    @PATCH("repos/{owner}/{repo}/pulls/{pull_number}")
-    suspend fun updatePullRequest(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-        @Path("pull_number") pullNumber: Int,
-        @Body body: PullUpdateRequest,
-    ): PullRequest
-
     @kotlinx.serialization.Serializable
     data class PullUpdateRequest(
         val state: String, // "open" | "closed"
     )
-
-    /** List files changed in a pull request. */
-    @GET("repos/{owner}/{repo}/pulls/{pull_number}/files")
-    suspend fun getPullRequestFiles(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-        @Path("pull_number") pullNumber: Int,
-        @Query("per_page") perPage: Int = 30,
-        @Query("page") page: Int = 1,
-    ): List<PullRequestFile>
-
-    /** List reviews on a pull request. */
-    @GET("repos/{owner}/{repo}/pulls/{pull_number}/reviews")
-    suspend fun getPullRequestReviews(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-        @Path("pull_number") pullNumber: Int,
-        @Query("per_page") perPage: Int = 30,
-        @Query("page") page: Int = 1,
-    ): List<PullRequestReview>
-
-    /** Merge a pull request. */
-    @PUT("repos/{owner}/{repo}/pulls/{pull_number}/merge")
-    suspend fun mergePullRequest(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-        @Path("pull_number") pullNumber: Int,
-        @Body body: MergeRequest = MergeRequest(),
-    ): Response<MergeResult>
-
-    /** Submit a pull request review. */
-    @POST("repos/{owner}/{repo}/pulls/{pull_number}/reviews")
-    suspend fun createPullRequestReview(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-        @Path("pull_number") pullNumber: Int,
-        @Body body: ReviewRequest,
-    ): PullRequestReview
-
-    /**
-     * List review comments (line-level comments) on a PR — these are different from issue
-     * comments (general PR discussion): they are anchored to a specific file + line range.
-     */
-    @GET("repos/{owner}/{repo}/pulls/{pull_number}/comments")
-    suspend fun listPullRequestReviewComments(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-        @Path("pull_number") pullNumber: Int,
-        @Query("per_page") perPage: Int = 100,
-        @Query("page") page: Int = 1,
-    ): List<ReviewComment>
-
-    /**
-     * Post a line-level review comment on a PR.
-     *
-     * Use [ReviewCommentRequest.line] (single-line) or [ReviewCommentRequest.startLine] + `line`
-     * (multi-line range). The full positional parameters are required by GitHub to anchor a
-     * comment on the file diff rather than the issue timeline.
-     */
-    @POST("repos/{owner}/{repo}/pulls/{pull_number}/comments")
-    suspend fun createPullRequestReviewComment(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-        @Path("pull_number") pullNumber: Int,
-        @Body body: ReviewCommentRequest,
-    ): ReviewComment
 
     @kotlinx.serialization.Serializable
     data class ReviewComment(
@@ -686,7 +326,7 @@ interface GitHubApi {
     data class ReviewRequest(
         val body: String? = null,
         val event: String, // "APPROVE" | "REQUEST_CHANGES" | "COMMENT"
-        @kotlinx.serialization.SerialName("comments") val comments: List<ReviewInlineComment> = emptyList(),
+        @kotlinx.serialization.SerialName("comments") val comments: List<GitHubApi.ReviewInlineComment> = emptyList(),
     )
 
     @kotlinx.serialization.Serializable
@@ -703,25 +343,8 @@ interface GitHubApi {
 
     // ── Issue / PR actions ──────────────────────────────
 
-    @POST("repos/{owner}/{repo}/issues/{number}/comments")
-    suspend fun createIssueComment(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-        @Path("number") number: Int,
-        @Body body: CommentRequest,
-    ): IssueComment
-
     @kotlinx.serialization.Serializable
     data class CommentRequest(val body: String)
-
-    /** Update an issue's editable fields. Null fields are left unchanged by GitHub. */
-    @PATCH("repos/{owner}/{repo}/issues/{number}")
-    suspend fun updateIssue(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-        @Path("number") number: Int,
-        @Body body: IssueUpdateRequest,
-    ): Issue
 
     @kotlinx.serialization.Serializable
     data class IssueUpdateRequest(
@@ -733,79 +356,6 @@ interface GitHubApi {
         val milestone: Int? = null,
     )
 
-    /** Labels configured for a repository. */
-    @GET("repos/{owner}/{repo}/labels")
-    suspend fun getRepositoryLabels(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-        @Query("per_page") perPage: Int = 100,
-    ): List<Issue.Label>
-
-    /** Open milestones configured for a repository. */
-    @GET("repos/{owner}/{repo}/milestones")
-    suspend fun getRepositoryMilestones(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-        @Query("state") state: String = "open",
-        @Query("per_page") perPage: Int = 100,
-    ): List<Issue.Milestone>
-
-    @PATCH("repos/{owner}/{repo}/issues/comments/{comment_id}")
-    suspend fun editIssueComment(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-        @Path("comment_id") commentId: Long,
-        @Body body: CommentRequest,
-    ): IssueComment
-
-    /** Delete a comment. */
-    @DELETE("repos/{owner}/{repo}/issues/comments/{comment_id}")
-    suspend fun deleteIssueComment(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-        @Path("comment_id") commentId: Long,
-    ): Response<Unit>
-
-    // ── Commits ──────────────────────────────────────────
-
-    /** List commits for a repo (paginated). */
-    @GET("repos/{owner}/{repo}/commits")
-    suspend fun getCommits(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-        @Query("page") page: Int = 1,
-        @Query("per_page") perPage: Int = 30,
-        @Query("sha") sha: String? = null, // branch or commit SHA
-        @Query("path") path: String? = null, // filter by file/dir path
-    ): List<Commit>
-
-    /** Single commit detail (includes files diff). */
-    @GET("repos/{owner}/{repo}/commits/{ref}")
-    suspend fun getCommit(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-        @Path("ref") ref: String,
-    ): CommitDetail
-
-    /** Comments on a commit (section / line-level via positional fields). */
-    @GET("repos/{owner}/{repo}/commits/{ref}/comments")
-    suspend fun getCommitComments(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-        @Path("ref") ref: String,
-        @Query("per_page") perPage: Int = 100,
-    ): List<CommitComment>
-
-    /** Add a comment to a commit. Body-only (no path/line) posts a top-level
-     *  commit comment on GitHub web's commit page. */
-    @POST("repos/{owner}/{repo}/commits/{ref}/comments")
-    suspend fun createCommitComment(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-        @Path("ref") ref: String,
-        @Body body: CommitCommentCreate,
-    ): CommitComment
-
     @kotlinx.serialization.Serializable
     data class CommitCommentCreate(
         val body: String,
@@ -814,25 +364,6 @@ interface GitHubApi {
         val position: Int? = null,
         val line: Int? = null,
     )
-
-    /**
-     * Force-update a Git ref (branch/tag) to point at a given SHA.
-     *
-     * Used by the commit-detail "revert to parent" action: we move the default
-     * branch ref back to the commit's parent, effectively discarding the commit
-     * on the user's own repository. `force = true` is required because rewinding
-     * a branch ref is a non-fast-forward update.
-     *
-     * GitHub REST: `PATCH /repos/{owner}/{repo}/git/refs/{ref}` where `{ref}` is
-     * e.g. `heads/main` (no leading `refs/`).
-     */
-    @PATCH("repos/{owner}/{repo}/git/refs/{ref}")
-    suspend fun updateRef(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-        @Path("ref") ref: String,
-        @Body body: UpdateRefRequest,
-    ): Response<Unit>
 
     @kotlinx.serialization.Serializable
     data class UpdateRefRequest(
@@ -883,12 +414,12 @@ interface GitHubApi {
     data class CommitDetail(
         val sha: String = "",
         @kotlinx.serialization.SerialName("html_url") val htmlUrl: String? = null,
-        val commit: Commit.CommitInfo? = null,
+        val commit: GitHubApi.Commit.CommitInfo? = null,
         val author: User? = null,
         val committer: User? = null,
         val stats: CommitStats? = null,
         val files: List<CommitFile> = emptyList(),
-        @kotlinx.serialization.SerialName("parents") val parents: List<Commit.Parent> = emptyList(),
+        @kotlinx.serialization.SerialName("parents") val parents: List<GitHubApi.Commit.Parent> = emptyList(),
     ) {
         @kotlinx.serialization.Serializable
         data class CommitStats(
@@ -914,15 +445,6 @@ interface GitHubApi {
 
     // ── Branches ──────────────────────────────────────────
 
-    /** List branches for a repo. */
-    @GET("repos/{owner}/{repo}/branches")
-    suspend fun getBranches(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-        @Query("page") page: Int = 1,
-        @Query("per_page") perPage: Int = 30,
-    ): List<Branch>
-
     @kotlinx.serialization.Serializable
     data class Branch(
         val name: String = "",
@@ -936,56 +458,10 @@ interface GitHubApi {
         )
     }
 
-    /** Releases for a repo. */
-    @GET("repos/{owner}/{repo}/releases")
-    suspend fun getReleases(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-        @Query("per_page") perPage: Int = 20,
-        @Query("page") page: Int = 1,
-    ): List<Release>
-
-    /**
-     * Delete a release. Requires the authenticated user to be the repo owner or
-     * have admin permission (the `delete_repo` scope is NOT required for releases).
-     * Returns 204 on success; 403 / 404 for permission / not-found cases.
-     */
-    @DELETE("repos/{owner}/{repo}/releases/{release_id}")
-    suspend fun deleteRelease(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-        @Path("release_id") releaseId: Long,
-    ): Response<Unit>
-
-    /** GitHub Actions workflow runs for a repo. */
-    @GET("repos/{owner}/{repo}/actions/runs")
-    suspend fun getWorkflowRuns(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-        @Query("per_page") perPage: Int = 30,
-        @Query("page") page: Int = 1,
-        @Query("branch") branch: String? = null,
-    ): WorkflowRunsResponse
-
-    /**
-     * List check runs for a given commit ref — the canonical source for "PR checks"
-     * (the PR header on GitHub web shows exactly this aggregate). Includes GitHub
-     * Actions plus all third-party CI apps.
-     */
-    @GET("repos/{owner}/{repo}/commits/{ref}/check-runs")
-    suspend fun listCheckRuns(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-        @Path("ref") ref: String,
-        @Query("per_page") perPage: Int = 100,
-        @Query("page") page: Int = 1,
-        @Query("filter") filter: String = "latest",
-    ): CheckRunsResponse
-
     @kotlinx.serialization.Serializable
     data class CheckRunsResponse(
         @kotlinx.serialization.SerialName("total_count") val totalCount: Int = 0,
-        val runs: List<CheckRun> = emptyList(),
+        val runs: List<GitHubApi.CheckRun> = emptyList(),
     )
 
     @kotlinx.serialization.Serializable
@@ -998,7 +474,7 @@ interface GitHubApi {
         @kotlinx.serialization.SerialName("completed_at") val completedAt: String? = null,
         @kotlinx.serialization.SerialName("html_url") val htmlUrl: String? = null,
         @kotlinx.serialization.SerialName("details_url") val detailsUrl: String? = null,
-        val app: CheckApp? = null,
+        val app: GitHubApi.CheckApp? = null,
     )
 
     @kotlinx.serialization.Serializable
@@ -1007,32 +483,16 @@ interface GitHubApi {
         @kotlinx.serialization.SerialName("slug") val slug: String? = null,
     )
 
-    /** List workflows (definitions) for a repo. */
-    @GET("repos/{owner}/{repo}/actions/workflows")
-    suspend fun getWorkflows(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-    ): WorkflowsResponse
-
-    /** Trigger a `workflow_dispatch` event for a single workflow. */
-    @POST("repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches")
-    suspend fun dispatchWorkflow(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-        @Path("workflow_id") workflowId: Long,
-        @Body body: WorkflowDispatchRequest,
-    ): retrofit2.Response<Unit>
-
     @kotlinx.serialization.Serializable
     data class WorkflowDispatchRequest(
-        /** Branch or tag name the workflow should run on. */
+        /** GitHubApi.Branch or tag name the workflow should run on. */
         val ref: String,
     )
 
     @kotlinx.serialization.Serializable
     data class WorkflowsResponse(
         @kotlinx.serialization.SerialName("total_count") val totalCount: Int = 0,
-        @kotlinx.serialization.SerialName("workflows") val workflows: List<Workflow> = emptyList(),
+        @kotlinx.serialization.SerialName("workflows") val workflows: List<GitHubApi.Workflow> = emptyList(),
     )
 
     @kotlinx.serialization.Serializable
@@ -1052,7 +512,7 @@ interface GitHubApi {
     @kotlinx.serialization.Serializable
     data class WorkflowRunsResponse(
         @kotlinx.serialization.SerialName("total_count") val totalCount: Int = 0,
-        @kotlinx.serialization.SerialName("workflow_runs") val runs: List<WorkflowRun> = emptyList(),
+        @kotlinx.serialization.SerialName("workflow_runs") val runs: List<GitHubApi.WorkflowRun> = emptyList(),
     )
 
     @kotlinx.serialization.Serializable
@@ -1060,6 +520,8 @@ interface GitHubApi {
         val id: Long = 0,
         @kotlinx.serialization.SerialName("node_id") val nodeId: String? = null,
         val name: String = "",
+        /** Run display title (defaults to the commit message subject on GitHub). */
+        @kotlinx.serialization.SerialName("display_title") val displayTitle: String? = null,
         @kotlinx.serialization.SerialName("head_branch") val headBranch: String? = null,
         @kotlinx.serialization.SerialName("head_sha") val headSha: String? = null,
         val path: String? = null,
@@ -1074,6 +536,13 @@ interface GitHubApi {
         @kotlinx.serialization.SerialName("updated_at") val updatedAt: String? = null,
         @kotlinx.serialization.SerialName("run_started_at") val runStartedAt: String? = null,
         val actor: User? = null,
+        @kotlinx.serialization.SerialName("head_commit")
+        val headCommit: GitHubApi.HeadCommit? = null,
+    )
+
+    @kotlinx.serialization.Serializable
+    data class HeadCommit(
+        val message: String? = null,
     )
 
     @kotlinx.serialization.Serializable
@@ -1104,143 +573,6 @@ interface GitHubApi {
     //  Notifications
     // ──────────────────────────────────────────────
 
-    /** Unread notifications (all). */
-    @GET("notifications")
-    suspend fun getNotifications(
-        @Query("page") page: Int = 1,
-        @Query("per_page") perPage: Int = 50,
-        @Query("all") all: Boolean = false,
-        @Query("participating") participating: Boolean = false,
-    ): List<GitHubNotification>
-
-    /** Mark a thread as read. */
-    @PATCH("notifications/threads/{thread_id}")
-    suspend fun markNotificationRead(
-        @Path("thread_id") threadId: String,
-    ): Response<Unit>
-
-    /** Unsubscribe from a thread (no future notifications for this thread). */
-    @DELETE("notifications/threads/{thread_id}/subscription")
-    suspend fun unsubscribeThread(
-        @Path("thread_id") threadId: String,
-    ): Response<Unit>
-
-    /** Mark all notifications as read. */
-    @PUT("notifications")
-    suspend fun markAllNotificationsRead(): Response<Unit>
-
-    // ──────────────────────────────────────────────
-    //  Activity feed (received_events — for the "Following" feed section)
-    // ──────────────────────────────────────────────
-
-    /** Public activity of a user (works for any public user; private events need the authed user). */
-    @GET("users/{login}/received_events")
-    suspend fun getReceivedEvents(
-        @Path("login") login: String,
-        @Query("per_page") perPage: Int = 30,
-        @Query("page") page: Int = 1,
-    ): List<com.pockethub.data.model.FeedEvent>
-
-    /** Public activity of a single user. */
-    @GET("users/{login}/events")
-    suspend fun getUserEvents(
-        @Path("login") login: String,
-        @Query("per_page") perPage: Int = 30,
-        @Query("page") page: Int = 1,
-    ): List<com.pockethub.data.model.FeedEvent>
-
-    /** Repositories owned/owned by a specific user. */
-    @GET("users/{login}/repos")
-    suspend fun getUserRepositories(
-        @Path("login") login: String,
-        @Query("page") page: Int = 1,
-        @Query("per_page") perPage: Int = 30,
-        @Query("sort") sort: String = "updated",
-        @Query("type") type: String? = null, // owner | member | all
-    ): List<Repository>
-
-    // ──────────────────────────────────────────────
-    //  Trending (unofficial — scraped or search-based)
-    // ──────────────────────────────────────────────
-
-    /**
-     * Generic repo search — single endpoint backing both the Explore feed
-     * (Trending / Featured / For You sections) and the global Search screen.
-     *
-     * GitHub has no official Trending API; the search API is the closest
-     * equivalent. Callers compose the appropriate `created:>/stars:>…` filter
-     * strings and pick `sort`/`order`.
-     */
-    @GET("search/repositories")
-    suspend fun searchTrending(
-        @Query("q") query: String = "stars:>1",
-        @Query("sort") sort: String = "stars",
-        @Query("order") order: String = "desc",
-        @Query("per_page") perPage: Int = 20,
-        @Query("page") page: Int = 1,
-    ): SearchRepoResult
-
-    /** Global search — repositories. */
-    @GET("search/repositories")
-    suspend fun searchRepositories(
-        @Query("q") query: String,
-        @Query("page") page: Int = 1,
-        @Query("per_page") perPage: Int = 20,
-        @Query("sort") sort: String? = null,
-        @Query("order") order: String? = null,
-    ): SearchRepoResult
-
-    /** Global search — users. */
-    @GET("search/users")
-    suspend fun searchUsers(
-        @Query("q") query: String,
-        @Query("page") page: Int = 1,
-        @Query("per_page") perPage: Int = 20,
-        @Query("sort") sort: String? = null,
-        @Query("order") order: String? = null,
-    ): SearchUserResult
-
-    /** Global search — code. */
-    @GET("search/code")
-    suspend fun searchCode(
-        @Query("q") query: String,
-        @Query("page") page: Int = 1,
-        @Query("per_page") perPage: Int = 20,
-    ): SearchCodeResult
-
-    /**
-     * Global search — issues & pull requests (GitHub's /search/issues endpoint
-     * returns both; use `is:issue` / `is:pr` to scope). Backs the Profile work-list
-     * ("Assigned to me", "Mentions me", "Created by me") via qualifier strings like
-     * `assignee:<login> state:open`, `involves:<login>`, `author:<login>`.
-     */
-    @GET("search/issues")
-    suspend fun searchIssues(
-        @Query("q") query: String,
-        @Query("sort") sort: String = "updated",
-        @Query("order") order: String = "desc",
-        @Query("per_page") perPage: Int = 30,
-        @Query("page") page: Int = 1,
-    ): SearchIssueResult
-
-    // ──────────────────────────────────────────────
-    //  Generic / raw endpoint for OAuth token exchange
-    // ──────────────────────────────────────────────
-
-    /** Exchange OAuth code for access token (POST to GitHub, not api.github.com). */
-    @FormUrlEncoded
-    @POST("https://github.com/login/oauth/access_token")
-    suspend fun exchangeOAuthCode(
-        @Field("client_id") clientId: String,
-        @Field("client_secret") clientSecret: String,
-        @Field("code") code: String,
-        @Field("redirect_uri") redirectUri: String,
-    ): OAuthTokenResponse
-
-    // ──────────────────────────────────────────────
-    //  Search result wrappers
-    // ──────────────────────────────────────────────
-
     @kotlinx.serialization.Serializable
     data class SearchRepoResult(
         val total_count: Int = 0,
@@ -1259,7 +591,7 @@ interface GitHubApi {
     data class SearchCodeResult(
         val total_count: Int = 0,
         val incomplete_results: Boolean = false,
-        val items: List<CodeSearchItem> = emptyList(),
+        val items: List<GitHubApi.CodeSearchItem> = emptyList(),
     )
 
     @kotlinx.serialization.Serializable
@@ -1296,28 +628,6 @@ interface GitHubApi {
     @kotlinx.serialization.Serializable
     data class EditReviewCommentRequest(val body: String)
 
-    /** Edit a review comment body. */
-    @PATCH("repos/{owner}/{repo}/pulls/comments/{comment_id}")
-    suspend fun editPullRequestReviewComment(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-        @Path("comment_id") commentId: Long,
-        @Body body: EditReviewCommentRequest,
-    ): ReviewComment
-
-    /** Delete a review comment. */
-    @DELETE("repos/{owner}/{repo}/pulls/comments/{comment_id}")
-    suspend fun deletePullRequestReviewComment(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-        @Path("comment_id") commentId: Long,
-    ): retrofit2.Response<Unit>
-
-    // ──────────────────────────────────────────────
-    //  GraphQL endpoint for thread resolve / unresolve
-    //  (https://docs.github.com/en/graphql)
-    // ──────────────────────────────────────────────
-
     /**
      * Body for a GraphQL query / mutation request.
      *
@@ -1338,7 +648,7 @@ interface GitHubApi {
     @kotlinx.serialization.Serializable
     data class GraphQLResponse(
         val data: kotlinx.serialization.json.JsonObject? = null,
-        val errors: List<GraphQLError>? = null,
+        val errors: List<GitHubApi.GraphQLError>? = null,
     )
 
     @kotlinx.serialization.Serializable
@@ -1347,57 +657,35 @@ interface GitHubApi {
         @kotlinx.serialization.SerialName("type") val type: String? = null,
     )
 
-    /** GraphQL endpoint (currently maps to https://api.github.com/graphql). */
-    @POST("graphql")
-    suspend fun graphQL(@Body body: GraphQLRequest): GraphQLResponse
+    @kotlinx.serialization.Serializable
+    data class ArtifactsResponse(
+        @kotlinx.serialization.SerialName("total_count") val totalCount: Int = 0,
+        val artifacts: List<GitHubApi.Artifact> = emptyList(),
+    )
 
-    // ──────────────────────────────────────────────
-    //  GitHub Actions — workflow run jobs & per-job logs
-    //  (https://docs.github.com/en/rest/actions/workflow-jobs)
-    // ──────────────────────────────────────────────
+    @kotlinx.serialization.Serializable
+    data class Artifact(
+        val id: Long = 0,
+        val name: String = "",
+        @kotlinx.serialization.SerialName("size_in_bytes") val sizeInBytes: Long = 0,
+        @kotlinx.serialization.SerialName("archive_download_url") val archiveDownloadUrl: String = "",
+        val expired: Boolean = false,
+        @kotlinx.serialization.SerialName("created_at") val createdAt: String? = null,
+        @kotlinx.serialization.SerialName("expires_at") val expiresAt: String? = null,
+        @kotlinx.serialization.SerialName("workflow_run") val workflowRun: GitHubApi.ArtifactWorkflowRun? = null,
+    )
 
-    /** List jobs for a specific workflow run. */
-    @GET("repos/{owner}/{repo}/actions/runs/{run_id}/jobs")
-    suspend fun getWorkflowRunJobs(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-        @Path("run_id") runId: Long,
-        @Query("per_page") perPage: Int = 100,
-        @Query("page") page: Int = 1,
-        @Query("filter") filter: String = "latest",
-    ): WorkflowJobsResponse
-
-    /**
-     * Per-job logs endpoint. GitHub responds with HTTP 302 to a signed
-     * objects.githubusercontent.com URL (zip). The retrofit call therefore must
-     * use [retrofit2.Response] to surface the Location header for callers that
-     * want to follow it themselves, or for callers that just want a 302 sentinel.
-     */
-    @GET("repos/{owner}/{repo}/actions/jobs/{job_id}/logs")
-    suspend fun getWorkflowJobLogsUrl(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-        @Path("job_id") jobId: Long,
-    ): retrofit2.Response<Unit>
-
-    @PUT("repos/{owner}/{repo}/actions/runs/{run_id}/cancel")
-    suspend fun cancelWorkflowRun(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-        @Path("run_id") runId: Long,
-    ): retrofit2.Response<Unit>
-
-    @POST("repos/{owner}/{repo}/actions/runs/{run_id}/rerun")
-    suspend fun rerunWorkflowRun(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-        @Path("run_id") runId: Long,
-    ): retrofit2.Response<Unit>
+    @kotlinx.serialization.Serializable
+    data class ArtifactWorkflowRun(
+        val id: Long? = null,
+        @kotlinx.serialization.SerialName("head_branch") val headBranch: String? = null,
+        @kotlinx.serialization.SerialName("head_sha") val headSha: String? = null,
+    )
 
     @kotlinx.serialization.Serializable
     data class WorkflowJobsResponse(
         @kotlinx.serialization.SerialName("total_count") val totalCount: Int = 0,
-        val jobs: List<WorkflowJob> = emptyList(),
+        val jobs: List<GitHubApi.WorkflowJob> = emptyList(),
     )
 
     @kotlinx.serialization.Serializable
@@ -1409,7 +697,7 @@ interface GitHubApi {
         val status: String? = null,              // queued | in_progress | completed
         val conclusion: String? = null,          // success | failure | cancelled | skipped | neutral
         val name: String = "",
-        val steps: List<WorkflowStep> = emptyList(),
+        val steps: List<GitHubApi.WorkflowStep> = emptyList(),
         @kotlinx.serialization.SerialName("html_url") val htmlUrl: String? = null,
         @kotlinx.serialization.SerialName("started_at") val startedAt: String? = null,
         @kotlinx.serialization.SerialName("completed_at") val completedAt: String? = null,

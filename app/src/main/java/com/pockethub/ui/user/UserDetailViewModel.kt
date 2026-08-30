@@ -1,6 +1,7 @@
 package com.pockethub.ui.user
 
 import androidx.lifecycle.ViewModel
+import com.pockethub.util.userMessage
 import androidx.lifecycle.viewModelScope
 import com.pockethub.data.model.FeedEvent
 import com.pockethub.data.model.Repository
@@ -17,6 +18,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class UserDetailViewModel @Inject constructor(
+    private val issueReporter: com.pockethub.data.reporting.IssueReporter,
     private val api: GitHubApi,
     private val cache: CachedRepository,
 ) : ViewModel() {
@@ -76,7 +78,12 @@ class UserDetailViewModel @Inject constructor(
                 // Load repos in parallel
                 launch {
                     try {
-                        _repos.update { cache.getUserRepositories(login, sort = "updated") }
+                        // force=true → straight to the network; otherwise cache-first.
+                        if (force) {
+                            _repos.update { api.getUserRepositories(login, sort = "updated") }
+                        } else {
+                            _repos.update { cache.getUserRepositories(login, sort = "updated") }
+                        }
                     } catch (_: Exception) {
                         // Non-fatal
                     }
@@ -97,6 +104,11 @@ class UserDetailViewModel @Inject constructor(
                         val me = api.getAuthenticatedUser()
                         val self = me.login.equals(login, ignoreCase = true)
                         _isSelf.update { self }
+                        if (self) {
+                            // /users/{login} only returns public counts; the
+                            // /user payload carries private repo totals too.
+                            _user.update { me }
+                        }
                         if (!self) {
                             _isFollowing.update { api.checkFollowing(login).isSuccessful }
                         }
@@ -105,7 +117,8 @@ class UserDetailViewModel @Inject constructor(
                     }
                 }
             } catch (e: Exception) {
-                _error.update { e.localizedMessage ?: "Failed to load user" }
+                issueReporter.reportError("UserDetail", "loadUser", e)
+                _error.update { e.userMessage("Failed to load user") }
             } finally {
                 _isLoading.update { false }
             }

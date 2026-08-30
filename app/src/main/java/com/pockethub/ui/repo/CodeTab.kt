@@ -1,6 +1,7 @@
 package com.pockethub.ui.repo
 
 import com.pockethub.R
+import com.pockethub.util.relativeTime
 import com.pockethub.data.download.DownloadManager
 import com.pockethub.ui.download.DownloadViewModel
 
@@ -33,7 +34,7 @@ import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.FolderZip
-import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.Fullscreen
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -48,6 +49,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -79,6 +81,7 @@ fun CodeTab(
     vm: CodeBrowserViewModel = hiltViewModel(),
 ) {
     val state by vm.state.collectAsState()
+    var showFullViewer by rememberSaveable { mutableStateOf(false) }
 
     // Lazy initialise for this owner/repo pair on first composition.
     androidx.compose.runtime.LaunchedEffect(owner, repo) {
@@ -148,9 +151,9 @@ fun CodeTab(
         }
 
         when {
-            state.isLoading && state.entries.isEmpty() && state.viewingFile == null -> Box(
-                Modifier.fillMaxSize(), contentAlignment = Alignment.Center
-            ) { CircularProgressIndicator() }
+            state.isLoading && state.entries.isEmpty() && state.viewingFile == null -> com.pockethub.ui.components.SkeletonList(
+                Modifier.fillMaxSize(), rows = 8, topPadding = 8.dp,
+            )
 
             state.viewingFile != null -> FileViewerContent(
                 entry = state.viewingFile!!,
@@ -158,6 +161,7 @@ fun CodeTab(
                 isLoading = state.isLoading,
                 onClose = { vm.closeFile() },
                 onDownload = { state.viewingFile?.let { downloadFile(it) } },
+                onFullScreen = { showFullViewer = true },
             )
 
             state.error != null && state.entries.isEmpty() -> Column(
@@ -187,6 +191,10 @@ fun CodeTab(
                 }
             }
         }
+    }
+
+    if (showFullViewer && state.viewingFile != null) {
+        FullScreenFileViewer(vm = vm, onDismiss = { showFullViewer = false })
     }
 }
 
@@ -327,7 +335,12 @@ private fun ContentRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         val icon = if (entry.type == "dir") Icons.Outlined.Folder else Icons.Outlined.Description
-        Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Icon(
+            icon, contentDescription = null,
+            modifier = Modifier.size(18.dp),
+            tint = if (entry.type == "dir") MaterialTheme.colorScheme.tertiary
+                   else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Spacer(Modifier.width(10.dp))
         Text(
             entry.name,
@@ -355,6 +368,7 @@ private fun FileViewerContent(
     isLoading: Boolean,
     onClose: () -> Unit,
     onDownload: () -> Unit,
+    onFullScreen: () -> Unit = {},
 ) {
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
@@ -386,6 +400,14 @@ private fun FileViewerContent(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+                IconButton(onClick = onFullScreen) {
+                    Icon(
+                        Icons.Outlined.Fullscreen,
+                        contentDescription = stringResource(R.string.cd_fullscreen),
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
         if (isLoading) {
@@ -412,38 +434,9 @@ private fun FileViewerContent(
     }
 }
 
-private fun humanReadableSize(bytes: Long): String = when {
-    bytes >= 1_048_576 -> "%.1f MB".format(bytes / 1_048_576.0)
-    bytes >= 1024 -> "%.1f KB".format(bytes / 1024.0)
-    else -> "$bytes B"
-}
-
 /**
- * GitHub-style relative time, e.g. "now", "3 minutes ago", "5 days ago", "2 months ago".
- * Falls back to a short absolute date for anything older than a year.
+ * Files larger than this render without highlighting to keep the UI responsive.
  */
-private fun relativeTime(iso: String): String {
-    val fmt = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US).apply {
-        timeZone = java.util.TimeZone.getTimeZone("UTC")
-    }
-    val then = runCatching { fmt.parse(iso) }.getOrNull() ?: return iso
-    val diffMs = System.currentTimeMillis() - then.time
-    if (diffMs < 0) return "now"
-    val sec = diffMs / 1000
-    if (sec < 60) return "now"
-    val min = sec / 60
-    if (min < 60) return if (min == 1L) "1 minute ago" else "$min minutes ago"
-    val hours = min / 60
-    if (hours < 24) return if (hours == 1L) "1 hour ago" else "$hours hours ago"
-    val days = hours / 24
-    if (days < 30) return if (days == 1L) "1 day ago" else "$days days ago"
-    val months = days / 30
-    if (months < 12) return if (months == 1L) "1 month ago" else "$months months ago"
-    val years = days / 365
-    return if (years == 1L) "1 year ago" else "$years years ago"
-}
-
-/** Files larger than this render without highlighting to keep the UI responsive. */
 private const val HIGHLIGHT_MAX_CHARS = 200_000
 
 /**
@@ -452,7 +445,7 @@ private const val HIGHLIGHT_MAX_CHARS = 200_000
  * of each line.
  */
 @Composable
-private fun SyntaxHighlightedCode(
+internal fun SyntaxHighlightedCode(
     code: String,
     fileName: String,
     modifier: Modifier = Modifier,

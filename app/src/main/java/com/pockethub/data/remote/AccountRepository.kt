@@ -2,7 +2,6 @@ package com.pockethub.data.remote
 
 import com.pockethub.data.local.AccountDao
 import com.pockethub.data.local.AccountEntity
-import com.pockethub.data.local.TokenCipher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject
@@ -14,31 +13,12 @@ import javax.inject.Singleton
 @Singleton
 class AccountRepository @Inject constructor(
     private val accountDao: AccountDao,
-    private val tokenCipher: TokenCipher,
 ) {
     val allAccounts: Flow<List<AccountEntity>> = accountDao.allAccounts()
     val activeAccount: Flow<AccountEntity?> = accountDao.activeAccount()
 
     /** Get the token of the current active account, or empty. */
-    suspend fun getActiveToken(): String {
-        val account = accountDao.getActiveAccountSync() ?: return ""
-        val token = tokenCipher.decrypt(account.token)
-        if (token.isNotBlank() && !account.token.startsWith("v1:")) {
-            accountDao.update(account.copy(token = tokenCipher.encrypt(token)))
-        }
-        return token
-    }
-    suspend fun loginStoredAccount(id: Long): Boolean {
-        val account = accountDao.getById(id) ?: return false
-        val token = tokenCipher.decrypt(account.token)
-        if (token.isBlank()) return false
-        if (!account.token.startsWith("v1:")) accountDao.update(account.copy(token = tokenCipher.encrypt(token)))
-        accountDao.deactivateAll()
-        accountDao.activate(id)
-        return true
-    }
-    /** Log out while retaining the encrypted account for quick re-login. */
-    suspend fun logout() = accountDao.deactivateAll()
+    suspend fun getActiveToken(): String = accountDao.getActiveAccountSync()?.token.orEmpty()
 
     /** Get the current login, or empty. */
     suspend fun getActiveLogin(): String = accountDao.getActiveAccountSync()?.login.orEmpty()
@@ -58,7 +38,7 @@ class AccountRepository @Inject constructor(
                 login = login,
                 name = name,
                 avatarUrl = avatarUrl,
-                token = tokenCipher.encrypt(token),
+                token = token,
                 tokenType = tokenType,
                 isActive = existing.isEmpty(), // first account is active by default
                 scopes = scopes,

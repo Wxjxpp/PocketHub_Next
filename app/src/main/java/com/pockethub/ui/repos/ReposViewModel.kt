@@ -1,6 +1,7 @@
 package com.pockethub.ui.repos
 
 import androidx.lifecycle.ViewModel
+import com.pockethub.util.userMessage
 import androidx.lifecycle.viewModelScope
 import com.pockethub.data.model.Repository
 import com.pockethub.data.remote.AccountRepository
@@ -14,13 +15,14 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-enum class RepoTab { MINE, STARRED }
+enum class ReposTab { MINE, STARRED }
 enum class RepoFilter { ALL, OWNER, MEMBER, PUBLIC, PRIVATE, FORKS }
 
 private const val PER_PAGE = 30
 
 @HiltViewModel
 class ReposViewModel @Inject constructor(
+    private val issueReporter: com.pockethub.data.reporting.IssueReporter,
     private val cache: CachedRepository,
     private val accounts: AccountRepository,
 ) : ViewModel() {
@@ -31,10 +33,15 @@ class ReposViewModel @Inject constructor(
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
+    /** Pull-to-refresh state, kept separate from [isLoading] so the list footer
+     *  (paging) spinner never shows at the same time as the pull indicator. */
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
 
-    var currentTab = MutableStateFlow(RepoTab.MINE)
+    var currentTab = MutableStateFlow(ReposTab.MINE)
     var currentFilter = MutableStateFlow(RepoFilter.ALL)
     var currentPage = 1
         private set
@@ -46,7 +53,7 @@ class ReposViewModel @Inject constructor(
         load()
     }
 
-    fun switchTab(tab: RepoTab) {
+    fun switchTab(tab: ReposTab) {
         currentTab.value = tab
         currentPage = 1
         canLoadMore = true
@@ -66,7 +73,7 @@ class ReposViewModel @Inject constructor(
         load(append = true)
     }
 
-    private fun load(append: Boolean = false) {
+    private fun load(append: Boolean = false, forceFresh: Boolean = false) {
         val page = currentPage
         // A filter or tab switch supersedes the current first-page request. Retrofit
         // cancellation alone is not enough: a completed old response could otherwise
@@ -74,11 +81,11 @@ class ReposViewModel @Inject constructor(
         if (!append) loadJob?.cancel()
         val requestId = ++loadRequestId
         loadJob = viewModelScope.launch {
-            _isLoading.update { true }
+            if (forceFresh && !append) _isRefreshing.value = true else _isLoading.update { true }
             _error.update { null }
             try {
                 val result = when (currentTab.value) {
-                    RepoTab.MINE -> {
+                    ReposTab.MINE -> {
                         val filter = currentFilter.value
                         val type = when (filter) {
                             RepoFilter.OWNER -> "owner"
@@ -90,9 +97,9 @@ class ReposViewModel @Inject constructor(
                             RepoFilter.PRIVATE -> "private"
                             else -> null
                         }
-                        cache.getMyRepositories(page = page, type = type, visibility = vis)
+                        cache.getMyRepositories(page = page, type = type, visibility = vis, forceFresh = forceFresh)
                     }
-                    RepoTab.STARRED -> cache.getStarredRepositories(page = page)
+                    ReposTab.STARRED -> cache.getStarredRepositories(page = page, forceFresh = forceFresh)
                 }
                 if (requestId != loadRequestId) return@launch
                 // Client-side filtering for filters the API can't express.
@@ -108,19 +115,25 @@ class ReposViewModel @Inject constructor(
                 else
                     filtered.size >= PER_PAGE
             } catch (e: Exception) {
+                issueReporter.reportError("Repos", "load", e)
                 if (requestId != loadRequestId) return@launch
-                _error.update { e.localizedMessage ?: "Failed to load" }
+                _error.update { e.userMessage("Failed to load") }
                 // Roll back the page counter so the next loadMore retries this page.
                 if (append && currentPage == page) currentPage--
             } finally {
-                if (requestId == loadRequestId) _isLoading.update { false }
+                if (requestId == loadRequestId) {
+                    if (forceFresh && !append) _isRefreshing.value = false else _isLoading.update { false }
+                }
             }
         }
     }
 
+    /** Cache-friendly reload of page 1 (used on tab re-entry — no forced network). */
+    fun load() = load(false)
+
     fun refresh() {
         currentPage = 1
         canLoadMore = true
-        load()
+        load(forceFresh = true)
     }
 }

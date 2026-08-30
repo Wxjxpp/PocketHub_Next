@@ -38,6 +38,13 @@ class SettingsViewModel @Inject constructor(
     val appStyle: StateFlow<AppStyle?> = settings.appStyle
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
+    val followSystemTheme: StateFlow<Boolean> = settings.followSystemTheme
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun setFollowSystemTheme(on: Boolean) {
+        viewModelScope.launch { settings.setFollowSystemTheme(on) }
+    }
+
     val appLocale: StateFlow<AppLocale> = settings.appLocale
         .map { AppLocale.fromKey(it) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, AppLocale.SYSTEM)
@@ -46,6 +53,10 @@ class SettingsViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Eagerly, "")
 
     val customClientSecret: StateFlow<String> = settings.customClientSecret
+        .stateIn(viewModelScope, SharingStarted.Eagerly, "")
+
+    /** GitHub file-download accelerator prefix (net branch experiment). */
+    val downloadMirrorPrefix: StateFlow<String> = settings.downloadMirrorPrefix
         .stateIn(viewModelScope, SharingStarted.Eagerly, "")
 
     val notifPollMinutes: StateFlow<Int> = settings.notifPollMinutes
@@ -105,6 +116,10 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settings.setCustomOAuthClient(id, secret) }
     }
 
+    fun setDownloadMirrorPrefix(prefix: String) {
+        viewModelScope.launch { settings.setDownloadMirrorPrefix(prefix) }
+    }
+
     fun setNotifPollMinutes(minutes: Int) {
         viewModelScope.launch {
             settings.setNotifPollMinutes(minutes)
@@ -133,6 +148,9 @@ class SettingsViewModel @Inject constructor(
     fun refreshIssueCount() {
         viewModelScope.launch { _issueCount.value = issueReporter.readLog().size }
     }
+
+    /** One-shot read of the local severe-event log for the email report. */
+    suspend fun issueEvents(): List<com.pockethub.data.reporting.IssueEvent> = issueReporter.readLog()
 
     fun setIssueReportEnabled(enabled: Boolean) {
         viewModelScope.launch {

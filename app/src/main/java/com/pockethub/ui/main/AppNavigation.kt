@@ -50,7 +50,7 @@ object Routes {
     const val SEARCH = "search?query={query}"
     const val SETTINGS = "settings"
     const val FEED_SOURCES = "feed_sources"
-    const val REPO_DETAIL = "repo/{owner}/{repo}"
+    const val REPO_DETAIL = "repo/{owner}/{repo}?tab={tab}"
     const val CREATE_ISSUE = "create_issue/{owner}/{repo}"
     const val ISSUE_DETAIL = "repo/{owner}/{repo}/issues/{number}"
     const val PR_DETAIL = "repo/{owner}/{repo}/pulls/{number}"
@@ -60,11 +60,16 @@ object Routes {
     const val HISTORY = "history"
     const val DOWNLOADS = "downloads?tab={tab}"
     const val IMAGE_PREVIEW = "image_preview?url={url}"
+    const val FILE_VIEWER = "repo/{owner}/{repo}/file?path={path}&ref={ref}"
 
     fun downloads(tab: String = "active") = "downloads?tab=$tab"
     fun imagePreview(url: String) = "image_preview?url=" + java.net.URLEncoder.encode(url, "UTF-8")
 
-    fun repoDetail(owner: String, repo: String) = "repo/$owner/$repo"
+    fun repoDetail(owner: String, repo: String, tab: String? = null) =
+        if (tab.isNullOrBlank()) "repo/$owner/$repo" else "repo/$owner/$repo?tab=$tab"
+    fun fileViewer(owner: String, repo: String, path: String, ref: String? = null) =
+        "repo/$owner/$repo/file?path=" + java.net.URLEncoder.encode(path, "UTF-8") +
+            (ref?.let { "&ref=" + java.net.URLEncoder.encode(it, "UTF-8") } ?: "")
     fun createIssue(owner: String, repo: String) = "create_issue/$owner/$repo"
     fun issueDetail(owner: String, repo: String, number: Int) = "repo/$owner/$repo/issues/$number"
     fun prDetail(owner: String, repo: String, number: Int) = "repo/$owner/$repo/pulls/$number"
@@ -99,6 +104,7 @@ object Routes {
 fun PocketHubApp(
     themeMode: ThemeMode,
     appStyle: AppStyle? = null,
+    forceDark: Boolean = false,
     deepLinkUri: Uri? = null,
     onDeepLinkConsumed: () -> Unit = {},
 ) {
@@ -113,6 +119,15 @@ fun PocketHubApp(
     val updateVm: UpdateViewModel = hiltViewModel()
     val updateState by updateVm.state.collectAsState()
     val context = androidx.compose.ui.platform.LocalContext.current
+
+    // Severe-issue diagnostics: record every navigation so a crash/ANR digest
+    // can answer "which screen was the user on?".
+    androidx.compose.runtime.LaunchedEffect(navController) {
+        val reporter = (context.applicationContext as? com.pockethub.PocketHubApp)?.issueReporter
+        navController.addOnDestinationChangedListener { _, dest, _ ->
+            reporter?.breadcrumb("→ ${dest.route ?: dest.label ?: "?"}")
+        }
+    }
 
     // Run the throttled auto-check once on launch — the ViewModel handles the
     // 24h interval and the "ignored version" gates.
@@ -168,7 +183,7 @@ fun PocketHubApp(
         }
     }
 
-    PocketHubTheme(mode = themeMode, styleOverride = appStyle) {
+    PocketHubTheme(mode = themeMode, styleOverride = appStyle, forceDark = forceDark) {
         val imagePreviewOpener = remember<(String) -> Unit> {
             { url -> navController.navigate(Routes.imagePreview(url)) }
         }
@@ -188,10 +203,20 @@ fun PocketHubApp(
             NavHost(
                 navController = navController,
                 startDestination = route,
-                enterTransition = { fadeIn(animationSpec = tween(200)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(200)) },
-                exitTransition = { fadeOut(animationSpec = tween(200)) },
-                popEnterTransition = { fadeIn(animationSpec = tween(200)) },
-                popExitTransition = { fadeOut(animationSpec = tween(200)) + slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(200)) },
+                enterTransition = {
+                    fadeIn(tween(240)) + slideIntoContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Start,
+                        tween(320, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+                    ) { it / 4 }
+                },
+                exitTransition = { fadeOut(tween(180)) },
+                popEnterTransition = { fadeIn(tween(240)) },
+                popExitTransition = {
+                    fadeOut(tween(200)) + slideOutOfContainer(
+                        AnimatedContentTransitionScope.SlideDirection.End,
+                        tween(300, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+                    ) { it / 4 }
+                },
             ) {
                 composable(Routes.LOGIN) {
                     LoginScreen(onLoginSuccess = ::onLoginSuccess)
@@ -273,7 +298,11 @@ fun PocketHubApp(
 
                 composable(
                     Routes.REPO_DETAIL,
-                    arguments = listOf(navArgument("owner") { type = NavType.StringType }, navArgument("repo") { type = NavType.StringType }),
+                    arguments = listOf(
+                        navArgument("owner") { type = NavType.StringType },
+                        navArgument("repo") { type = NavType.StringType },
+                        navArgument("tab") { type = NavType.StringType; nullable = true; defaultValue = null },
+                    ),
                     deepLinks = listOf(navDeepLink { uriPattern = Routes.DEEP_LINK_REPO }),
                 ) { backStackEntry ->
                     val owner = backStackEntry.arguments?.getString("owner") ?: return@composable
@@ -281,7 +310,12 @@ fun PocketHubApp(
                     RepoDetailScreen(
                         owner = owner,
                         repo = repo,
+                        initialTab = backStackEntry.arguments?.getString("tab"),
                         onNavigateToIssue = { n -> navController.navigate(Routes.issueDetail(owner, repo, n)) },
+                        onNavigateToRepoTab = { o, r, tab -> navController.navigate(Routes.repoDetail(o, r, tab)) },
+                        onNavigateToFile = { o, r, path, ref -> navController.navigate(Routes.fileViewer(o, r, path, ref)) },
+                        onNavigateToIssueFull = { o, r, n -> navController.navigate(Routes.issueDetail(o, r, n)) },
+                        onNavigateToPRFull = { o, r, n -> navController.navigate(Routes.prDetail(o, r, n)) },
                         onNavigateToPR = { n -> navController.navigate(Routes.prDetail(owner, repo, n)) },
                         onNavigateToCommit = { sha -> navController.navigate(Routes.commitDetail(owner, repo, sha)) },
                         onNavigateToCreateIssue = { o, r -> navController.navigate(Routes.createIssue(o, r)) },
@@ -312,6 +346,11 @@ fun PocketHubApp(
                         issueNumber = number,
                         onNavigateToRepo = { o, r -> navController.navigate(Routes.repoDetail(o, r)) },
                         onNavigateToUser = { login -> navController.navigate(Routes.userDetail(login)) },
+                        onNavigateToRepoTab = { o, r, tab -> navController.navigate(Routes.repoDetail(o, r, tab)) },
+                        onNavigateToFile = { o, r, path, ref -> navController.navigate(Routes.fileViewer(o, r, path, ref)) },
+                        onNavigateToIssue = { o, r, n -> navController.navigate(Routes.issueDetail(o, r, n)) },
+                        onNavigateToPR = { o, r, n -> navController.navigate(Routes.prDetail(o, r, n)) },
+                        onNavigateToCommit = { o, r, sha -> navController.navigate(Routes.commitDetail(o, r, sha)) },
                         onBack = { navController.popBackStack() },
                     )
                 }
@@ -334,6 +373,11 @@ fun PocketHubApp(
                         prNumber = number,
                         onNavigateToRepo = { o, r -> navController.navigate(Routes.repoDetail(o, r)) },
                         onNavigateToUser = { login -> navController.navigate(Routes.userDetail(login)) },
+                        onNavigateToRepoTab = { o, r, tab -> navController.navigate(Routes.repoDetail(o, r, tab)) },
+                        onNavigateToFile = { o, r, path, ref -> navController.navigate(Routes.fileViewer(o, r, path, ref)) },
+                        onNavigateToIssue = { o, r, n -> navController.navigate(Routes.issueDetail(o, r, n)) },
+                        onNavigateToPR = { o, r, n -> navController.navigate(Routes.prDetail(o, r, n)) },
+                        onNavigateToCommit = { o, r, sha -> navController.navigate(Routes.commitDetail(o, r, sha)) },
                         onBack = { navController.popBackStack() },
                     )
                 }
@@ -394,6 +438,38 @@ fun PocketHubApp(
                         owner = owner,
                         repo = repo,
                         sha = sha,
+                        onNavigateToUser = { login -> navController.navigate(Routes.userDetail(login)) },
+                        onNavigateToRepo = { o, r -> navController.navigate(Routes.repoDetail(o, r)) },
+                        onNavigateToRepoTab = { o, r, tab -> navController.navigate(Routes.repoDetail(o, r, tab)) },
+                        onNavigateToFile = { o, r, path, ref -> navController.navigate(Routes.fileViewer(o, r, path, ref)) },
+                        onNavigateToIssue = { o, r, n -> navController.navigate(Routes.issueDetail(o, r, n)) },
+                        onNavigateToPR = { o, r, n -> navController.navigate(Routes.prDetail(o, r, n)) },
+                        onNavigateToCommit = { o, r, s -> navController.navigate(Routes.commitDetail(o, r, s)) },
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+
+                composable(
+                    Routes.FILE_VIEWER,
+                    arguments = listOf(
+                        navArgument("owner") { type = NavType.StringType },
+                        navArgument("repo") { type = NavType.StringType },
+                        navArgument("path") { type = NavType.StringType },
+                        navArgument("ref") { type = NavType.StringType; nullable = true; defaultValue = null },
+                    ),
+                ) { backStackEntry ->
+                    val owner = backStackEntry.arguments?.getString("owner") ?: return@composable
+                    val repo = backStackEntry.arguments?.getString("repo") ?: return@composable
+                    com.pockethub.ui.repo.FileViewerScreen(
+                        owner = owner,
+                        repo = repo,
+                        path = backStackEntry.arguments?.getString("path").orEmpty(),
+                        ref = backStackEntry.arguments?.getString("ref"),
+                        onNavigateToRepo = { o, r, tab -> navController.navigate(Routes.repoDetail(o, r, tab)) },
+                        onNavigateToFile = { o, r, path, ref -> navController.navigate(Routes.fileViewer(o, r, path, ref)) },
+                        onNavigateToIssue = { o, r, n -> navController.navigate(Routes.issueDetail(o, r, n)) },
+                        onNavigateToPR = { o, r, n -> navController.navigate(Routes.prDetail(o, r, n)) },
+                        onNavigateToCommit = { o, r, sha -> navController.navigate(Routes.commitDetail(o, r, sha)) },
                         onNavigateToUser = { login -> navController.navigate(Routes.userDetail(login)) },
                         onBack = { navController.popBackStack() },
                     )

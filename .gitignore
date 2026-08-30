@@ -18,5 +18,6 @@ signing.properties.bak
 # build.yml uploads the generated APK directly to the GitHub Release.
 apk/*.apk
 
-release.keystore
-signing.properties
+# CI signing inputs remain tracked for the existing release pipeline.
+!release.keystore
+!signing.properties

@@ -1,6 +1,7 @@
 package com.pockethub.ui.search
 
 import androidx.lifecycle.ViewModel
+import com.pockethub.util.userMessage
 import androidx.lifecycle.viewModelScope
 import com.pockethub.data.model.Issue
 import com.pockethub.data.model.Repository
@@ -72,6 +73,7 @@ val COMMON_LANGUAGES: List<String> = listOf(
 
 @HiltViewModel
 class SearchViewModel @Inject constructor(
+    private val issueReporter: com.pockethub.data.reporting.IssueReporter,
     private val api: GitHubApi,
 ) : ViewModel() {
 
@@ -183,8 +185,9 @@ class SearchViewModel @Inject constructor(
                 pages[tab] = 1
                 _searchedQuery.update { q }
             } catch (e: Exception) {
+                issueReporter.reportError("Search", "search", e)
                 if (e is kotlinx.coroutines.CancellationException) throw e
-                _error.update { e.localizedMessage ?: "Search failed" }
+                _error.update { e.userMessage("Search failed") }
                 // Keep previous results visible — the error state only shows when there's
                 // nothing to display.
             } finally {
@@ -251,6 +254,7 @@ class SearchViewModel @Inject constructor(
                 }
                 pages[tab] = nextPage
             } catch (e: Exception) {
+                issueReporter.reportError("Search", "loadMore", e)
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 // Restore the previous page counter so the next scroll attempts the
                 // same page again (otherwise we'd silently skip a page on retry).

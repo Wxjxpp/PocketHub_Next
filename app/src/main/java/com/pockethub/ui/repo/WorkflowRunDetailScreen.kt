@@ -63,9 +63,9 @@ import com.pockethub.R
 import com.pockethub.data.remote.GitHubApi
 import java.text.DateFormat
 import java.util.Date
-import java.util.Locale
-import kotlinx.coroutines.launch
 import java.time.Duration
+import com.pockethub.util.parseIso
+import com.pockethub.util.parseIsoSafe
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -81,6 +81,9 @@ fun WorkflowRunDetailScreen(
     val isLoading by vm.isLoading.collectAsState()
     val error by vm.error.collectAsState()
     val actionMessage by vm.actionMessage.collectAsState()
+    val artifacts by vm.artifacts.collectAsState()
+    val artifactsLoading by vm.artifactsLoading.collectAsState()
+    val artifactsError by vm.artifactsError.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -94,6 +97,7 @@ fun WorkflowRunDetailScreen(
     }
     LaunchedEffect(owner, repo, runId) {
         vm.loadRun(owner, repo, runId)
+        vm.loadArtifacts(owner, repo, runId)
     }
 
     fun open(url: String?) {
@@ -110,11 +114,7 @@ fun WorkflowRunDetailScreen(
                         Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = stringResource(R.string.action_back))
                     }
                 },
-                actions = {
-                    IconButton(onClick = { open(run?.htmlUrl) }) {
-                        Icon(Icons.AutoMirrored.Outlined.OpenInNew, contentDescription = stringResource(R.string.cd_open_in_browser))
-                    }
-                },
+                actions = { },
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -206,6 +206,20 @@ fun WorkflowRunDetailScreen(
                 items(jobs, key = { it.id }) { job ->
                     JobCard(job = job, dateFmt = dateFmt, onOpenLogs = { open(job.htmlUrl) })
                 }
+            }
+
+            item { HorizontalDivider() }
+
+            item {
+                ArtifactsSection(
+                    artifacts = artifacts,
+                    loading = artifactsLoading,
+                    error = artifactsError,
+                    onDownload = { vm.downloadArtifact(owner, repo, runId, it) },
+                    onRetryDownload = { vm.retryArtifactDownload(it) },
+                    onRetryList = { vm.retryArtifacts(owner, repo, runId) },
+                    dateFmt = dateFmt,
+                )
             }
 
             item { Spacer(Modifier.height(40.dp)) }
@@ -372,14 +386,6 @@ private fun stepConclusionColor(c: String?): Color {
         else -> Color(0xFF959DA5)
     }
 }
-
-private fun parseIso(iso: String): Date {
-    return parseIsoSafe(iso) ?: Date()
-}
-
-private fun parseIsoSafe(iso: String): Date? = runCatching {
-    java.util.Date.from(java.time.OffsetDateTime.parse(iso.trim().replace(" ", "T")).toInstant())
-}.getOrNull()
 
 @Composable
 private fun InfoPill(label: String, value: String) {

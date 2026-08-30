@@ -1,5 +1,8 @@
 package com.pockethub.ui.main
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,6 +47,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.Alignment
@@ -54,7 +58,6 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import coil.compose.AsyncImage
 import com.pockethub.R
 import com.pockethub.ui.explore.ExploreScreen
 import com.pockethub.ui.notifications.NotificationsViewModel
@@ -105,7 +108,23 @@ fun HomeScreen(
     Scaffold(
         topBar = {
             androidx.compose.material3.TopAppBar(
-                title = { Text(stringResource(items[selectedTab].labelRes), style = MaterialTheme.typography.titleLarge) },
+                title = {
+                    // Title crossfades+slides when switching tabs.
+                    androidx.compose.animation.AnimatedContent(
+                        targetState = selectedTab,
+                        transitionSpec = {
+                            (androidx.compose.animation.fadeIn(tween(200)) +
+                                androidx.compose.animation.slideInVertically(tween(220)) { it / 3 })
+                                .togetherWith(
+                                    androidx.compose.animation.fadeOut(tween(120)) +
+                                        androidx.compose.animation.slideOutVertically(tween(160)) { -it / 3 }
+                                )
+                        },
+                        label = "topbar_title",
+                    ) { tab ->
+                        Text(stringResource(items[tab].labelRes), style = MaterialTheme.typography.titleLarge)
+                    }
+                },
                 actions = {
                     when (selectedTab) {
                         0, 1 -> IconButton(onClick = { onNavigateToSearch("") }) {
@@ -130,6 +149,20 @@ fun HomeScreen(
             NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
                 items.forEachIndexed { index, item ->
                     val selected = selectedTab == index
+                    // Selected icon pops with a spring; unselected stays quiet.
+                    val iconScale by androidx.compose.animation.core.animateFloatAsState(
+                        targetValue = if (selected) 1.12f else 1f,
+                        animationSpec = androidx.compose.animation.core.spring(
+                            dampingRatio = 0.5f, stiffness = androidx.compose.animation.core.Spring.StiffnessMedium,
+                        ),
+                        label = "nav_icon_scale",
+                    )
+                    val tint by animateColorAsState(
+                        targetValue = if (selected) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        animationSpec = tween(200),
+                        label = "nav_icon_tint",
+                    )
                     NavigationBarItem(
                         selected = selected,
                         onClick = {
@@ -143,13 +176,37 @@ fun HomeScreen(
                                 selectedTab = index
                             }
                         },
+                        colors = androidx.compose.material3.NavigationBarItemDefaults.colors(
+                            selectedIconColor = MaterialTheme.colorScheme.primary,
+                            selectedTextColor = MaterialTheme.colorScheme.primary,
+                            indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
+                        ),
                         icon = {
                             if (index == 2 && unreadCount > 0) {
                                 BadgedBox(badge = { Badge { Text(if (unreadCount > 99) "99+" else unreadCount.toString()) } }) {
-                                    Icon(item.selectedIcon, contentDescription = stringResource(item.labelRes))
+                                    Icon(
+                                        item.selectedIcon, contentDescription = stringResource(item.labelRes),
+                                        tint = tint,
+                                        modifier = Modifier
+                                            .size(26.dp)
+                                            .graphicsLayer {
+                                                scaleX = iconScale
+                                                scaleY = iconScale
+                                            },
+                                    )
                                 }
                             } else {
-                                Icon(if (selected) item.selectedIcon else item.unselectedIcon, contentDescription = stringResource(item.labelRes))
+                                Icon(
+                                    if (selected) item.selectedIcon else item.unselectedIcon,
+                                    contentDescription = stringResource(item.labelRes),
+                                    tint = tint,
+                                    modifier = Modifier
+                                        .size(26.dp)
+                                        .graphicsLayer {
+                                            scaleX = iconScale
+                                            scaleY = iconScale
+                                        },
+                                )
                             }
                         },
                         label = { Text(stringResource(item.labelRes), style = MaterialTheme.typography.labelSmall) },

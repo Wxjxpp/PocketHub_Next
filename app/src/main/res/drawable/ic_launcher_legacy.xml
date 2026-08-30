@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Legacy (pre-API-26) launcher icon: same deep gradient + cat tilted 30°,
+     drawn edge-to-edge at legacy metrics. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <path android:pathData="M0,0h108v108h-108z">
+        <aapt:attr xmlns:aapt="http://schemas.android.com/aapt" name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="0" android:startY="0"
+                android:endX="108" android:endY="108">
+                <item android:offset="0.0" android:color="#FF161B22" />
+                <item android:offset="0.6" android:color="#FF1F2430" />
+                <item android:offset="1.0" android:color="#FF2D3A59" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <group
+        android:pivotX="54"
+        android:pivotY="54"
+        android:rotation="30">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="
+                M54,32
+                C41.85,32 32,41.85 32,54
+                C32,63.79 38.24,72.13 46.94,75.03
+                C48.05,75.23 48.46,74.55 48.46,73.96
+                C48.46,73.44 48.44,71.7 48.43,69.84
+                C42.37,71.14 41.11,67.29 41.11,67.29
+                C40.13,64.79 38.71,64.12 38.71,64.12
+                C36.76,62.78 38.86,62.81 38.86,62.81
+                C41.02,62.96 42.16,65.02 42.16,65.02
+                C44.08,68.28 47.19,67.33 48.42,66.78
+                C48.61,65.39 49.17,64.44 49.78,63.91
+                C45.04,63.37 40.06,61.55 40.06,53.34
+                C40.06,51.01 40.89,49.11 42.2,47.62
+                C41.99,47.08 41.26,44.93 42.42,42
+                C42.42,42 44.23,41.42 48.4,44.23
+                C50.13,43.74 51.98,43.5 53.81,43.49
+                C55.65,43.5 57.5,43.74 59.23,44.23
+                C63.39,41.42 65.2,42 65.2,42
+                C66.37,44.93 65.63,47.08 65.42,47.62
+                C66.74,49.11 67.56,51.01 67.56,53.34
+                C67.56,61.57 62.57,63.36 57.82,63.9
+                C58.58,64.55 59.26,65.83 59.26,67.8
+                C59.26,70.63 59.23,73.25 59.23,73.96
+                C59.23,74.55 59.63,75.24 60.76,75.02
+                C69.45,72.12 76,63.79 76,54
+                C76,41.85 66.15,32 54,32 Z" />
+    </group>
+</vector>

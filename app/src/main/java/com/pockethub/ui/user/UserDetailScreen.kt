@@ -7,6 +7,7 @@ import androidx.compose.ui.res.stringResource
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -78,10 +79,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import coil.compose.AsyncImage
 import com.pockethub.data.model.FeedEvent
 import com.pockethub.data.model.Repository
 import com.pockethub.data.model.User
+import com.pockethub.ui.components.PhAsyncImage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -132,9 +133,7 @@ fun UserDetailScreen(
         },
     ) { padding ->
         if (isLoading && user == null) {
-            Box(Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
+            com.pockethub.ui.components.SkeletonList(Modifier.padding(padding).fillMaxSize(), rows = 8, topPadding = 8.dp)
             return@Scaffold
         }
 
@@ -340,7 +339,7 @@ private fun FollowListSheet(
                         Modifier.fillMaxWidth().clickable { onUserClick(u.login) }.padding(vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        AsyncImage(model = u.avatarUrl, contentDescription = null, modifier = Modifier.size(36.dp).clip(CircleShape))
+                        PhAsyncImage(model = u.avatarUrl, contentDescription = null, modifier = Modifier.size(36.dp).clip(CircleShape))
                         Spacer(Modifier.width(12.dp))
                         Column {
                             Text(u.name ?: "@${u.login}", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
@@ -364,12 +363,26 @@ private fun UserHeader(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(0.dp),
     ) {
-        Column(Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            AsyncImage(
+        Column(
+            Modifier
+                .padding(20.dp)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                            androidx.compose.ui.graphics.Color.Transparent,
+                        )
+                    ),
+                    shape = RoundedCornerShape(20.dp),
+                )
+                .fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            PhAsyncImage(
                 model = user?.avatarUrl,
                 contentDescription = null,
                 modifier = Modifier.size(88.dp).clip(CircleShape)
@@ -435,7 +448,7 @@ private fun UserStatsRow(
     ) {
         StatPill(stringResource(R.string.followers), user?.followers ?: 0, onClick = onFollowersClick)
         StatPill(stringResource(R.string.following), user?.following ?: 0, onClick = onFollowingClick)
-        StatPill(stringResource(R.string.repos), user?.publicRepos ?: 0)
+        StatPill(stringResource(R.string.repos), (user?.publicRepos ?: 0) + (user?.totalPrivateRepos ?: 0))
     }
 }
 
@@ -495,7 +508,7 @@ private fun UserRepoCard(repo: Repository, onClick: () -> Unit) {
     ) {
         Column(Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                AsyncImage(
+                PhAsyncImage(
                     model = repo.owner.avatarUrl,
                     contentDescription = null,
                     modifier = Modifier.size(16.dp).clip(CircleShape),

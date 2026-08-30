@@ -1,19 +1,20 @@
 package com.pockethub.ui.notifications
 
 import androidx.lifecycle.ViewModel
+import com.pockethub.util.userMessage
 import androidx.lifecycle.viewModelScope
 import com.pockethub.data.model.GitHubNotification
-import com.pockethub.data.model.NotificationReason
 import com.pockethub.data.remote.CachedRepository
 import com.pockethub.data.remote.GitHubApi
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.time.OffsetDateTime
 import javax.inject.Inject
+import com.pockethub.util.parseIsoSafe
 
 /**
  * Mirrors GitHub web's three notification tabs. UNREAD pulls the default list
@@ -40,6 +41,7 @@ enum class ReasonFilter(val labelKey: String, val apiValue: String?) {
 
 @HiltViewModel
 class NotificationsViewModel @Inject constructor(
+    private val issueReporter: com.pockethub.data.reporting.IssueReporter,
     private val api: GitHubApi,
     private val cache: CachedRepository,
 ) : ViewModel() {
@@ -59,17 +61,26 @@ class NotificationsViewModel @Inject constructor(
     var currentTab = MutableStateFlow(NotifTab.UNREAD)
     var reasonFilter = MutableStateFlow(ReasonFilter.ALL)
 
+    private var loadJob: Job? = null
+    private var loadRequestId = 0
+
     init { load() }
 
     fun load(all: Boolean? = null) {
         val tab = currentTab.value
         val showAll = all ?: (tab == NotifTab.ALL)
-        viewModelScope.launch {
+        // Cancel any in-flight load: a slow older response (e.g. from a previous
+        // tab) must never land after a newer one, otherwise the spinner is
+        // cleared by stale data or the list shows the wrong tab's content.
+        loadJob?.cancel()
+        val requestId = ++loadRequestId
+        loadJob = viewModelScope.launch {
             _isLoading.update { true }
             _error.update { null }
             try {
                 val participating = (tab == NotifTab.PARTICIPATING)
                 val result = cache.getNotifications(perPage = 80, all = showAll, participating = participating)
+                if (requestId != loadRequestId) return@launch
                 // UNREAD tab falls back to the all=false list and filters to effectively
                 // unread threads client-side; PARTICIPATING / ALL show the server list
                 // as-is (they were already scoped server-side).
@@ -77,9 +88,12 @@ class NotificationsViewModel @Inject constructor(
                     if (tab == NotifTab.UNREAD) result.filter { it.isEffectivelyUnread() } else result
                 }
             } catch (e: Exception) {
-                _error.update { e.localizedMessage ?: "Failed to load notifications" }
+                issueReporter.reportError("Notifications", "load", e)
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                if (requestId != loadRequestId) return@launch
+                _error.update { e.userMessage("Failed to load notifications") }
             } finally {
-                _isLoading.update { false }
+                if (requestId == loadRequestId) _isLoading.update { false }
             }
         }
     }
@@ -110,8 +124,9 @@ class NotificationsViewModel @Inject constructor(
             try {
                 api.markNotificationRead(threadId)
             } catch (e: Exception) {
+                issueReporter.reportError("Notifications", "markRead", e)
                 _notifications.value = before
-                _error.update { e.localizedMessage ?: "Failed to mark read" }
+                _error.update { e.userMessage("Failed to mark read") }
             }
         }
     }
@@ -126,9 +141,10 @@ class NotificationsViewModel @Inject constructor(
                 api.unsubscribeThread(threadId)
                 _actionMessage.update { "Unsubscribed from this thread" }
             } catch (e: Exception) {
+                issueReporter.reportError("Notifications", "unsubscribe", e)
                 // Unsubscribe failed — restore the thread so the user can retry.
                 _notifications.value = before
-                _actionMessage.update { e.localizedMessage ?: "Failed to unsubscribe" }
+                _actionMessage.update { e.userMessage("Failed to unsubscribe") }
             }
         }
     }
@@ -140,9 +156,10 @@ class NotificationsViewModel @Inject constructor(
                 // Reload from cache so the local state reflects the server truth.
                 load(all = currentTab.value == NotifTab.ALL)
             } catch (e: Exception) {
+                issueReporter.reportError("Notifications", "markAllRead", e)
                 // Server still says some are unread; reload rather than pretend it worked.
                 load(all = currentTab.value == NotifTab.ALL)
-                _error.update { e.localizedMessage ?: "Failed to mark all as read" }
+                _error.update { e.userMessage("Failed to mark all as read") }
             }
         }
     }
@@ -160,7 +177,5 @@ class NotificationsViewModel @Inject constructor(
         return updated > lastRead
     }
 
-    private fun parseIso(iso: String?): Long? = try {
-        iso?.let { OffsetDateTime.parse(it.trim().replace("Z", "+00:00")).toInstant().toEpochMilli() }
-    } catch (_: Exception) { null }
+    private fun parseIso(iso: String?): Long? = iso?.let { parseIsoSafe(it)?.time }
 }
