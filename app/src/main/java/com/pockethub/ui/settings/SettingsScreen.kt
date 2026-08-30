@@ -445,6 +445,20 @@ fun SettingsScreen(
         else -> Unit
     }
 }
+private data class MirrorOption(val name: String, val prefix: String)
+private data class MirrorSpeed(val option: MirrorOption, val bytesPerSecond: Long, val code: Int)
+
+private val builtInMirrors = listOf(
+    MirrorOption("gh-proxy.com", "https://gh-proxy.com/"),
+    MirrorOption("v6.gh-proxy.org", "https://v6.gh-proxy.org/"),
+    MirrorOption("ghproxy.net", "https://ghproxy.net/"),
+    MirrorOption("ghp.ci", "https://ghp.ci/"),
+    MirrorOption("github.akams.cn", "https://github.akams.cn/"),
+    MirrorOption("moeyy.cn/gh-proxy", "https://moeyy.cn/gh-proxy/"),
+    MirrorOption("gitproxy.click", "https://gitproxy.click/"),
+    MirrorOption("gh.jiasu.in", "https://gh.jiasu.in/"),
+)
+
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun MirrorPrefixSheet(
@@ -452,33 +466,43 @@ private fun MirrorPrefixSheet(
     onDismiss: () -> Unit,
     onSave: (String) -> Unit,
 ) {
-    var value by rememberSaveable { mutableStateOf(initial) }
-
+    var selected by rememberSaveable { mutableStateOf(initial) }
+    var testing by remember { mutableStateOf(false) }
+    var results by remember { mutableStateOf<List<MirrorSpeed>>(emptyList()) }
+    val scope = rememberCoroutineScope()
+    val sample = "https://github.com/Wxjxpp/PocketHub_Next/archive/refs/heads/main.zip"
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState()) {
         Column(
-            Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-                .imePadding()
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            Modifier.fillMaxWidth().padding(16.dp).imePadding().verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(stringResource(R.string.mirror_prefix_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Text(
-                stringResource(R.string.mirror_prefix_summary),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            Text("选择加速站，测速会实际下载测试数据，而不是只测延迟。测试结果仅代表当前网络。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            builtInMirrors.forEach { option ->
+                val result = results.firstOrNull { it.option == option }
+                ListItem(
+                    headlineContent = { Text(option.name) },
+                    supportingContent = { Text(result?.let { if (it.code in 200..299 && it.bytesPerSecond > 0) "${formatSpeed(it.bytesPerSecond)} · HTTP ${it.code}" else "不可用 · HTTP ${it.code}" } ?: option.prefix) },
+                    leadingContent = { RadioButton(selected == option.prefix, onClick = { selected = option.prefix }) },
+                    modifier = Modifier.clickable { selected = option.prefix },
+                )
+            }
+            ListItem(
+                headlineContent = { Text("直连（关闭加速）") },
+                leadingContent = { RadioButton(selected.isBlank(), onClick = { selected = "" }) },
+                modifier = Modifier.clickable { selected = "" },
             )
-            OutlinedTextField(
-                value = value,
-                onValueChange = { value = it },
-                label = { Text(stringResource(R.string.mirror_prefix_label)) },
-                placeholder = { Text("https://gh-proxy.com/") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { onSave(value.trim()) }) { Text(stringResource(R.string.action_save)) }
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(enabled = !testing, onClick = {
+                    testing = true
+                    scope.launch {
+                        results = withContext(Dispatchers.IO) { builtInMirrors.map { testMirror(it, sample) } }
+                        testing = false
+                    }
+                }) {
+                    if (testing) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) else Text("测速")
+                }
+                Button(onClick = { onSave(selected) }) { Text(stringResource(R.string.action_save)) }
                 OutlinedButton(onClick = { onSave("") }) { Text(stringResource(R.string.action_clear)) }
                 TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
             }
@@ -486,6 +510,37 @@ private fun MirrorPrefixSheet(
         }
     }
 }
+
+private fun testMirror(option: MirrorOption, original: String): MirrorSpeed {
+    val started = System.nanoTime()
+    var bytes = 0L
+    var code = 0
+    runCatching {
+        val connection = java.net.URL(option.prefix + original).openConnection() as java.net.HttpURLConnection
+        connection.connectTimeout = 8_000
+        connection.readTimeout = 12_000
+        connection.instanceFollowRedirects = true
+        code = connection.responseCode
+        if (code in 200..299) connection.inputStream.use { input ->
+            val buffer = ByteArray(32 * 1024)
+            while (System.nanoTime() - started < 5_000_000_000L) {
+                val count = input.read(buffer)
+                if (count <= 0) break
+                bytes += count
+            }
+        }
+        connection.disconnect()
+    }
+    val seconds = ((System.nanoTime() - started).coerceAtLeast(1L)) / 1_000_000_000.0
+    return MirrorSpeed(option, (bytes / seconds).toLong(), code)
+}
+
+private fun formatSpeed(bytesPerSecond: Long): String = when {
+    bytesPerSecond >= 1_048_576 -> "%.1f MB/s".format(bytesPerSecond / 1_048_576.0)
+    bytesPerSecond >= 1024 -> "%.0f KB/s".format(bytesPerSecond / 1024.0)
+    else -> "$bytesPerSecond B/s"
+}
+
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
