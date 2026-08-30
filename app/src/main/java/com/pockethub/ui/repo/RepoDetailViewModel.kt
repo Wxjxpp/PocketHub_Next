@@ -190,6 +190,10 @@ class RepoDetailViewModel @Inject constructor(
     val isLoadingBranches: StateFlow<Boolean> = _isLoadingBranches.asStateFlow()
 
     internal val _readme = MutableStateFlow<String?>(null)
+    // True only AFTER a README fetch finished and found none — the empty
+    // state must never flash while the request is still in flight.
+    internal val _readmeMissing = MutableStateFlow(false)
+    val readmeMissing: StateFlow<Boolean> = _readmeMissing.asStateFlow()
     val readme: StateFlow<String?> = _readme
 
     // ── Translation state ─────────────────────────────────────
@@ -282,6 +286,7 @@ class RepoDetailViewModel @Inject constructor(
                     cache.invalidateRepo(owner, repo)
                     _repo.value = null
                     _readme.value = null
+                    _readmeMissing.value = false
                 }
                 _repo.update { cache.getRepository(owner, repo) }
                 _repo.value?.let { r ->
@@ -362,9 +367,11 @@ class RepoDetailViewModel @Inject constructor(
                 resp.content
             }
             _readme.update { markdown }
+            _readmeMissing.update { markdown.isNullOrBlank() }
             readmeRef = ref
         } catch (_: Exception) {
             _readme.update { null }
+            _readmeMissing.update { true }
         }
     }
 

@@ -428,6 +428,7 @@ fun RepoDetailScreen(
                     repoData,
                     readme,
                     isLoading,
+                    readmeMissing = readmeMissing,
                     translatedReadme = translatedReadme,
                     showTranslated = showTranslated,
                     isTranslating = isTranslating,

@@ -134,6 +134,7 @@ internal fun OverviewTab(
     repoData: Repository?,
     readme: String?,
     isLoading: Boolean,
+    readmeMissing: Boolean = false,
     translatedReadme: String? = null,
     showTranslated: Boolean = false,
     isTranslating: Boolean = false,
@@ -298,9 +299,9 @@ internal fun OverviewTab(
             }
 
             // ── README section ──
-            // Also shown (as an explicit empty state) once the repo is loaded
-            // but has no README — a silent blank tab looked like a bug.
-            val showReadmeSection = readme != null || isLoading || repoData != null
+            // Empty state only when a fetch FINISHED and found nothing
+            // (readmeMissing) — never while the request is still running.
+            val showReadmeSection = readme != null || isLoading || (readmeMissing && repoData != null)
             if (showReadmeSection) {
                 Row(
                     Modifier.fillMaxWidth(),

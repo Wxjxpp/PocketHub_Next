@@ -44,6 +44,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -198,54 +201,102 @@ private fun SwipeDismissHistoryItem(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
-    val state = androidx.compose.material3.rememberSwipeToDismissBoxState(
-        confirmValueChange = { v ->
-            // Keep the row open past the threshold so the delete button is
-            // tappable; actual deletion happens on the button tap.
-            v == androidx.compose.material3.SwipeToDismissBoxValue.EndToStart
-        },
-        positionalThreshold = { width -> width * 0.25f },
-    )
-    androidx.compose.material3.SwipeToDismissBox(
-        state = state,
-        modifier = modifier,
-        enableDismissFromStartToEnd = false,
-        enableDismissFromEndToStart = true,
-        backgroundContent = {
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(Color(0xFFD1242F))
-                    .padding(horizontal = 20.dp, vertical = 12.dp)
-                    .fillMaxHeight(),
-                contentAlignment = Alignment.CenterEnd,
+    // Custom anchored drag instead of SwipeToDismissBox: the row is HARD-CAPPED
+    // at 25% of the screen width, and settling uses a medium spring — lively
+    // release, no visible bounce.
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val maxOffsetPx = with(density) {
+        androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.dp.toPx() * 0.25f
+    }
+    var offsetX by androidx.compose.runtime.remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
+    var open by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+
+    fun settleTo(target: Float) {
+        scope.launch {
+            androidx.compose.animation.core.Animatable(offsetX).animateTo(
+                target,
+                androidx.compose.animation.core.spring(
+                    dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
+                    stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow,
+                ),
+            ) { offsetX = value }
+        }
+    }
+
+    Box(modifier = modifier.fillMaxWidth()) {
+        // Delete affordance behind the card, right-aligned; reveal intensity
+        // (fade + scale) follows the drag distance for a lively feel.
+        Box(
+            Modifier
+                .matchParentSize()
+                .clip(RoundedCornerShape(18.dp))
+                .background(Color(0xFFD1242F)),
+            contentAlignment = Alignment.CenterEnd,
+        ) {
+            val reveal = (-offsetX / maxOffsetPx).coerceIn(0f, 1f)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .padding(end = 20.dp)
+                    .graphicsLayer {
+                        alpha = 0.3f + 0.7f * reveal
+                        scaleX = 0.75f + 0.25f * reveal
+                        scaleY = 0.75f + 0.25f * reveal
+                    }
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable(enabled = open) {
+                        onDelete()
+                        open = false
+                        settleTo(0f)
+                    }
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(10.dp))
-                        .clickable { onDelete() }
-                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                ) {
-                    Icon(
-                        Icons.Outlined.Delete,
-                        contentDescription = stringResource(R.string.action_delete),
-                        tint = androidx.compose.ui.graphics.Color.White,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Spacer(Modifier.width(5.dp))
-                    Text(
-                        stringResource(R.string.action_delete),
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = androidx.compose.ui.graphics.Color.White,
-                    )
-                }
+                Icon(
+                    Icons.Outlined.Delete,
+                    contentDescription = stringResource(R.string.action_delete),
+                    tint = androidx.compose.ui.graphics.Color.White,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    stringResource(R.string.action_delete),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = androidx.compose.ui.graphics.Color.White,
+                )
             }
-        },
-    ) {
-        content()
+        }
+
+        // Foreground card: horizontal drag only, offset hard-capped with a
+        // rubber-band feel (resistance grows as you push past the cap).
+        Box(
+            Modifier
+                .offset { androidx.compose.ui.unit.IntOffset(offsetX.roundToInt(), 0) }
+                .pointerInput(maxOffsetPx) {
+                    androidx.compose.foundation.gestures.detectHorizontalDragGestures(
+                        onDragEnd = {
+                            val target = if (-offsetX > maxOffsetPx * 0.55f) -maxOffsetPx else 0f
+                            open = target != 0f
+                            settleTo(target)
+                        },
+                        onDragCancel = {
+                            open = false
+                            settleTo(0f)
+                        },
+                    ) { change, dragAmount ->
+                        change.consume()
+                        val raw = offsetX + dragAmount
+                        offsetX = when {
+                            raw > 0f -> 0f                          // no rightward swipe
+                            raw < -maxOffsetPx -> -maxOffsetPx - ((-raw - maxOffsetPx) * 0.15f) // rubber band
+                            else -> raw
+                        }
+                    }
+                },
+        ) {
+            content()
+        }
     }
 }
 
