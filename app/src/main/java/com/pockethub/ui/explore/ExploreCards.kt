@@ -125,43 +125,53 @@ internal fun FeedEventCard(
  * signal scrollability) while matching the lists' 16dp horizontal padding.
  * Name-only — no icon, no owner line.
  */
-@Composable
 internal fun PinnedRepoCard(
     slug: String,
     onClick: () -> Unit,
 ) {
     val repo = slug.substringAfter('/', slug)
     val owner = slug.substringBefore('/', "")
-    // Compact avatar+name pill: 3+ fit across a phone screen, so the pinned
-    // row stays one tidy line instead of dominating the explore feed.
+    // Two-plus cards per screen width: avatar + repo name over the owner
+    // handle. Sized against the lists' 32dp padding + one 8dp gap.
+    val screenW = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp
+    val cardWidth = ((screenW - 40) / 2.2f).dp
     Row(
         modifier = Modifier
-            .widthIn(max = 170.dp)
-            .clip(RoundedCornerShape(999.dp))
+            .width(cardWidth)
+            .clip(RoundedCornerShape(14.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
             .border(
                 0.5.dp,
                 MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-                RoundedCornerShape(999.dp),
+                RoundedCornerShape(14.dp),
             )
             .clickable(onClick = onClick)
-            .padding(start = 8.dp, end = 14.dp, top = 7.dp, bottom = 7.dp),
+            .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         PhAsyncImage(
-            model = "https://github.com/$owner.png?size=40",
+            model = "https://github.com/$owner.png?size=80",
             contentDescription = null,
-            modifier = Modifier.size(22.dp).clip(CircleShape),
+            modifier = Modifier.size(34.dp).clip(CircleShape),
         )
-        Spacer(Modifier.width(8.dp))
-        Text(
-            repo,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Medium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
+        Spacer(Modifier.width(10.dp))
+        Column {
+            Text(
+                repo,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                owner,
+                style = MaterialTheme.typography.labelSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 

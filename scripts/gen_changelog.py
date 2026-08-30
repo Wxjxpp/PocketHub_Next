@@ -28,33 +28,47 @@ TYPE_MAP = {
     "chore": "improve",
 }
 
-# Vague but honest phrasing for the no-LLM fallback. Users see one line per
-# change category instead of raw commit subjects — readable, never wrong.
-FALLBACK_BY_TYPE = {
-    "fix":     {"zh": "修复若干已知问题，提升稳定性", "en": "Bug fixes and stability improvements"},
-    "feat":    {"zh": "新增实用功能，完善使用体验", "en": "New features and refinements"},
-    "perf":    {"zh": "多项性能优化，运行更流畅", "en": "Performance improvements"},
-    "improve": {"zh": "优化界面与交互体验", "en": "UI and interaction polish"},
-    "revert":  {"zh": "回退了有问题的改动", "en": "Reverted problematic changes"},
-}
-
-FALLBACK_SUMMARY = {
-    "zh": "本次更新以修复与优化为主，整体体验更加稳定流畅",
-    "en": "This release focuses on fixes and polish for a smoother experience",
-}
+# No-LLM fallback: one item PER COMMIT, phrased from the actual commit
+# subject (scope kept, PR refs stripped). Content stays 1:1 with what this
+# release changed — never a generic line that could describe any release.
+# The zh text keeps the English subject (the app shows it under a Chinese
+# category tag: 修复/新增/提速/优化); configure LLM_API_KEY for polished
+# Chinese summaries.
 
 def fallback_items(commits):
-    types = []
+    items = []
     for c in commits:
         m = re.match(r'^(feat|fix|perf|revert|refactor|improvement|docs|style|test|build|ci|chore)(?:\(([^)]+)\))?\s*[:：]\s*(.+)$', c, re.I)
-        if m:
-            types.append(TYPE_MAP[m.group(1).lower()])
-    if not types:
-        return []
-    # One vague-but-accurate line per category that actually occurred,
-    # ordered by user impact: fixes first, then features, perf, polish.
-    order = ["fix", "feat", "perf", "improve", "revert"]
-    return [{"type": t, **FALLBACK_BY_TYPE[t]} for t in order if t in types]
+        if not m:
+            continue
+        ctype = TYPE_MAP[m.group(1).lower()]
+        scope = m.group(2) or ""
+        msg = m.group(3).strip().replace("`", "")
+        msg = re.sub(r'\s*\(#\d+\)$', '', msg)
+        en = (scope + ": " + msg) if scope else msg
+        if len(en) > 90:
+            en = en[:87] + "…"
+        items.append({"type": ctype, "zh": en, "en": en})
+    seen, dedup = set(), []
+    for it in items:
+        if it["en"] in seen:
+            continue
+        seen.add(it["en"])
+        dedup.append(it)
+    return dedup[:8]
+
+
+def fallback_summary(items):
+    if not items:
+        return {"zh": "例行维护更新", "en": "Routine maintenance update"}
+    counts = {}
+    for it in items:
+        counts[it["type"]] = counts.get(it["type"], 0) + 1
+    label = {"fix": "问题修复", "feat": "新功能", "perf": "性能优化",
+             "improve": "体验优化", "revert": "改动回退"}
+    parts = [f"{label[t]} {n} 项" for t, n in counts.items()]
+    return {"zh": "本次更新包含 " + "、".join(parts),
+            "en": "This release ships " + ", ".join(f"{n} {t}" for t, n in counts.items())}
 
 LLM_PROMPT = """You write the "what's new" notes for PocketHub, a GitHub client app for Android.
 Below are the commit messages of one release.
@@ -135,7 +149,8 @@ def main():
     except Exception as e:
         print(f"LLM summary failed, falling back: {e}", file=sys.stderr)
     if not out:
-        out = {"summary": FALLBACK_SUMMARY, "items": fallback_items(commits)}
+        fb = fallback_items(commits)
+        out = {"summary": fallback_summary(fb), "items": fb}
     json.dump(out, sys.stdout, ensure_ascii=False, separators=(",", ":"))
 
 if __name__ == "__main__":
