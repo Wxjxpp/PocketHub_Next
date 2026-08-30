@@ -388,12 +388,26 @@ internal fun OverviewTab(
                 // README content — show translated or original
                 val displayReadme = if (showTranslated && translatedReadme != null) translatedReadme else readme
                 if (displayReadme != null) {
+                    // Gallery of all image URLs in the rendered document — each
+                    // raw src resolved exactly like MarkdownText resolves it, so
+                    // the tapped URL matches an entry and the full-screen preview
+                    // can swipe between them.
+                    val imageResolver = com.pockethub.ui.markdown.rememberImageResolver("$owner/$repo", repoData?.defaultBranch)
+                    val imageGallery = remember(displayReadme, repoData?.defaultBranch) {
+                        Regex("""!\[[^\]]*\]\(\s*([^)\s]+)""")
+                            .findAll(displayReadme)
+                            .mapNotNull { m -> m.groupValues[1].takeIf { it.isNotBlank() } }
+                            .map { imageResolver(it) }
+                            .distinct()
+                            .toList()
+                    }
                     MarkdownText(
                         markdown = displayReadme,
                         modifier = Modifier.fillMaxWidth(),
                         repoContext = "$owner/$repo",
                         defaultBranch = repoData?.defaultBranch,
                         onLinkClick = onLinkClick,
+                        imageGallery = imageGallery,
                     )
                 } else if (isLoading) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
