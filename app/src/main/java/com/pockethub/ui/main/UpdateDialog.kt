@@ -203,6 +203,7 @@ private fun ChangelogSection(notes: String) {
     // Content is already locale-split and polished — no runtime translation.
     val structured = remember(notes) { parseStructuredChangelog(notes) }
     val tags = ChangelogTags(
+        summary = stringResource(R.string.tag_summary),
         new = stringResource(R.string.tag_new),
         fix = stringResource(R.string.tag_fix),
         improved = stringResource(R.string.tag_improved),
@@ -263,6 +264,12 @@ private fun ChangelogSection(notes: String) {
         }
     }
     if (items.isEmpty()) return
+    val display = buildList {
+        parseStructuredSummary(notes, isZh)?.let {
+            add(ChangeItem(tag = tags.summary, text = it, tagColor = Color(0xFF3FB950)))
+        }
+        addAll(items)
+    }
 
     Column {
         Text(
@@ -282,7 +289,7 @@ private fun ChangelogSection(notes: String) {
                 .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            items.forEachIndexed { i, item ->
+            display.forEachIndexed { i, item ->
                 if (i > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f), thickness = 0.5.dp)
                 Row(verticalAlignment = Alignment.Top) {
                     Text(
@@ -474,8 +481,26 @@ private fun parseStructuredChangelog(notes: String): List<org.json.JSONObject> {
     }.getOrDefault(emptyList())
 }
 
+/** One-line theme of the release ("本次更新聚焦…"), localized like the items. */
+private fun parseStructuredSummary(notes: String, isZh: Boolean): String? {
+    val marker = "<!--pockethub-changelog"
+    val start = notes.indexOf(marker)
+    if (start == -1) return null
+    val jsonStart = notes.indexOf('{', start)
+    val end = notes.indexOf("-->", jsonStart)
+    if (jsonStart == -1 || end == -1) return null
+    return runCatching {
+        val obj = org.json.JSONObject(notes.substring(jsonStart, end).trim())
+        val sm = obj.optJSONObject("summary") ?: return@runCatching null
+        val text = (if (isZh) sm.optString("zh", "") else sm.optString("en", ""))
+            .ifBlank { sm.optString("en", sm.optString("zh", "")) }
+        text.ifBlank { null }
+    }.getOrNull()
+}
+
 /** Localized changelog category tags (resolved from string resources). */
 private data class ChangelogTags(
+    val summary: String,
     val new: String,
     val fix: String,
     val improved: String,

@@ -47,6 +47,7 @@
     <string name="update_checking">Checking for updates…</string>
     <!-- Changelog tags in the update dialog -->
     <string name="tag_new">New</string>
+    <string name="tag_summary">Highlights</string>
     <string name="tag_fix">Fixed</string>
     <string name="tag_improved">Improved</string>
     <string name="tag_faster">Faster</string>

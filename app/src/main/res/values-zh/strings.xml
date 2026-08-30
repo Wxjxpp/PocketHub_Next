@@ -560,6 +560,7 @@
     <string name="update_checking">正在检查更新…</string>
     <!-- Changelog tags in the update dialog -->
     <string name="tag_new">新增</string>
+    <string name="tag_summary">概要</string>
     <string name="tag_fix">修复</string>
     <string name="tag_improved">优化</string>
     <string name="tag_faster">提速</string>
