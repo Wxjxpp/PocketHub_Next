@@ -66,6 +66,14 @@ class DownloadManager @Inject constructor(
 
     init {
         scope.launch {
+            // The app may have been killed mid-download: any rows left in
+            // IN_PROGRESS are stale. Reset them to QUEUED so the next drain
+            // resumes them (the .part file on disk is kept for byte-range
+            // resume). Runs before the drain loop so the first pass sees them.
+            val stale = dao.flowByStates(listOf("IN_PROGRESS")).first()
+            stale.forEach {
+                dao.upsert(it.copy(status = "QUEUED", errorMsg = "", updatedAt = System.currentTimeMillis()))
+            }
             for (ignored in queueSignals) drainQueue()
         }
         queueSignals.trySend(Unit)
@@ -104,17 +112,22 @@ class DownloadManager @Inject constructor(
         runNextIfIdle()
     }
 
-    suspend fun retry(url: String) {
+    /**
+     * Re-queue a failed/cancelled download. The `.part` file is kept so
+     * [executeDownload] resumes from the already-downloaded bytes via an HTTP
+     * Range request; pass [fromScratch] = true (long-press "restart" style
+     * actions) to delete it and start over.
+     */
+    suspend fun retry(url: String, fromScratch: Boolean = false) {
         cancelledUrls.remove(url)
         val existing = dao.byUrl(url) ?: return
-        destFileOrNull(existing)?.delete()
+        if (fromScratch) destFileOrNull(existing)?.let { f ->
+            File(f.parentFile, "${f.name}.part").delete()
+        }
         dao.upsert(
             existing.copy(
                 status = "QUEUED",
-                downloadedBytes = 0,
-                progressPct = 0,
                 errorMsg = "",
-                createdAt = System.currentTimeMillis(),
                 updatedAt = System.currentTimeMillis(),
             )
         )
@@ -128,7 +141,10 @@ class DownloadManager @Inject constructor(
             currentCall?.cancel()
             currentJob?.cancel()
         }
-        destFileOrNull(existing)?.delete()
+        destFileOrNull(existing)?.let {
+            it.delete()
+            File(it.parentFile, "${it.name}.part").delete()
+        }
         dao.deleteByUrl(url)
         runNextIfIdle()
     }
@@ -204,10 +220,15 @@ class DownloadManager @Inject constructor(
      *   bare [redirectClient] with no auth header attached.
      *
      * Returns the final call (usable for cancellation) and its response.
+     *
+     * When [rangeHeader] is non-null (byte-range resume), it is attached to
+     * every hop — the signed redirect targets accept Range requests and the
+     * bare client must carry the header explicitly because requests are
+     * rebuilt per hop.
      */
-    private fun openDownload(url: String): Pair<Call, Response> {
+    private fun openDownload(url: String, rangeHeader: String? = null): Pair<Call, Response> {
         var call = client.newBuilder().followRedirects(false).build()
-            .newCall(Request.Builder().url(url).build())
+            .newCall(Request.Builder().url(url).apply { rangeHeader?.let(::header) }.build())
         currentCall = call
         var response = call.execute()
         var hops = 0
@@ -215,7 +236,7 @@ class DownloadManager @Inject constructor(
             val nextUrl = response.header("Location")?.let { response.request.url.resolve(it) }
             response.close()
             if (nextUrl == null) throw IOException("Redirect missing Location header")
-            call = redirectClient.newCall(Request.Builder().url(nextUrl).build())
+            call = redirectClient.newCall(Request.Builder().url(nextUrl).apply { rangeHeader?.let(::header) }.build())
             currentCall = call
             response = call.execute()
             hops++
@@ -232,56 +253,87 @@ class DownloadManager @Inject constructor(
         val destFile = File(targetFile.parentFile, "${targetFile.name}.part")
         val job = scope.launch(start = CoroutineStart.LAZY) {
             try {
-                val (call, response) = openDownload(url)
-                currentCall = call
-                response.use {
-                    if (!it.isSuccessful) {
-                        dao.upsert(entity.copy(status = "FAILED", errorMsg = "HTTP ${it.code}", updatedAt = System.currentTimeMillis()))
-                        return@launch
+                var attempt = 0
+                while (true) {
+                    attempt++
+                    // Byte-range resume: a leftover .part file (from a previous
+                    // failure, cancel or app kill) requests only the missing
+                    // tail. 206 → append; 200 → server ignored Range, restart.
+                    val baseBytes = if (destFile.exists()) destFile.length() else 0L
+                    val (call, response) = openDownload(
+                        url, if (baseBytes > 0) "bytes=$baseBytes-" else null,
+                    )
+                    currentCall = call
+
+                    // Stale part that can no longer be satisfied (content
+                    // changed server-side or the part was already complete):
+                    // drop it and restart from scratch — exactly once, so a
+                    // persisting 416 fails cleanly below.
+                    if (response.code == 416 && baseBytes > 0 && attempt == 1) {
+                        response.close()
+                        destFile.delete()
+                        continue
                     }
 
-                    val totalBytes = it.body?.contentLength()?.takeIf { size -> size > 0 } ?: entity.sizeBytes
-                    val body = it.body ?: throw IOException("No body in response")
-                    dao.upsert(entity.copy(status = "IN_PROGRESS", sizeBytes = totalBytes, updatedAt = System.currentTimeMillis()))
+                    response.use {
+                        if (!it.isSuccessful) {
+                            dao.upsert(entity.copy(status = "FAILED", errorMsg = "HTTP ${it.code}", updatedAt = System.currentTimeMillis()))
+                            return@launch
+                        }
 
-                    body.byteStream().use { input ->
-                        destFile.outputStream().use { output ->
-                            val buffer = ByteArray(16 * 1024)
-                            var totalRead = 0L
-                            var lastReported = 0L
-                            while (true) {
-                                val read = input.read(buffer)
-                                if (read == -1) break
-                                output.write(buffer, 0, read)
-                                totalRead += read
-                                if (totalRead - lastReported >= 100 * 1024) {
-                                    val progress = if (totalBytes > 0) ((totalRead * 100) / totalBytes).toInt() else 0
-                                    dao.upsert(entity.copy(status = "IN_PROGRESS", downloadedBytes = totalRead, progressPct = progress.coerceIn(0, 100), updatedAt = System.currentTimeMillis()))
-                                    lastReported = totalRead
+                        val resume = it.code == 206 && baseBytes > 0
+                        val alreadyBytes = if (resume) baseBytes else 0L
+                        val totalBytes = when {
+                            it.code == 206 -> it.header("Content-Range")
+                                ?.let { r -> Regex("bytes .*/(\\d+)").find(r)?.groupValues?.get(1)?.toLong() }
+                                ?: (baseBytes + (it.body?.contentLength()?.takeIf { len -> len > 0 } ?: 0L))
+                            else -> it.body?.contentLength()?.takeIf { size -> size > 0 } ?: entity.sizeBytes
+                        }
+                        val body = it.body ?: throw IOException("No body in response")
+                        dao.upsert(entity.copy(status = "IN_PROGRESS", sizeBytes = totalBytes, updatedAt = System.currentTimeMillis()))
+
+                        body.byteStream().use { input ->
+                            destFile.outputStream(append = resume).use { output ->
+                                val buffer = ByteArray(16 * 1024)
+                                var read = 0L
+                                var lastReported = 0L
+                                while (true) {
+                                    val n = input.read(buffer)
+                                    if (n == -1) break
+                                    output.write(buffer, 0, n)
+                                    read += n
+                                    if (read - lastReported >= 100 * 1024) {
+                                        val downloaded = alreadyBytes + read
+                                        val progress = if (totalBytes > 0) ((downloaded * 100) / totalBytes).toInt() else 0
+                                        dao.upsert(entity.copy(status = "IN_PROGRESS", downloadedBytes = downloaded, progressPct = progress.coerceIn(0, 100), updatedAt = System.currentTimeMillis()))
+                                        lastReported = read
+                                    }
                                 }
                             }
                         }
-                    }
 
-                    if (targetFile.exists()) targetFile.delete()
-                    if (!destFile.renameTo(targetFile)) {
-                        destFile.copyTo(targetFile, overwrite = true)
-                        destFile.delete()
+                        if (targetFile.exists()) targetFile.delete()
+                        if (!destFile.renameTo(targetFile)) {
+                            destFile.copyTo(targetFile, overwrite = true)
+                            destFile.delete()
+                        }
+                        dao.upsert(entity.copy(status = "DONE", downloadedBytes = totalBytes, progressPct = 100, updatedAt = System.currentTimeMillis()))
+                        // Mirror into the user-chosen download folder (best-effort;
+                        // the app-private copy above stays authoritative for APK
+                        // install / artifact extraction flows).
+                        exportToUserFolder(entity, targetFile)
                     }
-                    dao.upsert(entity.copy(status = "DONE", downloadedBytes = totalBytes, progressPct = 100, updatedAt = System.currentTimeMillis()))
-                    // Mirror into the user-chosen download folder (best-effort;
-                    // the app-private copy above stays authoritative for APK
-                    // install / artifact extraction flows).
-                    exportToUserFolder(entity, targetFile)
+                    break
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
-                destFile.delete()
+                // Keep the .part file — retry resumes from it; cancel() deletes
+                // it explicitly for user-requested removals.
                 if (!cancelledUrls.remove(url)) {
                     dao.upsert(entity.copy(status = "FAILED", errorMsg = "Cancelled", updatedAt = System.currentTimeMillis()))
                 }
                 throw e
             } catch (e: Throwable) {
-                destFile.delete()
+                // Keep the .part file so retry() can byte-range resume.
                 if (!cancelledUrls.remove(url)) {
                     val message = e.userMessage(e.javaClass.simpleName)
                     dao.upsert(entity.copy(status = "FAILED", errorMsg = message, updatedAt = System.currentTimeMillis()))
