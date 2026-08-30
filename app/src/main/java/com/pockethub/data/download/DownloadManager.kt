@@ -227,8 +227,10 @@ class DownloadManager @Inject constructor(
      * rebuilt per hop.
      */
     private fun openDownload(url: String, rangeHeader: String? = null): Pair<Call, Response> {
+        val baseReq = Request.Builder().url(url)
+        if (rangeHeader != null) baseReq.header("Range", rangeHeader)
         var call = client.newBuilder().followRedirects(false).build()
-            .newCall(Request.Builder().url(url).apply { rangeHeader?.let { header(it) } }.build())
+            .newCall(baseReq.build())
         currentCall = call
         var response = call.execute()
         var hops = 0
@@ -236,7 +238,9 @@ class DownloadManager @Inject constructor(
             val nextUrl = response.header("Location")?.let { response.request.url.resolve(it) }
             response.close()
             if (nextUrl == null) throw IOException("Redirect missing Location header")
-            call = redirectClient.newCall(Request.Builder().url(nextUrl).apply { rangeHeader?.let { header(it) } }.build())
+            val hopReq = Request.Builder().url(nextUrl)
+            if (rangeHeader != null) hopReq.header("Range", rangeHeader)
+            call = redirectClient.newCall(hopReq.build())
             currentCall = call
             response = call.execute()
             hops++
