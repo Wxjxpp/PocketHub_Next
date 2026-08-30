@@ -374,6 +374,12 @@ fun RepoDetailScreen(
             }
 
             val tabs = RepoTab.entries
+            // Double-tap detection: two taps on the same tab within 400ms open
+            // that tab's GitHub web page. The first tap of the pair still
+            // performs the normal tab switch, so a double-tap on an inactive
+            // tab lands on the tab AND opens the web view.
+            var lastTapTab by remember { mutableStateOf<RepoTab?>(null) }
+            var lastTapAt by remember { mutableStateOf(0L) }
             ScrollableTabRow(selectedTabIndex = tabs.indexOf(tab), edgePadding = 0.dp) {
                 tabs.forEach { current ->
                     val label = when (current) {
@@ -387,7 +393,25 @@ fun RepoDetailScreen(
                     }
                     Tab(
                         selected = tab == current,
-                        onClick = { vm.currentTab.value = current },
+                        onClick = {
+                            val now = android.os.SystemClock.elapsedRealtime()
+                            if (lastTapTab == current && now - lastTapAt < 400) {
+                                lastTapTab = null
+                                val url = repoTabWebUrl(
+                                    current, owner, repo,
+                                    repoData?.defaultBranch,
+                                    vm.issueStateFilter.value,
+                                    vm.prStateFilter.value,
+                                )
+                                runCatching {
+                                    context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url)))
+                                }
+                            } else {
+                                lastTapTab = current
+                                lastTapAt = now
+                                vm.currentTab.value = current
+                            }
+                        },
                         text = { Text(label, style = MaterialTheme.typography.labelMedium) },
                     )
                 }
@@ -745,5 +769,41 @@ internal fun guessAssetMime(name: String): String {
         "webp" -> "image/webp"
         "md" -> "text/markdown"
         else -> "application/octet-stream"
+    }
+}
+
+/**
+ * GitHub web URL for a repo tab, carrying the tab's live filter state so the
+ * browser lands on the same view the user is looking at: the Code / Commits
+ * tabs follow the current default branch, Issues / PRs carry their open /
+ * closed / merged filter as the `q` query param.
+ */
+internal fun repoTabWebUrl(
+    tab: RepoTab,
+    owner: String,
+    repo: String,
+    defaultBranch: String?,
+    issueFilter: IssueStateFilter,
+    prFilter: PRStateFilter,
+): String {
+    val base = "https://github.com/$owner/$repo"
+    val branch = defaultBranch?.takeIf { it.isNotBlank() } ?: "main"
+    return when (tab) {
+        RepoTab.OVERVIEW -> base
+        RepoTab.CODE -> "$base/tree/$branch"
+        RepoTab.ISSUES -> when (issueFilter) {
+            IssueStateFilter.OPEN -> "$base/issues?q=is%3Aopen+is%3Aissue"
+            IssueStateFilter.CLOSED -> "$base/issues?q=is%3Aclosed+is%3Aissue"
+            IssueStateFilter.ALL -> "$base/issues"
+        }
+        RepoTab.PRS -> when (prFilter) {
+            PRStateFilter.OPEN -> "$base/pulls?q=is%3Apr+is%3Aopen"
+            PRStateFilter.CLOSED -> "$base/pulls?q=is%3Apr+is%3Aclosed"
+            PRStateFilter.MERGED -> "$base/pulls?q=is%3Apr+is%3Amerged"
+            PRStateFilter.ALL -> "$base/pulls"
+        }
+        RepoTab.RELEASES -> "$base/releases"
+        RepoTab.COMMITS -> "$base/commits/$branch"
+        RepoTab.WORKFLOWS -> "$base/actions"
     }
 }
