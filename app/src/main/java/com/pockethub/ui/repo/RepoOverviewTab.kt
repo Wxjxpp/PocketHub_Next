@@ -376,20 +376,24 @@ internal fun OverviewTab(
                         Text(stringResource(R.string.readme_loading), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 } else {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(vertical = 8.dp),
+                    // Empty state: centered in the remaining space, icon over text.
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .fillParentHeightIfPossible(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
                     ) {
                         Icon(
                             Icons.Outlined.Description,
                             contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(40.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
                         )
-                        Spacer(Modifier.width(8.dp))
+                        Spacer(Modifier.height(12.dp))
                         Text(
                             stringResource(R.string.readme_empty),
-                            style = MaterialTheme.typography.bodySmall,
+                            style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
@@ -398,6 +402,14 @@ internal fun OverviewTab(
             Spacer(Modifier.height(40.dp))
         }
     }
+}
+
+
+/** Fill the space left under the info card so the empty state can center. */
+@Composable
+private fun Modifier.fillParentHeightIfPossible(): Modifier {
+    val screenH = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp
+    return height(screenH * 0.55f)
 }
 
 /** Small icon+value stat used in the overview info card. */

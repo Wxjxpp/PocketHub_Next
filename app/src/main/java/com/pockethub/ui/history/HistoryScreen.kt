@@ -24,6 +24,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.ForkRight
+import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -45,6 +47,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -101,7 +104,7 @@ fun HistoryScreen(
                             // Header: avatar + owner — mirrors RepositoryRow on the repos tab.
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 PhAsyncImage(
-                                    model = "https://github.com/${entry.owner}.png?size=80",
+                                    model = entry.avatarUrl ?: "https://github.com/${entry.owner}.png?size=80",
                                     contentDescription = null,
                                     modifier = Modifier.size(28.dp).clip(CircleShape),
                                 )
@@ -125,15 +128,49 @@ fun HistoryScreen(
                                 color = MaterialTheme.colorScheme.onSurface,
                             )
 
-                            Spacer(Modifier.height(8.dp))
-
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    Icons.Outlined.History, null,
-                                    modifier = Modifier.size(13.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            entry.description?.takeIf { it.isNotBlank() }?.let { desc ->
+                                Spacer(Modifier.height(8.dp))
+                                Text(
+                                    text = desc,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 2,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                    lineHeight = 18.sp,
                                 )
-                                Spacer(Modifier.width(5.dp))
+                            }
+
+                            Spacer(Modifier.height(12.dp))
+
+                            // Meta: language dot · stars · forks · last visit
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                            ) {
+                                entry.language?.let { lang ->
+                                    val color = com.pockethub.ui.components.parseColorHex(
+                                        com.pockethub.ui.components.languageColorHex(lang),
+                                    ) ?: MaterialTheme.colorScheme.outline
+                                    Box(Modifier.size(10.dp).clip(CircleShape).background(color))
+                                    Text(
+                                        lang,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Outlined.Star, null, modifier = Modifier.size(13.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(com.pockethub.util.formatCount(entry.stars ?: 0), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Outlined.ForkRight, null, modifier = Modifier.size(13.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(com.pockethub.util.formatCount(entry.forks ?: 0), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                Spacer(Modifier.weight(1f))
+                                Icon(Icons.Outlined.History, null, modifier = Modifier.size(13.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Spacer(Modifier.width(4.dp))
                                 Text(
                                     formatAgo(entry.visitedAt),
                                     style = MaterialTheme.typography.labelSmall,
@@ -167,7 +204,7 @@ private fun SwipeDismissHistoryItem(
             // tappable; actual deletion happens on the button tap.
             v == androidx.compose.material3.SwipeToDismissBoxValue.EndToStart
         },
-        positionalThreshold = { width -> width * 0.45f },
+        positionalThreshold = { width -> width * 0.25f },
     )
     androidx.compose.material3.SwipeToDismissBox(
         state = state,

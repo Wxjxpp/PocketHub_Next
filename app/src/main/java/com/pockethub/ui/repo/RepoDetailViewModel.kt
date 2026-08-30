@@ -284,7 +284,22 @@ class RepoDetailViewModel @Inject constructor(
                     _readme.value = null
                 }
                 _repo.update { cache.getRepository(owner, repo) }
-                history.recordVisit(owner, repo)
+                _repo.value?.let { r ->
+                    history.recordVisit(
+                        owner,
+                        repo,
+                        com.pockethub.data.remote.HistoryEntry(
+                            owner = owner,
+                            repo = repo,
+                            visitedAt = 0L,
+                            avatarUrl = r.owner.avatarUrl,
+                            description = r.description,
+                            stars = r.stars,
+                            forks = r.forks,
+                            language = r.language,
+                        ),
+                    )
+                }
                 loadReadme(owner, repo)
                 checkStar(owner, repo)
                 checkWatch(owner, repo)

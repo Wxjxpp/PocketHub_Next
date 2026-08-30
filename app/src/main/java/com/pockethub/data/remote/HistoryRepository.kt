@@ -32,11 +32,12 @@ class HistoryRepository @Inject constructor(
         prefs[key]?.let { Json.decodeFromString(it) } ?: emptyList()
     }
 
-    suspend fun recordVisit(owner: String, repo: String) {
+    suspend fun recordVisit(owner: String, repo: String, snapshot: HistoryEntry? = null) {
         context.dataStore.edit { prefs ->
             val current = prefs[key]?.let { Json.decodeFromString<List<HistoryEntry>>(it) } ?: emptyList()
             val trimmed = current.filterNot { it.owner == owner && it.repo == repo }
-            val updated = listOf(HistoryEntry(owner, repo, System.currentTimeMillis())) + trimmed
+            val updated = listOf((snapshot ?: HistoryEntry(owner, repo, System.currentTimeMillis()))
+                .copy(owner = owner, repo = repo, visitedAt = System.currentTimeMillis())) + trimmed
             prefs[key] = Json.encodeToString(updated.take(MAX_ENTRIES))
         }
     }
@@ -63,4 +64,11 @@ data class HistoryEntry(
     val owner: String,
     val repo: String,
     val visitedAt: Long,
+    // Snapshot fields so the history list can render rich rows without
+    // re-fetching every repo. Optional → old entries decode fine.
+    val avatarUrl: String? = null,
+    val description: String? = null,
+    val stars: Int? = null,
+    val forks: Int? = null,
+    val language: String? = null,
 )
