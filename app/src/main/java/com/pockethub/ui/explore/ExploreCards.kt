@@ -5,6 +5,8 @@ import com.pockethub.R
 import androidx.compose.ui.res.stringResource
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.FlowRow
@@ -18,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material.icons.outlined.DeveloperMode
@@ -41,6 +44,7 @@ import com.pockethub.data.remote.feed.CommunitySignal
 import com.pockethub.data.remote.feed.DiscoverItem
 import com.pockethub.ui.components.languageColorHex
 import com.pockethub.ui.components.parseColorHex
+import androidx.compose.foundation.layout.widthIn
 import com.pockethub.ui.components.PhAsyncImage
 
 @Composable
@@ -121,33 +125,42 @@ internal fun FeedEventCard(
  * signal scrollability) while matching the lists' 16dp horizontal padding.
  * Name-only — no icon, no owner line.
  */
-@Composable
 internal fun PinnedRepoCard(
     slug: String,
     onClick: () -> Unit,
 ) {
     val repo = slug.substringAfter('/', slug)
-    // content width = screen - 32dp list padding; minus one 8dp gap → /2.2 cards.
-    val screenW = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp
-    val cardWidth = ((screenW - 40) / 2.2f).dp
-    com.pockethub.ui.components.PhCard(
-        onClick = onClick,
-        modifier = Modifier.width(cardWidth),
-        cornerRadius = 16.dp,
-    ) {
-        Box(
-            Modifier.padding(horizontal = 14.dp, vertical = 16.dp),
-            contentAlignment = Alignment.CenterStart,
-        ) {
-            Text(
-                repo,
-                style = MaterialTheme.typography.bodySmall,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                color = MaterialTheme.colorScheme.onSurface,
+    val owner = slug.substringBefore('/', "")
+    // Compact avatar+name pill: 3+ fit across a phone screen, so the pinned
+    // row stays one tidy line instead of dominating the explore feed.
+    Row(
+        modifier = Modifier
+            .widthIn(max = 170.dp)
+            .clip(RoundedCornerShape(999.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
+            .border(
+                0.5.dp,
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                RoundedCornerShape(999.dp),
             )
-        }
+            .clickable(onClick = onClick)
+            .padding(start = 8.dp, end = 14.dp, top = 7.dp, bottom = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        PhAsyncImage(
+            model = "https://github.com/$owner.png?size=40",
+            contentDescription = null,
+            modifier = Modifier.size(22.dp).clip(CircleShape),
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            repo,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
     }
 }
 
