@@ -547,17 +547,22 @@ class FeedSourceService @Inject constructor(
 
     // ── Komi Store discovery feed — /v1/feed?platform=… ───────────────────
     //
-    // GET {base}feed?platform={android|windows|macos|linux|<empty>=all}
-    //   → { "items": [BackendRepoResponse...], "page", "hasMore", "rotation" }
-    // Daily-rotating picks. Offline mirror (page 1 only):
-    //   cached-data/feed/{platform}.json — same envelope.
+    // GET {base}feed?platform={android|windows|macos|linux} → { "items": […], … }
+    // A MISSING platform param means "all platforms" — a literal "all" value is
+    // rejected by the backend. Daily-rotating picks. Offline mirror (page 1
+    // only): cached-data/feed/{platform|all}.json — same {repositories:[…]} envelope.
 
     private suspend fun fetchKomiDiscoverFeed(cfg: FeedSourceConfig, forceFresh: Boolean): List<DiscoverItem> {
         val source = FeedSourceOption.KOMI_DISCOVER
         val base = baseUrlFor(source, cfg.customBaseUrl).ifEmpty { "https://api.github-store.org/v1/" }
         val platform = cfg.komiPlatform.ifBlank { "android" }
-        // platform=all lives only on the backend (no offline mirror exists).
-        val primaryUrl = base.trimEnd('/') + "/feed?platform=$platform&limit=30"
+        // The backend treats a MISSING platform param as "all platforms"; a
+        // literal "all" (or empty value) is rejected with "Invalid platform".
+        val primaryUrl = if (platform == "all") {
+            base.trimEnd('/') + "/feed?limit=30"
+        } else {
+            base.trimEnd('/') + "/feed?platform=$platform&limit=30"
+        }
 
         val primaryBody = withTimeoutOrNull(PRIMARY_DEADLINE_MS) {
             coroutineScope {
@@ -568,18 +573,17 @@ class FeedSourceService @Inject constructor(
         }
         parseKomiEnvelope(primaryBody, source)?.takeIf { it.isNotEmpty() }?.let { return it }
 
-        // Offline mirror for a concrete platform.
-        if (platform != "all") {
-            val mirrors = listOf(
-                "https://raw.githubusercontent.com/kurikomi-labs/komi-store-backend-data/main" +
-                    "/cached-data/feed/$platform.json",
-                "https://cdn.jsdelivr.net/gh/kurikomi-labs/komi-store-backend-data@main" +
-                    "/cached-data/feed/$platform.json",
-            )
-            for (mirror in mirrors) {
-                val body = runCatching { requestText(mirror, forceFresh) }.getOrNull() ?: continue
-                parseKomiEnvelope(body, source)?.takeIf { it.isNotEmpty() }?.let { return it }
-            }
+        // Offline mirror for any platform — all.json exists and uses the same
+        // {repositories:[…]} envelope the parser already accepts.
+        val mirrors = listOf(
+            "https://raw.githubusercontent.com/kurikomi-labs/komi-store-backend-data/main" +
+                "/cached-data/feed/$platform.json",
+            "https://cdn.jsdelivr.net/gh/kurikomi-labs/komi-store-backend-data@main" +
+                "/cached-data/feed/$platform.json",
+        )
+        for (mirror in mirrors) {
+            val body = runCatching { requestText(mirror, forceFresh) }.getOrNull() ?: continue
+            parseKomiEnvelope(body, source)?.takeIf { it.isNotEmpty() }?.let { return it }
         }
         return emptyList()
     }
