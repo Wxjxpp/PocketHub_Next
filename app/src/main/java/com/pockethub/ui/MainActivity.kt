@@ -78,7 +78,8 @@ class MainActivity : AppCompatActivity() {
                 val incomingData by pendingData.asStateFlow().collectAsState()
                 LaunchedEffect(incomingData) {
                     val data: Uri? = incomingData
-                    if (data != null && data.scheme == "pockethub" && data.host == "oauth") {
+                    val oauthScheme = BuildConfig.GITHUB_OAUTH_REDIRECT_URI.substringBefore("://")
+                    if (data != null && data.scheme == oauthScheme && data.host == "oauth") {
                         handleOAuthCallback(data){code,state->oauthCode.value=code;oauthState.value=state}
                     } else if (data != null && data.scheme == "pockethub") {
                         // Non-OAuth pockethub:// deep link — forward to the NavHost for routing.
@@ -110,10 +111,11 @@ class MainActivity : AppCompatActivity() {
         pendingData.value=intent.data
     }
 
-    /** Inspect intent data for ?code=xxx from the pockethub://oauth/callback URI. */
+    /** Inspect intent data for ?code=xxx from the configured OAuth callback URI. */
     private fun handleOAuthCallback(data: Uri?, onCode: (String,String?) -> Unit) {
         data ?: return
-        if (data.scheme != "pockethub") return
+        val oauthScheme = BuildConfig.GITHUB_OAUTH_REDIRECT_URI.substringBefore("://")
+        if (data.scheme != oauthScheme) return
         if (data.host != "oauth") return
         if(data.getQueryParameter("error")!=null)return
         val code=data.getQueryParameter("code")?:return
