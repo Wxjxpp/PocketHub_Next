@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.pockethub.ui.theme.AppStyle
 import com.pockethub.ui.theme.ThemeMode
+import com.pockethub.data.local.TokenCipher
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -28,6 +29,7 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore("p
 @Singleton
 class SettingsRepository @Inject constructor(
     @ApplicationContext private val context: Context,
+    private val tokenCipher: TokenCipher,
 ) {
     // ── Keys ──────────────────────────────────────────────
     private object Keys {
@@ -95,13 +97,13 @@ class SettingsRepository @Inject constructor(
     }
 
     val customClientSecret: Flow<String> = context.dataStore.data.map {
-        it[Keys.CUSTOM_CLIENT_SECRET].orEmpty()
+        tokenCipher.decrypt(it[Keys.CUSTOM_CLIENT_SECRET].orEmpty())
     }
 
     suspend fun setCustomOAuthClient(id: String, secret: String) {
         context.dataStore.edit { prefs ->
             prefs[Keys.CUSTOM_CLIENT_ID] = id
-            prefs[Keys.CUSTOM_CLIENT_SECRET] = secret
+            prefs[Keys.CUSTOM_CLIENT_SECRET] = tokenCipher.encrypt(secret)
         }
     }
 

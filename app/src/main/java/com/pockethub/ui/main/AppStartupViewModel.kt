@@ -81,8 +81,7 @@ class AppStartupViewModel @Inject constructor(
     /** Sign out the active account and trigger return to login. */
     fun signOut() {
         viewModelScope.launch {
-            val active = accounts.activeAccount.first()
-            if (active != null) accounts.removeAccount(active.id)
+            accounts.logout()
             authInterceptor.token = ""
             _startRoute.value = Routes.LOGIN
             _signedOut.value = true

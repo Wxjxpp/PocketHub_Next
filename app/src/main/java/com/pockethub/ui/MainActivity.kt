@@ -20,6 +20,8 @@ import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.runtime.staticCompositionLocalOf
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import coil.ImageLoader
 import com.pockethub.data.remote.AccountRepository
 import com.pockethub.data.remote.AuthInterceptor
@@ -46,6 +48,7 @@ class MainActivity : AppCompatActivity() {
 
     // Android 13+ requires a runtime grant before the app can post system
     // notifications (the background poller's alerts are silently dropped without it).
+    private val pendingIntentData = MutableStateFlow<Uri?>(null)
     private val notifPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* no-op — setting stays accessible */ }
 
@@ -53,6 +56,7 @@ class MainActivity : AppCompatActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         requestNotificationPermissionIfNeeded()
+        pendingIntentData.value = intent?.data
         setContent {
             CompositionLocalProvider(LocalAppImageLoader provides imageLoader) {
                 val settingsVm: SettingsViewModel = hiltViewModel()
@@ -64,11 +68,13 @@ class MainActivity : AppCompatActivity() {
                 // or other deep links (pockethub://notifications, etc.) that should land on the
                 // matching Compose destination.
                 val oauthCode = remember { mutableStateOf<String?>(null) }
+                val oauthState = remember { mutableStateOf<String?>(null) }
                 val deepLinkUri = remember { mutableStateOf<Uri?>(null) }
-                LaunchedEffect(intent) {
-                    val data: Uri? = intent?.data
+                val incomingData by pendingIntentData.asStateFlow().collectAsState()
+                LaunchedEffect(incomingData) {
+                    val data: Uri? = incomingData
                     if (data != null && data.scheme == "pockethub" && data.host == "oauth") {
-                        handleOAuthCallback(intent) { code -> oauthCode.value = code }
+                        handleOAuthCallback(data) { code, state -> oauthCode.value = code; oauthState.value = state }
                     } else if (data != null && data.scheme == "pockethub") {
                         // Non-OAuth pockethub:// deep link — forward to the NavHost for routing.
                         deepLinkUri.value = data
@@ -76,8 +82,9 @@ class MainActivity : AppCompatActivity() {
                 }
                 LaunchedEffect(oauthCode.value) {
                     oauthCode.value?.let { code ->
-                        loginVm.exchangeOAuthCode(code)
+                        loginVm.exchangeOAuthCode(code, oauthState.value)
                         oauthCode.value = null
+                        oauthState.value = null
                     }
                 }
 
@@ -94,15 +101,17 @@ class MainActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        pendingIntentData.value = intent.data
     }
 
     /** Inspect intent data for ?code=xxx from the pockethub://oauth/callback URI. */
-    private fun handleOAuthCallback(intent: Intent?, onCode: (String) -> Unit) {
-        val data: Uri = intent?.data ?: return
+    private fun handleOAuthCallback(data: Uri?, onCode: (String, String?) -> Unit) {
+        data ?: return
         if (data.scheme != "pockethub") return
         if (data.host != "oauth") return
+        if (data.getQueryParameter("error") != null) return
         val code = data.getQueryParameter("code") ?: return
-        onCode(code)
+        onCode(code, data.getQueryParameter("state"))
     }
 
     /** Ask once for POST_NOTIFICATIONS on Android 13+ when not yet granted. */
