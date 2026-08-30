@@ -1,11 +1,13 @@
 {
-  "version": "0.3.64",
+  "version": "0.3.65",
   "summary": {
-    "zh": "本次更新让删除已完成的下载真正清理本地文件，删除前会先确认。",
-    "en": "Deleting a finished download now removes the local file too, with a confirmation prompt first."
+    "zh": "本次更新修复了工作台条目点击无法跳转的问题，并限制了工作台的高度。",
+    "en": "Workbench entries now open correctly when tapped, and the board no longer grows unbounded."
   },
   "items": [
-    { "type": "fix", "zh": "删除已完成的下载时同时删除本地下载文件夹中的文件，而不再只移除列表记录", "en": "Deleting a finished download now also removes the file from the local download folder instead of only dropping the list entry" },
-    { "type": "improve", "zh": "删除已下载文件前弹框确认，标明会同时删除本地文件且无法撤销", "en": "A confirmation dialog before deleting a downloaded file makes clear the local file will be removed and it cannot be undone" }
+    { "type": "fix", "zh": "工作台条目点击无反应的问题已修复，现在可正确跳转到对应的 Issue 或 PR 详情", "en": "Tapping a workbench entry now opens the corresponding issue or PR instead of doing nothing" },
+    { "type": "fix", "zh": "工作台条目现在显示所属仓库，搜索结果缺仓库信息的问题已修复", "en": "Workbench entries now show their repository, fixing missing repo context on search results" },
+    { "type": "improve", "zh": "工作台列表高度封顶，超出部分在卡片内滚动，不再撑长个人页", "en": "The workbench list is height-capped and scrolls internally, so it no longer stretches the profile page" },
+    { "type": "fix", "zh": "修复工作台查询里无效的排序写法，列表顺序不稳定的问题已修复", "en": "Removed an invalid inline sort from workbench queries, fixing unstable ordering" }
   ]
 }

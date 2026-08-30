@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -22,6 +23,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -74,6 +76,7 @@ import com.pockethub.data.local.AccountEntity
 import com.pockethub.data.model.Repository
 import com.pockethub.data.model.User
 import com.pockethub.ui.components.PhAsyncImage
+import com.pockethub.ui.search.issueOwnerRepo
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -534,18 +537,27 @@ private fun WorkListCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(8.dp),
                 )
-                else -> Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    items.take(8).forEach { issue ->
+                else -> Column(
+                    Modifier
+                        .fillMaxWidth()
+                        // Hard height cap: a busy board must never stretch the
+                        // profile page — overflow scrolls inside the card.
+                        .heightIn(max = 300.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    items.forEach { issue ->
                         WorkListRow(
                             issue = issue,
                             onClick = {
-                                val repo = issue.repository
-                                val owner = repo?.owner?.login
-                                val name = repo?.name
-                                if (owner != null && name != null) {
-                                    if (issue.pullRequest != null) onOpenPR(owner, name, issue.number)
-                                    else onOpenIssue(owner, name, issue.number)
-                                }
+                                // GitHub no longer returns the repository object in
+                                // /search/issues — resolve owner/repo through the same
+                                // fallback chain as Search (repository → repository_url
+                                // → html_url). A bare `issue.repository` click silently
+                                // does nothing on every result today.
+                                val (owner, name) = issueOwnerRepo(issue) ?: return@WorkListRow
+                                if (issue.pullRequest != null) onOpenPR(owner, name, issue.number)
+                                else onOpenIssue(owner, name, issue.number)
                             },
                         )
                     }
@@ -566,7 +578,9 @@ private fun WorkListCard(
 @Composable
 private fun WorkListRow(issue: com.pockethub.data.model.Issue, onClick: () -> Unit) {
     val isPr = issue.pullRequest != null
-    val repoFullName = issue.repository?.fullName
+    // Search results carry no repository object — derive "owner/repo" from
+    // repository_url / html_url so the context line stays visible.
+    val repoFullName = issueOwnerRepo(issue)?.let { (o, n) -> "$o/$n" }
     Row(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 4.dp),
         verticalAlignment = Alignment.Top,
