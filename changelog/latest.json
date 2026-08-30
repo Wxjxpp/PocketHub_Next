@@ -1,12 +1,11 @@
 {
-  "version": "0.3.63",
+  "version": "0.3.64",
   "summary": {
-    "zh": "本次更新修复页面返回后滚动位置丢失，并清理更新日志的重复显示。",
-    "en": "Scroll positions are kept when returning from a detail page, and duplicated release notes are cleaned up."
+    "zh": "本次更新让删除已完成的下载真正清理本地文件，删除前会先确认。",
+    "en": "Deleting a finished download now removes the local file too, with a confirmation prompt first."
   },
   "items": [
-    { "type": "fix", "zh": "概览页、Markdown 文件浏览、PR 详情页跳转后返回不再丢失滚动位置", "en": "Overview, markdown viewer and PR detail keep their scroll position after navigating back" },
-    { "type": "fix", "zh": "Releases 页不再显示混排的机器日志块，只保留可读的更新说明", "en": "The Releases tab no longer shows the raw machine changelog block, only readable notes" },
-    { "type": "fix", "zh": "更新日志只包含当前版本的变化，不再混入之前几轮的内容", "en": "Release notes cover only the current round of changes, not earlier ones" }
+    { "type": "fix", "zh": "删除已完成的下载时同时删除本地下载文件夹中的文件，而不再只移除列表记录", "en": "Deleting a finished download now also removes the file from the local download folder instead of only dropping the list entry" },
+    { "type": "improve", "zh": "删除已下载文件前弹框确认，标明会同时删除本地文件且无法撤销", "en": "A confirmation dialog before deleting a downloaded file makes clear the local file will be removed and it cannot be undone" }
   ]
 }
