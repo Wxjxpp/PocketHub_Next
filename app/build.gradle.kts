@@ -22,6 +22,7 @@ android {
 
     defaultConfig {
         applicationId = "com.pockethub"
+        manifestPlaceholders["oauthScheme"] = "pockethub-next"
         minSdk = 26
         targetSdk = 34
         versionCode = vCode
@@ -59,6 +60,7 @@ android {
 
     buildTypes {
         debug {
+            manifestPlaceholders["oauthScheme"] = "pockethub-next-debug"
             buildConfigField("String", "GITHUB_OAUTH_REDIRECT_URI", "\"pockethub-next-debug://oauth/callback\"")
             isMinifyEnabled = false
             applicationIdSuffix = ".debug"
