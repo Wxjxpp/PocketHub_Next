@@ -124,7 +124,7 @@ class LoginViewModel @Inject constructor(
      * for an access token. The deep link is handled by [MainActivity]; once it receives
      * `code=xxx`, it will call this function.
      */
-    fun exchangeOAuthCode(code: String, state: String?)
+    fun exchangeOAuthCode(code: String, state: String?) {
         viewModelScope.launch {
             _ui.update { it.copy(isLoading = true, error = null) }
             try {
