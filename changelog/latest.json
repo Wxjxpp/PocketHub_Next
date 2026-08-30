@@ -1,13 +1,11 @@
 {
-  "version": "0.3.65",
+  "version": "0.3.66",
   "summary": {
-    "zh": "本次更新修复了工作台条目点击无法跳转的问题，并限制了工作台的高度。",
-    "en": "Workbench entries now open correctly when tapped, and the board no longer grows unbounded."
+    "zh": "本次更新修复了动态列表里推送事件点击无法打开 commit 详情的问题。",
+    "en": "Push events in the activity list now open the corresponding commit detail when tapped."
   },
   "items": [
-    { "type": "fix", "zh": "工作台条目点击无反应的问题已修复，现在可正确跳转到对应的 Issue 或 PR 详情", "en": "Tapping a workbench entry now opens the corresponding issue or PR instead of doing nothing" },
-    { "type": "fix", "zh": "工作台条目现在显示所属仓库，搜索结果缺仓库信息的问题已修复", "en": "Workbench entries now show their repository, fixing missing repo context on search results" },
-    { "type": "improve", "zh": "工作台列表高度封顶，超出部分在卡片内滚动，不再撑长个人页", "en": "The workbench list is height-capped and scrolls internally, so it no longer stretches the profile page" },
-    { "type": "fix", "zh": "修复工作台查询里无效的排序写法，列表顺序不稳定的问题已修复", "en": "Removed an invalid inline sort from workbench queries, fixing unstable ordering" }
+    { "type": "fix", "zh": "动态列表的推送事件点击现在会跳转到对应 commit 详情页，不再只能进仓库", "en": "Tapping a push event now opens the commit detail page instead of only the repository" },
+    { "type": "fix", "zh": "推送事件卡片重新显示推送分支名（GitHub 接口已不再返回 commit 内容）", "en": "Push event cards show the pushed branch name again (GitHub no longer returns commit contents on events)" }
   ]
 }
