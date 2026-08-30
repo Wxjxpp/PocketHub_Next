@@ -256,10 +256,10 @@ class DownloadManager @Inject constructor(
         val url = com.pockethub.util.applyMirrorPrefix(entity.url, mirrorPrefix)
         val destFile = File(targetFile.parentFile, "${targetFile.name}.part")
         val job = scope.launch(start = CoroutineStart.LAZY) {
-            try {
-                var attempt = 0
-                while (true) {
-                    attempt++
+            var droppedStale = false  // 416: the stale .part was dropped once already
+            var autoResumes = 0       // transient network failures auto-resumed so far
+            while (true) {
+                try {
                     // Byte-range resume: a leftover .part file (from a previous
                     // failure, cancel or app kill) requests only the missing
                     // tail. 206 → append; 200 → server ignored Range, restart.
@@ -273,18 +273,28 @@ class DownloadManager @Inject constructor(
                     // changed server-side or the part was already complete):
                     // drop it and restart from scratch — exactly once, so a
                     // persisting 416 fails cleanly below.
-                    if (response.code == 416 && baseBytes > 0 && attempt == 1) {
+                    if (response.code == 416 && baseBytes > 0 && !droppedStale) {
                         response.close()
                         destFile.delete()
+                        droppedStale = true
                         continue
                     }
 
-                    response.use {
-                        if (!it.isSuccessful) {
-                            dao.upsert(entity.copy(status = "FAILED", errorMsg = "HTTP ${it.code}", updatedAt = System.currentTimeMillis()))
-                            return@launch
+                    if (!response.isSuccessful) {
+                        val code = response.code
+                        response.close()
+                        // Server-side hiccups (5xx) get the same bounded
+                        // auto-resume treatment as in-stream network errors.
+                        if (code in 500..599 && autoResumes < MAX_AUTO_RESUME) {
+                            autoResumes++
+                            kotlinx.coroutines.delay(AUTO_RESUME_BACKOFF_MS * autoResumes)
+                            continue
                         }
+                        dao.upsert(entity.copy(status = "FAILED", errorMsg = "HTTP $code", updatedAt = System.currentTimeMillis()))
+                        return@launch
+                    }
 
+                    response.use {
                         val resume = it.code == 206 && baseBytes > 0
                         val alreadyBytes = if (resume) baseBytes else 0L
                         val totalBytes = when {
@@ -328,19 +338,34 @@ class DownloadManager @Inject constructor(
                         exportToUserFolder(entity, targetFile)
                     }
                     break
-                }
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                // Keep the .part file — retry resumes from it; cancel() deletes
-                // it explicitly for user-requested removals.
-                if (!cancelledUrls.remove(url)) {
-                    dao.upsert(entity.copy(status = "FAILED", errorMsg = "Cancelled", updatedAt = System.currentTimeMillis()))
-                }
-                throw e
-            } catch (e: Throwable) {
-                // Keep the .part file so retry() can byte-range resume.
-                if (!cancelledUrls.remove(url)) {
-                    val message = e.userMessage(e.javaClass.simpleName)
-                    dao.upsert(entity.copy(status = "FAILED", errorMsg = message, updatedAt = System.currentTimeMillis()))
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    // Keep the .part file — retry resumes from it; cancel() deletes
+                    // it explicitly for user-requested removals.
+                    if (!cancelledUrls.remove(url)) {
+                        dao.upsert(entity.copy(status = "FAILED", errorMsg = "Cancelled", updatedAt = System.currentTimeMillis()))
+                    }
+                    throw e
+                } catch (e: IOException) {
+                    // A user-requested cancel surfaces as an OkHttp IOException —
+                    // honour the cancelled set before any auto-resume.
+                    if (cancelledUrls.remove(url)) return@launch
+                    // Transient network error mid-transfer: the .part file kept
+                    // everything downloaded so far, so re-entering the loop
+                    // re-issues the Range request and only fetches the tail.
+                    if (autoResumes < MAX_AUTO_RESUME) {
+                        autoResumes++
+                        kotlinx.coroutines.delay(AUTO_RESUME_BACKOFF_MS * autoResumes)
+                        continue
+                    }
+                    // Keep the .part file so retry() can byte-range resume.
+                    dao.upsert(entity.copy(status = "FAILED", errorMsg = e.userMessage(e.javaClass.simpleName), updatedAt = System.currentTimeMillis()))
+                    return@launch
+                } catch (e: Throwable) {
+                    // Unexpected non-IO failure — fail cleanly instead of
+                    // crashing the scope; the .part file stays for retry().
+                    if (cancelledUrls.remove(url)) return@launch
+                    dao.upsert(entity.copy(status = "FAILED", errorMsg = e.userMessage(e.javaClass.simpleName), updatedAt = System.currentTimeMillis()))
+                    return@launch
                 }
             }
         }
@@ -351,5 +376,13 @@ class DownloadManager @Inject constructor(
         currentCall = null
         currentJob = null
         currentUrl = null
+    }
+
+    private companion object {
+        /** Bounded auto-resume attempts for transient network failures (5xx / IOException). */
+        const val MAX_AUTO_RESUME = 3
+
+        /** Linear backoff between auto-resume attempts, multiplied by the attempt number. */
+        const val AUTO_RESUME_BACKOFF_MS = 1_500L
     }
 }
