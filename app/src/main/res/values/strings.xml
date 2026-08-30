@@ -266,6 +266,7 @@
     <string name="stat_forks">forks</string>
     <string name="readme_title">README</string>
     <string name="readme_loading">Loading README…</string>
+    <string name="readme_empty">This repository has no README file</string>
     <string name="no_open_issues">No open issues</string>
     <string name="no_releases_yet">No releases yet</string>
     <string name="no_workflow_runs">No workflow runs</string>

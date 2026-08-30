@@ -41,6 +41,13 @@ class HistoryRepository @Inject constructor(
         }
     }
 
+    suspend fun remove(owner: String, repo: String) {
+        context.dataStore.edit { prefs ->
+            val current = prefs[key]?.let { Json.decodeFromString<List<HistoryEntry>>(it) } ?: emptyList()
+            prefs[key] = Json.encodeToString(current.filterNot { it.owner == owner && it.repo == repo })
+        }
+    }
+
     suspend fun clear() {
         context.dataStore.edit { prefs -> prefs[key] = Json.encodeToString(emptyList<HistoryEntry>()) }
     }

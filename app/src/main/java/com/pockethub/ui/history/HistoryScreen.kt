@@ -2,6 +2,8 @@ package com.pockethub.ui.history
 
 import com.pockethub.R
 
+import com.pockethub.ui.components.PhAsyncImage
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -10,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -18,6 +21,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Delete
@@ -83,41 +87,60 @@ fun HistoryScreen(
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 8.dp),
             ) {
                 items(history, key = { "${it.owner}/${it.repo}@${it.visitedAt}" }) { entry ->
+                    SwipeDismissHistoryItem(
+                        onDelete = { vm.remove(entry.owner, entry.repo) },
+                        modifier = Modifier.animateItem(),
+                    ) {
                     com.pockethub.ui.components.PhCard(
                         modifier = Modifier.fillMaxWidth(),
                         onClick = { onNavigateToRepo(entry.owner, entry.repo) },
-                        cornerRadius = 16.dp,
+                        cornerRadius = 18.dp,
                     ) {
-                        ListItem(
-                            headlineContent = {
-                                Text(
-                                    "${entry.owner}/${entry.repo}",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.SemiBold,
+                        Column(Modifier.padding(16.dp)) {
+                            // Header: avatar + owner — mirrors RepositoryRow on the repos tab.
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                PhAsyncImage(
+                                    model = "https://github.com/${entry.owner}.png?size=80",
+                                    contentDescription = null,
+                                    modifier = Modifier.size(28.dp).clip(CircleShape),
                                 )
-                            },
-                            supportingContent = {
+                                Spacer(Modifier.width(10.dp))
+                                Text(
+                                    text = entry.owner,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontWeight = FontWeight.Medium,
+                                )
+                            }
+
+                            Spacer(Modifier.height(10.dp))
+
+                            Text(
+                                text = entry.repo,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+
+                            Spacer(Modifier.height(8.dp))
+
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Outlined.History, null,
+                                    modifier = Modifier.size(13.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                Spacer(Modifier.width(5.dp))
                                 Text(
                                     formatAgo(entry.visitedAt),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
-                            },
-                            leadingContent = {
-                                Box(
-                                    Modifier.size(36.dp).clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    Icon(
-                                        Icons.Outlined.History, null,
-                                        modifier = Modifier.size(18.dp),
-                                        tint = MaterialTheme.colorScheme.primary,
-                                    )
-                                }
-                            },
-                            modifier = Modifier,
-                        )
+                            }
+                        }
+                    }
                     }
                 }
             }
@@ -125,7 +148,70 @@ fun HistoryScreen(
     }
 }
 
-private fun formatAgo(timestamp: Long): String {
+/**
+ * Swipe left → a red delete affordance slides out on the right; tapping it
+ * removes the entry. Classic reveal pattern: the swipe stays open (no
+ * auto-delete) so the tap is always deliberate.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SwipeDismissHistoryItem(
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    val state = androidx.compose.material3.rememberSwipeToDismissBoxState(
+        confirmValueChange = { v ->
+            // Keep the row open past the threshold so the delete button is
+            // tappable; actual deletion happens on the button tap.
+            v == androidx.compose.material3.SwipeToDismissBoxValue.EndToStart
+        },
+        positionalThreshold = { width -> width * 0.45f },
+    )
+    androidx.compose.material3.SwipeToDismissBox(
+        state = state,
+        modifier = modifier,
+        enableDismissFromStartToEnd = false,
+        enableDismissFromEndToStart = true,
+        backgroundContent = {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(Color(0xFFD1242F))
+                    .padding(horizontal = 20.dp, vertical = 12.dp)
+                    .fillMaxHeight(),
+                contentAlignment = Alignment.CenterEnd,
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable { onDelete() }
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                ) {
+                    Icon(
+                        Icons.Outlined.Delete,
+                        contentDescription = stringResource(R.string.action_delete),
+                        tint = androidx.compose.ui.graphics.Color.White,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(Modifier.width(5.dp))
+                    Text(
+                        stringResource(R.string.action_delete),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = androidx.compose.ui.graphics.Color.White,
+                    )
+                }
+            }
+        },
+    ) {
+        content()
+    }
+}
+
+: Long): String {
     val diff = System.currentTimeMillis() - timestamp
     val minutes = diff / 60_000
     return when {

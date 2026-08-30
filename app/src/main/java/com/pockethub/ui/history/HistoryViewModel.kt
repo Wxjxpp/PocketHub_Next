@@ -17,6 +17,10 @@ class HistoryViewModel @Inject constructor(
     val history = historyRepository.history
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    fun remove(owner: String, repo: String) {
+        viewModelScope.launch { historyRepository.remove(owner, repo) }
+    }
+
     fun clear() {
         viewModelScope.launch { historyRepository.clear() }
     }
