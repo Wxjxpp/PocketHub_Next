@@ -120,7 +120,7 @@ object IssueReportFormat {
         groups.forEachIndexed { i, g ->
             sb.appendLine("---")
             sb.appendLine()
-            val badge = if (g.count > 1) " \`×${g.count}\`" else ""
+            val badge = if (g.count > 1) " ×${g.count}" else ""
             sb.appendLine("### ${kindBadge(g.kind)} #$i · ${g.subject.take(160)}$badge")
             sb.appendLine()
             sb.appendLine("- **最近发生**: ${g.latest.isoTs}")
@@ -128,7 +128,7 @@ object IssueReportFormat {
             sb.appendLine("- **线程**: `${g.latest.threadName}`")
             val crumbs = breadcrumbs(g.latest)
             if (crumbs.isNotEmpty()) {
-                sb.appendLine("- **现场轨迹**(最近 ${crumbs.size.take(2)} 步,旧 → 新):")
+                sb.appendLine("- **现场轨迹**(最近 ${minOf(crumbs.size, 8)} 步,旧 → 新):")
                 sb.appendLine()
                 sb.appendLine("```text")
                 crumbs.takeLast(8).forEach { sb.appendLine(it) }
