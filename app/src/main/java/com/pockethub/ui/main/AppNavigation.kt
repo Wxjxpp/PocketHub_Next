@@ -539,7 +539,7 @@ fun PocketHubApp(
                     val url = backStackEntry.arguments?.getString("url") ?: return@composable
                     val gallery = backStackEntry.arguments?.getString("gallery")
                         ?.split("\n")?.filter { it.isNotBlank() }
-                        .takeIf { it.isNotEmpty() } ?: listOf(url)
+                        ?.takeIf { it.isNotEmpty() } ?: listOf(url)
                     val index = backStackEntry.arguments?.getInt("index") ?: 0
                     com.pockethub.ui.components.ImagePreviewScreen(
                         imageUrls = gallery,

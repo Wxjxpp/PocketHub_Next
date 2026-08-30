@@ -109,20 +109,25 @@ fun ActivityCard(
             ?: issue?.number?.takeIf { it > 0 && issue.pullRequest != null }
         val issueNumber = issue?.number?.takeIf { it > 0 && issue.pullRequest == null }
         val sha = event.payload?.commits?.lastOrNull()?.sha?.takeIf { it.isNotBlank() }
-        when {
-            event.type == "PushEvent" && sha != null && onNavigateToCommit != null ->
-                { onNavigateToCommit(owner, repo, sha) }
-            event.type == "PullRequestEvent" && prNumber != null && onNavigateToPR != null ->
-                { onNavigateToPR(owner, repo, prNumber) }
-            event.type == "IssueCommentEvent" && prNumber != null && onNavigateToPR != null ->
-                { onNavigateToPR(owner, repo, prNumber) }
-            (event.type == "IssueCommentEvent" || event.type == "IssuesEvent") &&
-                issueNumber != null && onNavigateToIssue != null ->
-                { onNavigateToIssue(owner, repo, issueNumber) }
-            event.type == "ForkEvent" && !event.payload?.forkee?.fullName.isNullOrBlank() ->
-                { onNavigateToRepo(event.payload.forkee.fullName) }
-            else -> if (repoName.isNotEmpty()) { onNavigateToRepo(repoName) } else null
-        }
+
+        val commitAction: (() -> Unit)? =
+            if (event.type == "PushEvent" && sha != null) { { onNavigateToCommit?.invoke(owner, repo, sha) } } else null
+        val prAction: (() -> Unit)? =
+            if (prNumber != null && (event.type == "PullRequestEvent" || event.type == "IssueCommentEvent")) {
+                { onNavigateToPR?.invoke(owner, repo, prNumber) }
+            } else null
+        val issueAction: (() -> Unit)? =
+            if (issueNumber != null && (event.type == "IssueCommentEvent" || event.type == "IssuesEvent")) {
+                { onNavigateToIssue?.invoke(owner, repo, issueNumber) }
+            } else null
+        val forkAction: (() -> Unit)? =
+            if (event.type == "ForkEvent" && !event.payload?.forkee?.fullName.isNullOrBlank()) {
+                { onNavigateToRepo(event.payload!!.forkee!!.fullName!!) }
+            } else null
+        val repoAction: (() -> Unit)? =
+            if (repoName.isNotEmpty()) { { onNavigateToRepo(repoName) } } else null
+
+        commitAction ?: prAction ?: issueAction ?: forkAction ?: repoAction
     }
 
     PhCard(
