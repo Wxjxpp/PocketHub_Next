@@ -280,7 +280,7 @@ private fun SwipeDismissHistoryItem(
             Modifier
                 .offset { androidx.compose.ui.unit.IntOffset(offsetX.roundToInt(), 0) }
                 .pointerInput(maxOffsetPx) {
-                    androidx.compose.foundation.gestures.detectHorizontalDragGestures(
+                    detectHorizontalDragGestures(
                         onDragEnd = {
                             val target = if (-offsetX > maxOffsetPx * 0.55f) -maxOffsetPx else 0f
                             open = target != 0f
@@ -290,7 +290,7 @@ private fun SwipeDismissHistoryItem(
                             open = false
                             settleTo(0f)
                         },
-                    ) { change, dragAmount ->
+                    ) { change: androidx.compose.ui.input.pointer.PointerInputChange, dragAmount: Float ->
                         change.consume()
                         val raw = offsetX + dragAmount
                         offsetX = when {
