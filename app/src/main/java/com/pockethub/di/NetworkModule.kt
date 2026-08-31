@@ -15,8 +15,6 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import kotlinx.serialization.json.Json
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
 import com.pockethub.data.remote.SettingsRepository
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
@@ -49,14 +47,14 @@ object NetworkModule {
      */
     @Provides
     @Singleton
-    fun provideDns(settings: SettingsRepository): okhttp3.Dns {
+    fun provideDns(): okhttp3.Dns {
         val bootstrapClient = OkHttpClient.Builder()
             .connectTimeout(5, TimeUnit.SECONDS)
             .readTimeout(5, TimeUnit.SECONDS)
             .build()
         val doh = okhttp3.dnsoverhttps.DnsOverHttps.Builder()
             .client(bootstrapClient)
-            .url(runBlocking { settings.dohUrl.first() }.toHttpUrl())
+            .url(SettingsRepository.DEFAULT_DOH_URL.toHttpUrl())
             .bootstrapDnsHosts(
                 java.net.InetAddress.getByName("223.5.5.5"),
                 java.net.InetAddress.getByName("223.6.6.6"),
