@@ -122,9 +122,10 @@ fun DiffPatchWithComment(
     threadState: Map<Long, ThreadState> = emptyMap(),
     currentLogin: String? = null,
     busyCommentIds: Set<Long> = emptySet(),
+    preloadedLines: List<DiffLine>? = null,
     modifier: Modifier = Modifier,
 ) {
-    val lines = remember(patch) { parsePatch(patch) }
+    val lines = preloadedLines ?: remember(patch) { parsePatch(patch) }
     // Track which line is currently being commented — show an inline input below it.
     var activeLine by remember { mutableStateOf<Int?>(null) }
     var draftBody by remember { mutableStateOf("") }
