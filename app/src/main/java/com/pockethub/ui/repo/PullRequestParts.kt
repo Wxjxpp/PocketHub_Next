@@ -251,6 +251,8 @@ internal fun FileDiffItem(
     }
 }
 
+}
+
 /**
  * Single-line CI checks summary shown above labels / reviewers on PR detail.
  *
