@@ -109,10 +109,6 @@ class SettingsRepository @Inject constructor(
         }
     }
 
-    companion object {
-        const val DEFAULT_OAUTH_BACKEND_URL = "https://oauth.wxjxpp.de5.net"
-        const val DEFAULT_DOH_URL = "https://dns.alidns.com/dns-query"
-    }
     val oauthBackendUrl: Flow<String> = context.dataStore.data.map {
         it[Keys.OAUTH_BACKEND_URL] ?: DEFAULT_OAUTH_BACKEND_URL
     }
@@ -386,7 +382,9 @@ class SettingsRepository @Inject constructor(
         context.dataStore.edit { it[Keys.ISSUE_REPORT_TARGET_REPO] = slug.trim().lowercase() }
     }
 
-    private companion object {
+    companion object {
         const val KEEP = 200
+        const val DEFAULT_OAUTH_BACKEND_URL = "https://oauth.wxjxpp.de5.net"
+        const val DEFAULT_DOH_URL = "https://dns.alidns.com/dns-query"
     }
 }
