@@ -40,6 +40,7 @@ class SettingsRepository @Inject constructor(
         val CUSTOM_CLIENT_ID = stringPreferencesKey("custom_client_id")
         val CUSTOM_CLIENT_SECRET = stringPreferencesKey("custom_client_secret")
         val OAUTH_BACKEND_URL = stringPreferencesKey("oauth_backend_url")
+        val DOH_URL = stringPreferencesKey("doh_url")
         val PENDING_OAUTH_STATE = stringPreferencesKey("pending_oauth_state")
         val NOTIF_POLL_MINUTES = intPreferencesKey("notif_poll_minutes")
         val NOTIFIED_IDS = stringPreferencesKey("notified_ids")
@@ -108,7 +109,22 @@ class SettingsRepository @Inject constructor(
         }
     }
 
-    val oauthBackendUrl: Flow<String> = context.dataStore.data.map { it[Keys.OAUTH_BACKEND_URL].orEmpty() }
+    companion object {
+        const val DEFAULT_OAUTH_BACKEND_URL = "https://oauth.wxjxpp.de5.net"
+        const val DEFAULT_DOH_URL = "https://dns.alidns.com/dns-query"
+    }
+    val oauthBackendUrl: Flow<String> = context.dataStore.data.map {
+        it[Keys.OAUTH_BACKEND_URL] ?: DEFAULT_OAUTH_BACKEND_URL
+    }
+    val dohUrl: Flow<String> = context.dataStore.data.map {
+        it[Keys.DOH_URL] ?: DEFAULT_DOH_URL
+    }
+    suspend fun setDohUrl(url: String) {
+        context.dataStore.edit { prefs ->
+            val value = url.trim()
+            if (value.isBlank()) prefs.remove(Keys.DOH_URL) else prefs[Keys.DOH_URL] = value
+        }
+    }
 
     suspend fun setOAuthBackendUrl(url: String) {
         context.dataStore.edit { prefs ->

@@ -56,7 +56,9 @@ class SettingsViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Eagerly, "")
 
     val oauthBackendUrl: StateFlow<String> = settings.oauthBackendUrl
-        .stateIn(viewModelScope, SharingStarted.Eagerly, "")
+        .stateIn(viewModelScope, SharingStarted.Eagerly, SettingsRepository.DEFAULT_OAUTH_BACKEND_URL)
+    val dohUrl: StateFlow<String> = settings.dohUrl
+        .stateIn(viewModelScope, SharingStarted.Eagerly, SettingsRepository.DEFAULT_DOH_URL)
 
     /** GitHub file-download accelerator prefix (net branch experiment). */
     val downloadMirrorPrefix: StateFlow<String> = settings.downloadMirrorPrefix
@@ -123,6 +125,9 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settings.setOAuthBackendUrl(url) }
     }
 
+    fun setDohUrl(url: String) {
+        viewModelScope.launch { settings.setDohUrl(url) }
+    }
     fun setDownloadMirrorPrefix(prefix: String) {
         viewModelScope.launch { settings.setDownloadMirrorPrefix(prefix) }
     }

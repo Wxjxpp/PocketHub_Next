@@ -104,6 +104,7 @@ fun SettingsScreen(
     val downloadMirrorPrefix by vm.downloadMirrorPrefix.collectAsState()
     val customClientSecret by vm.customClientSecret.collectAsState()
     val oauthBackendUrl by vm.oauthBackendUrl.collectAsState()
+    val dohUrl by vm.dohUrl.collectAsState()
     val accountCount by vm.accountCount.collectAsState()
     val cacheSizeBytes by vm.cacheSizeBytes.collectAsState()
     val translateTarget by vm.translateTarget.collectAsState()
@@ -112,6 +113,7 @@ fun SettingsScreen(
     var showTranslateSheet by remember { mutableStateOf(false) }
     var showOAuthSheet by remember { mutableStateOf(false) }
     var showMirrorSheet by remember { mutableStateOf(false) }
+    var showDohSheet by remember { mutableStateOf(false) }
     var showAbout by remember { mutableStateOf(false) }
     var showSignOutDialog by remember { mutableStateOf(false) }
     val issueCount by vm.issueCount.collectAsState()
@@ -236,6 +238,12 @@ fun SettingsScreen(
                 headlineContent = { Text(stringResource(R.string.mirror_prefix_title)) },
                 supportingContent = { Text(if (downloadMirrorPrefix.isBlank()) stringResource(R.string.mirror_prefix_not_set) else stringResource(R.string.mirror_prefix_set, downloadMirrorPrefix)) },
                 modifier = Modifier.clickable { showMirrorSheet = true },
+            )
+            ListItem(
+                leadingContent = { Icon(Icons.Outlined.Public, contentDescription = null) },
+                headlineContent = { Text("加密 DNS（DoH）") },
+                supportingContent = { Text(dohUrl) },
+                modifier = Modifier.clickable { showDohSheet = true },
             )
             ListItem(
                 leadingContent = { Icon(Icons.Outlined.CleaningServices, contentDescription = null) },
@@ -396,6 +404,9 @@ fun SettingsScreen(
         )
     }
 
+    if (showDohSheet) {
+        DohSettingsSheet(initial = dohUrl, onDismiss = { showDohSheet = false }, onSave = { url -> vm.setDohUrl(url); showDohSheet = false })
+    }
     if (showAbout) {
         ModalBottomSheet(onDismissRequest = { showAbout = false }, sheetState = rememberModalBottomSheetState()) {
             AboutContent()
@@ -446,6 +457,38 @@ fun SettingsScreen(
         else -> Unit
     }
 }
+private data class DohOption(val name: String, val url: String)
+private val builtInDoh = listOf(
+    DohOption("阿里 DNS（国内）", "https://dns.alidns.com/dns-query"),
+    DohOption("腾讯 DNSPod（国内）", "https://doh.pub/dns-query"),
+    DohOption("360 安全 DNS（国内）", "https://doh.360.cn"),
+    DohOption("18Bit DNS（国内）", "https://doh.18bit.cn/dns-query"),
+    DohOption("Cloudflare", "https://1.1.1.1/dns-query"),
+    DohOption("Google Public DNS", "https://dns.google/dns-query"),
+    DohOption("Quad9", "https://dns.quad9.net/dns-query"),
+    DohOption("AdGuard DNS", "https://dns.adguard-dns.com/dns-query"),
+)
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DohSettingsSheet(initial: String, onDismiss: () -> Unit, onSave: (String) -> Unit) {
+    var selected by rememberSaveable { mutableStateOf(initial) }
+    var custom by rememberSaveable { mutableStateOf(if (builtInDoh.none { it.url == initial }) initial else "") }
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState()) {
+        Column(Modifier.fillMaxWidth().padding(16.dp).imePadding().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("选择加密 DNS（DoH）", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text("优先使用国内服务。修改后重启应用，使新的 DNS 解析器生效。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            builtInDoh.forEach { option ->
+                ListItem(headlineContent = { Text(option.name) }, supportingContent = { Text(option.url) }, leadingContent = { RadioButton(selected == option.url, onClick = { selected = option.url; custom = "" }) }, modifier = Modifier.clickable { selected = option.url; custom = "" })
+            }
+            OutlinedTextField(value = custom, onValueChange = { custom = it; selected = it }, label = { Text("自定义 DoH 地址") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = onDismiss) { Text("取消") }
+                Button(enabled = selected.startsWith("https://"), onClick = { onSave(selected.trim()) }) { Text("保存") }
+            }
+        }
+    }
+}
+
 private data class MirrorOption(val name: String, val prefix: String)
 private data class MirrorSpeed(val option: MirrorOption, val bytesPerSecond: Long, val code: Int)
 
