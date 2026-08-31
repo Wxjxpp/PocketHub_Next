@@ -452,12 +452,8 @@ private data class MirrorSpeed(val option: MirrorOption, val bytesPerSecond: Lon
 private val builtInMirrors = listOf(
     MirrorOption("gh-proxy.com", "https://gh-proxy.com/"),
     MirrorOption("v6.gh-proxy.org", "https://v6.gh-proxy.org/"),
+    MirrorOption("gh.1s.fan", "https://gh.1s.fan/"),
     MirrorOption("ghproxy.net", "https://ghproxy.net/"),
-    MirrorOption("ghp.ci", "https://ghp.ci/"),
-    MirrorOption("github.akams.cn", "https://github.akams.cn/"),
-    MirrorOption("moeyy.cn/gh-proxy", "https://moeyy.cn/gh-proxy/"),
-    MirrorOption("gitproxy.click", "https://gitproxy.click/"),
-    MirrorOption("gh.jiasu.in", "https://gh.jiasu.in/"),
 )
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
